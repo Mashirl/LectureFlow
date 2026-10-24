@@ -1,0 +1,10 @@
+[
+  {"id": "01JTRM0000000000000000000A", "en": "cache line", "zh": "缓存行", "source": "syllabus", "enabled": true, "freq": 42,
+   "tier": "enforce", "locked": false, "common_word": false, "janitor_note": "", "zh_source": "extractor"},
+  {"id": "01JTRM0000000000000000000B", "en": "CPU", "zh": "", "source": "material", "enabled": true, "freq": 120,
+   "tier": "enforce", "locked": false, "common_word": false, "janitor_note": "", "zh_source": "extractor"},
+  {"id": "01JTRM0000000000000000000C", "en": "write-back", "zh": "写回", "source": "manual", "enabled": false, "freq": 7,
+   "tier": "enforce", "locked": true, "common_word": false, "janitor_note": "", "zh_source": "user"},
+  {"id": "01JTRM0000000000000000000D", "en": "line", "zh": "行", "source": "material", "enabled": true, "freq": 64,
+   "tier": "reference", "locked": false, "common_word": true, "janitor_note": "Common word; technical only in 'cache line'.", "zh_source": "extractor"}
+]

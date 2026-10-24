@@ -1,0 +1,30 @@
+{
+  "id": "01JLEC0000000000000000000A", "course_id": "01JCRS0000000000000000000A", "title": "Week 3 - Caching",
+  "created_at": "2026-10-23T20:00:00Z",
+  "stages": [
+    {"stage": "prep", "status": "done", "progress": 1, "attempt": 0, "error": null, "allowed_actions": ["rerun"],
+     "started_at": "2026-10-23T20:00:01Z", "finished_at": "2026-10-23T20:00:40Z", "duration_ms": 39000,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+    {"stage": "asr", "status": "running", "progress": 0.42, "attempt": 0, "error": null, "allowed_actions": ["cancel"],
+     "note": "首次运行，正在下载模型",
+     "started_at": "2026-10-23T20:00:41Z", "finished_at": null, "duration_ms": null,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+    {"stage": "summary", "status": "pending", "progress": 0, "attempt": 0, "error": null, "allowed_actions": [],
+     "waiting_for": "upstream:asr", "started_at": null, "finished_at": null, "duration_ms": null,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+    {"stage": "repair", "status": "pending", "progress": 0, "attempt": 0, "error": null, "allowed_actions": [],
+     "waiting_for": "upstream:summary", "started_at": null, "finished_at": null, "duration_ms": null,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+    {"stage": "translate", "status": "pending", "progress": 0, "attempt": 0, "error": null, "allowed_actions": [],
+     "waiting_for": "upstream:repair", "started_at": null, "finished_at": null, "duration_ms": null,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+    {"stage": "export", "status": "pending", "progress": 0, "attempt": 0, "error": null, "allowed_actions": [],
+     "waiting_for": "upstream:translate", "started_at": null, "finished_at": null, "duration_ms": null,
+     "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}}
+  ],
+  "counts": {"sentences": 0, "patches_pending": 0, "zh_ok": 0, "zh_qa_failed": 0, "zh_stale": 0},
+  "can_delete": false,
+  "reviewable": true,
+  "exports": [],
+  "usage": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}
+}

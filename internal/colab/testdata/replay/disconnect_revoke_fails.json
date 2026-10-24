@@ -1,0 +1,28 @@
+{
+ "_source": "依据 RFC 7009 撤销端点构造，非真实录制：撤销端点暂时不可用（503），本地凭据仍须删除并报告。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/auth.py#_get_adc_credentials"
+  ]
+ },
+ "recorded": false,
+ "steps": [
+  {
+   "name": "revoke the refresh token (503)",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/revoke",
+    "form": {
+     "token": "1//replay-refresh-token-0123456789"
+    }
+   },
+   "response": {
+    "status": 503,
+    "body": "unavailable"
+   }
+  }
+ ]
+}

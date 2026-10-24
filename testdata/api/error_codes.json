@@ -1,0 +1,1339 @@
+{
+  "api.not_found": {
+    "zh": "没有这个接口：{method} {path}",
+    "params": [
+      "method",
+      "path"
+    ]
+  },
+  "app.cross_site": {
+    "zh": "拒绝了来自其他网站的请求",
+    "params": []
+  },
+  "app.open_logs_failed": {
+    "zh": "无法打开日志文件夹：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "app_settings.close_behavior_invalid": {
+    "zh": "关闭窗口时的行为“{value}”无效（ask、background 或 quit）",
+    "params": [
+      "value"
+    ]
+  },
+  "app_settings.update_channel_invalid": {
+    "zh": "更新渠道“{value}”无效（stable 或 beta）",
+    "params": [
+      "value"
+    ]
+  },
+  "audio.bad_range": {
+    "zh": "start_ms / end_ms 无效",
+    "params": []
+  },
+  "audio.ffmpeg_failed": {
+    "zh": "ffmpeg 截取音频失败",
+    "params": []
+  },
+  "audio.not_ready": {
+    "zh": "音频还没有准备好（预处理完成后才能播放）",
+    "params": []
+  },
+  "audio.past_end": {
+    "zh": "start_ms 超出了音频的长度",
+    "params": []
+  },
+  "auth.bad_host": {
+    "zh": "请求的主机名不被允许",
+    "params": []
+  },
+  "auth.token_required": {
+    "zh": "缺少或错误的访问令牌，请从 LectureFlow 应用中打开这个页面",
+    "params": []
+  },
+  "calendar.after_upload": {
+    "zh": "解析出的日期 {date} 晚于上传时间 {uploaded}",
+    "params": [
+      "date",
+      "uploaded"
+    ]
+  },
+  "calendar.before_term": {
+    "zh": "解析出的日期 {date} 早于开课日期 {term_start} 超过 {days} 天",
+    "params": [
+      "date",
+      "term_start",
+      "days"
+    ]
+  },
+  "calendar.date_invalid": {
+    "zh": "日期不合法：{date}",
+    "params": [
+      "date"
+    ]
+  },
+  "calendar.day_unknown": {
+    "zh": "无法识别日期“{value}”",
+    "params": [
+      "value"
+    ]
+  },
+  "calendar.file_invalid": {
+    "zh": "{filename}：{reason}",
+    "params": [
+      "filename",
+      "reason"
+    ]
+  },
+  "calendar.low_match": {
+    "zh": "只匹配了 {matched} / {total} 个文件名，少于 {percent}%",
+    "params": [
+      "matched",
+      "total",
+      "percent"
+    ]
+  },
+  "calendar.month_unknown": {
+    "zh": "无法识别月份“{value}”",
+    "params": [
+      "value"
+    ]
+  },
+  "calendar.no_match": {
+    "zh": "文件名与规则不匹配",
+    "params": []
+  },
+  "calendar.no_samples": {
+    "zh": "没有可用于校验的文件名",
+    "params": []
+  },
+  "calendar.regex_groups_missing": {
+    "zh": "正则表达式缺少命名分组 {groups}",
+    "params": [
+      "groups"
+    ]
+  },
+  "calendar.regex_invalid": {
+    "zh": "正则表达式无法编译（须为 Go RE2 语法，不支持后行断言和反向引用）：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "calendar.renumber": {
+    "zh": "这会改变 {count} 节讲座的编号，之前导出的引用将与新编号不一致",
+    "params": [
+      "count"
+    ]
+  },
+  "calendar.time_invalid": {
+    "zh": "时间不合法：{time}",
+    "params": [
+      "time"
+    ]
+  },
+  "calendar.time_unknown": {
+    "zh": "无法识别时间“{time}”",
+    "params": [
+      "time"
+    ]
+  },
+  "calendar.year_unknown": {
+    "zh": "无法识别年份“{value}”",
+    "params": [
+      "value"
+    ]
+  },
+  "chapters.invalid_output": {
+    "zh": "模型返回的章节不符合要求（重试一次后仍然失败），可以重新生成",
+    "params": []
+  },
+  "chapters.no_summary": {
+    "zh": "摘要完成后才能生成章节",
+    "params": []
+  },
+  "chapters.not_configured": {
+    "zh": "还没有为“章节”角色选择模型，请先在设置中配置",
+    "params": []
+  },
+  "chapters.not_found": {
+    "zh": "还没有生成章节",
+    "params": []
+  },
+  "chapters.summary_not_ready": {
+    "zh": "摘要完成后才能生成章节",
+    "params": []
+  },
+  "chapters.too_short": {
+    "zh": "讲座太短，无法分出章节",
+    "params": []
+  },
+  "check.api_failed": {
+    "zh": "请求失败：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.api_ok": {
+    "zh": "连通（{ms} ms）",
+    "params": [
+      "ms"
+    ]
+  },
+  "check.api_skipped": {
+    "zh": "未检查",
+    "params": []
+  },
+  "check.api_skipped_deleted": {
+    "zh": "未检查：提供商已删除",
+    "params": []
+  },
+  "check.api_skipped_no_key": {
+    "zh": "未检查：缺少 API key",
+    "params": []
+  },
+  "check.checking": {
+    "zh": "正在检查…",
+    "params": []
+  },
+  "check.crashed": {
+    "zh": "检查时出错：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.cuda_fake": {
+    "zh": "测试模式（asr.fake_result），跳过推理自检",
+    "params": []
+  },
+  "check.dir_not_writable": {
+    "zh": "{path} 不可写：{error}",
+    "params": [
+      "path",
+      "error"
+    ]
+  },
+  "check.dir_writable": {
+    "zh": "{path} 可写",
+    "params": [
+      "path"
+    ]
+  },
+  "check.disk_free": {
+    "zh": "剩余 {free_mb}",
+    "params": [
+      "free_mb"
+    ]
+  },
+  "check.disk_unreadable": {
+    "zh": "无法读取剩余空间：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.gpu_fake": {
+    "zh": "测试模式（asr.fake_result），不使用 GPU",
+    "params": []
+  },
+  "check.gpu_unreadable": {
+    "zh": "无法读取 GPU 显存：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.gpu_vram": {
+    "zh": "总显存 {total} MB，剩余 {free} MB",
+    "params": [
+      "total",
+      "free"
+    ]
+  },
+  "check.hint_api": {
+    "zh": "离线时转写仍可运行；联网后点击“重新检查”。若持续失败请检查 base_url、API key 和模型名",
+    "params": []
+  },
+  "check.hint_cpu": {
+    "zh": "转写设备为 CPU：CPU 转写速度很慢，一节课可能需要数小时（可在设置页的“转写”中修改）",
+    "params": []
+  },
+  "check.hint_data_dir": {
+    "zh": "检查 config.toml 中的 data_dir 和该目录的权限",
+    "params": []
+  },
+  "check.hint_disk_error": {
+    "zh": "剩余空间少于 2 GB，新的上传会被拒绝。请删除不需要的讲座或清理磁盘",
+    "params": []
+  },
+  "check.hint_disk_warn": {
+    "zh": "剩余空间少于 5 GB，建议删除不需要的讲座",
+    "params": []
+  },
+  "check.hint_ffmpeg": {
+    "zh": "安装 ffmpeg 并加入 PATH，或在 config.toml 中设置 ffmpeg 的完整路径",
+    "params": []
+  },
+  "check.hint_key_config": {
+    "zh": "在 config.toml 的 [llm.providers.{provider}] 中设置 api_key_env",
+    "params": [
+      "provider"
+    ]
+  },
+  "check.hint_key_env": {
+    "zh": "设置环境变量 {env} 后重启服务",
+    "params": [
+      "env"
+    ]
+  },
+  "check.hint_key_settings": {
+    "zh": "在设置页的“提供商”中编辑「{provider}」并填写 API key",
+    "params": [
+      "provider"
+    ]
+  },
+  "check.hint_npu_driver": {
+    "zh": "NPU 驱动通过 Windows 更新或电脑厂商的驱动程序安装；本程序不会安装或升级驱动",
+    "params": []
+  },
+  "check.hint_nvidia": {
+    "zh": "确认已安装 NVIDIA 驱动，nvidia-smi 可以运行（也可在 config.toml 中设置 nvidia_smi 的路径）",
+    "params": []
+  },
+  "check.hint_openvino_venv": {
+    "zh": "需要 Intel 核显或 NPU 转写时，按 worker/requirements-openvino.txt 在项目目录建立 .venv-ov，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_pip": {
+    "zh": "在项目的 .venv 中执行 pip install -r worker/requirements.txt",
+    "params": []
+  },
+  "check.hint_python": {
+    "zh": "按 README 在项目目录创建 .venv，或在 config.toml 中设置 python 的路径",
+    "params": []
+  },
+  "check.hint_python_version": {
+    "zh": "需要 Python 3.10 或更新版本",
+    "params": []
+  },
+  "check.hint_role_model_unlisted": {
+    "zh": "在设置页的“角色分配”中换成 {provider} 模型列表里的模型；列表可能过期时，先在“提供商”中重新探测模型",
+    "params": [
+      "provider"
+    ]
+  },
+  "check.hint_selftest": {
+    "zh": "确认 faster-whisper 与 CUDA 库已安装（worker/requirements.txt）；首次运行需要联网下载 tiny 模型",
+    "params": []
+  },
+  "check.import_failed": {
+    "zh": "无法导入 {module}：{error}",
+    "params": [
+      "module",
+      "error"
+    ]
+  },
+  "check.import_ok": {
+    "zh": "可以导入 {module}",
+    "params": [
+      "module"
+    ]
+  },
+  "check.key_env_unset": {
+    "zh": "环境变量 {env} 未设置",
+    "params": [
+      "env"
+    ]
+  },
+  "check.key_from_config": {
+    "zh": "已配置（{key}，来自config.toml）",
+    "params": [
+      "key"
+    ]
+  },
+  "check.key_from_env": {
+    "zh": "已配置（{key}，来自环境变量 {env}）",
+    "params": [
+      "key",
+      "env"
+    ]
+  },
+  "check.key_local_model": {
+    "zh": "本地模型，不需要 API key",
+    "params": []
+  },
+  "check.key_local_service": {
+    "zh": "本机服务，不需要 API key",
+    "params": []
+  },
+  "check.key_missing": {
+    "zh": "没有设置 API key",
+    "params": []
+  },
+  "check.key_not_configured": {
+    "zh": "没有配置 API key",
+    "params": []
+  },
+  "check.key_set": {
+    "zh": "已配置（{key}）",
+    "params": [
+      "key"
+    ]
+  },
+  "check.not_run": {
+    "zh": "尚未运行（点击“重新检查”运行）",
+    "params": []
+  },
+  "check.npu_driver_failed": {
+    "zh": "NPU 驱动不可用：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.npu_driver_ok": {
+    "zh": "NPU 驱动可用（{version}）",
+    "params": [
+      "version"
+    ]
+  },
+  "check.npu_missing": {
+    "zh": "没有检测到 NPU",
+    "params": []
+  },
+  "check.openvino_devices": {
+    "zh": "识别到的设备：{devices}",
+    "params": [
+      "devices"
+    ]
+  },
+  "check.openvino_no_devices": {
+    "zh": "OpenVINO 没有识别到可用的 Intel 设备",
+    "params": []
+  },
+  "check.openvino_venv_missing": {
+    "zh": "没有找到 OpenVINO 环境（{path}）。Intel 核显与 NPU 不可用，不影响 CUDA 转写",
+    "params": [
+      "path"
+    ]
+  },
+  "check.openvino_venv_ok": {
+    "zh": "OpenVINO 环境：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "check.provider_deleted": {
+    "zh": "提供商已删除",
+    "params": []
+  },
+  "check.python_version_unknown": {
+    "zh": "无法识别 Python 版本：{version}",
+    "params": [
+      "version"
+    ]
+  },
+  "check.role_model_unlisted": {
+    "zh": "{roles}使用的 {model} 不在 {provider} 的模型列表里，可能已停用",
+    "params": [
+      "roles",
+      "model",
+      "provider"
+    ]
+  },
+  "check.run_failed": {
+    "zh": "无法运行 {program}：{error}",
+    "params": [
+      "program",
+      "error"
+    ]
+  },
+  "check.scheduler_off": {
+    "zh": "调度器未启动",
+    "params": []
+  },
+  "check.selftest_failed": {
+    "zh": "推理自检失败：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.selftest_ok": {
+    "zh": "自检通过",
+    "params": []
+  },
+  "common.duplicate": {
+    "zh": "名称已存在",
+    "params": []
+  },
+  "common.not_found": {
+    "zh": "找不到请求的对象（可能已被删除），请刷新页面",
+    "params": []
+  },
+  "components.sources_invalid": {
+    "zh": "下载源设置无效（{group}：{field}）",
+    "params": [
+      "group",
+      "field"
+    ]
+  },
+  "course.code_has_space": {
+    "zh": "课程代码不能包含空格（它会出现在引用标记中，例如 CSC1003 W02L1@12:34）",
+    "params": []
+  },
+  "course.code_too_long": {
+    "zh": "课程代码太长（最多 {max} 个字符）",
+    "params": [
+      "max"
+    ]
+  },
+  "course.name_empty": {
+    "zh": "课程名称不能为空",
+    "params": []
+  },
+  "course.name_too_long": {
+    "zh": "课程名称太长（最多 {max} 个字符）",
+    "params": [
+      "max"
+    ]
+  },
+  "course.not_found": {
+    "zh": "找不到这门课程（可能已被删除）",
+    "params": []
+  },
+  "course.numbering_invalid": {
+    "zh": "编号方式“{value}”无效（auto、always 或 never）",
+    "params": [
+      "value"
+    ]
+  },
+  "course.skip_week_invalid": {
+    "zh": "不计入教学周的日期无效：{value}（格式 YYYY-MM-DD）",
+    "params": [
+      "value"
+    ]
+  },
+  "course.term_start_invalid": {
+    "zh": "开课日期无效：{value}（格式 YYYY-MM-DD）",
+    "params": [
+      "value"
+    ]
+  },
+  "data_dir.busy": {
+    "zh": "有 {running} 个任务正在运行、{queued} 个在排队。请等它们结束或取消后再试",
+    "params": [
+      "running",
+      "queued"
+    ]
+  },
+  "data_dir.cancelled": {
+    "zh": "复制已取消，原来的数据没有改动",
+    "params": []
+  },
+  "data_dir.components_failed": {
+    "zh": "复制后无法更新转写组件的位置。原来的数据没有改动，可以重试",
+    "params": []
+  },
+  "data_dir.copy_failed": {
+    "zh": "复制数据时出错（{path}）。原来的数据没有改动，可以稍后重试",
+    "params": [
+      "path"
+    ]
+  },
+  "data_dir.env_override": {
+    "zh": "数据目录由环境变量 LECTUREFLOW_DATA_DIR 指定，不能在这里更改",
+    "params": []
+  },
+  "data_dir.in_progress": {
+    "zh": "正在复制数据，请等它完成",
+    "params": []
+  },
+  "data_dir.location_failed": {
+    "zh": "无法保存新的数据目录位置。原来的数据没有改动，可以重试",
+    "params": []
+  },
+  "data_dir.no_space": {
+    "zh": "空间不足：需要 {need_bytes}，目标磁盘只剩 {free_bytes}",
+    "params": [
+      "need_bytes",
+      "free_bytes"
+    ]
+  },
+  "data_dir.path_invalid": {
+    "zh": "“{path}”不是有效的文件夹路径，请选择一个完整的文件夹路径",
+    "params": [
+      "path"
+    ]
+  },
+  "data_dir.path_too_long": {
+    "zh": "“{data_dir}”的路径太长：转写组件里最深的文件路径会有 {path_len} 个字符，超过 Windows 的上限 {max}。请选一个更短的文件夹（例如 D:\\LectureFlow）",
+    "params": [
+      "data_dir",
+      "path_len",
+      "max"
+    ]
+  },
+  "data_dir.same_dir": {
+    "zh": "这就是现在的数据目录，请选择另一个文件夹",
+    "params": []
+  },
+  "data_dir.source_changed": {
+    "zh": "复制期间数据发生了变化。原来的数据没有改动，请在没有任务运行时重试",
+    "params": []
+  },
+  "data_dir.target_contains_source": {
+    "zh": "新位置不能包含现在的数据目录，请选择别处的文件夹",
+    "params": []
+  },
+  "data_dir.target_inside_source": {
+    "zh": "新位置不能在现在的数据目录里面，请选择别处的文件夹",
+    "params": []
+  },
+  "data_dir.target_not_empty": {
+    "zh": "“{path}”里已经有文件。请选择一个空文件夹，或者新建一个文件夹",
+    "params": [
+      "path"
+    ]
+  },
+  "data_dir.target_not_writable": {
+    "zh": "无法写入“{path}”，请换一个有写入权限的文件夹",
+    "params": [
+      "path"
+    ]
+  },
+  "data_dir.verify_failed": {
+    "zh": "复制后的数据没有通过校验（{what}）。原来的数据没有改动，可以重试",
+    "params": [
+      "what"
+    ]
+  },
+  "data_import.not_fresh": {
+    "zh": "现在的资料库里已经有 {courses} 门课程、{lectures} 节讲座，只能导入到空的资料库",
+    "params": [
+      "courses",
+      "lectures"
+    ]
+  },
+  "data_import.not_lectureflow": {
+    "zh": "“{path}”不是 LectureFlow 的数据目录（里面应当有 lectureflow.db）",
+    "params": [
+      "path"
+    ]
+  },
+  "data_import.same_dir": {
+    "zh": "这就是现在的数据目录（或与它重叠），请选择开发版的 data 文件夹",
+    "params": []
+  },
+  "data_import.too_new": {
+    "zh": "这份数据来自更新的 LectureFlow（数据版本 {version}，本程序支持到 {supported}）。请先更新 LectureFlow",
+    "params": [
+      "version",
+      "supported"
+    ]
+  },
+  "export.bad_name": {
+    "zh": "文件名无效",
+    "params": []
+  },
+  "export.not_found": {
+    "zh": "导出文件不存在（可能正在重新导出），请刷新后再试",
+    "params": []
+  },
+  "filename_rule.invalid": {
+    "zh": "正则表达式无效",
+    "params": []
+  },
+  "filename_rule.invalid_output": {
+    "zh": "模型没有返回可用的文件名规则，可以重试",
+    "params": []
+  },
+  "filename_rule.no_proposal": {
+    "zh": "没有待确认的文件名格式",
+    "params": []
+  },
+  "filename_rule.no_samples": {
+    "zh": "这门课程还没有讲座，无法识别文件名格式",
+    "params": []
+  },
+  "filename_rule.no_undo": {
+    "zh": "没有可以撤销的自动设置",
+    "params": []
+  },
+  "filename_rule.not_configured": {
+    "zh": "还没有为“标题与简介”角色选择模型，无法识别文件名格式，请先在设置中配置",
+    "params": []
+  },
+  "filename_rule.regex_empty": {
+    "zh": "请填写正则表达式",
+    "params": []
+  },
+  "filename_rule.rejected": {
+    "zh": "识别出的规则只匹配了 {matched} / {total} 个文件名，没有采用",
+    "params": [
+      "matched",
+      "total"
+    ]
+  },
+  "glossary.already_undone": {
+    "zh": "这一项已经撤销过了",
+    "params": []
+  },
+  "glossary.bad_run": {
+    "zh": "run 只能是 last，且不能与 version 同时使用",
+    "params": []
+  },
+  "glossary.bad_version": {
+    "zh": "version 必须是术语表版本号（非负整数）",
+    "params": []
+  },
+  "glossary.no_reports": {
+    "zh": "这门课程还没有改动过术语表的整理报告",
+    "params": []
+  },
+  "glossary.no_runs": {
+    "zh": "这门课程还没有整理过术语表",
+    "params": []
+  },
+  "glossary.report_not_found": {
+    "zh": "找不到术语表 v{version} 的整理报告",
+    "params": [
+      "version"
+    ]
+  },
+  "glossary.undo_missing": {
+    "zh": "缺少要撤销的改动（version 与 term_id）",
+    "params": []
+  },
+  "glossary.undo_not_found": {
+    "zh": "找不到要撤销的改动（报告或术语可能已被删除），请刷新",
+    "params": []
+  },
+  "holidays.source_cn": {
+    "zh": "国务院办公厅发布的节假日安排（已收录 {years} 年），只含放假日期（包括放假期间的周末），不含调休上班日；尚未公布的年份没有收录",
+    "params": [
+      "years"
+    ]
+  },
+  "kind.builtin": {
+    "zh": "内置类型不能修改或删除",
+    "params": []
+  },
+  "kind.code_invalid": {
+    "zh": "代码“{code}”无效：须为 1–3 个大写字母",
+    "params": [
+      "code"
+    ]
+  },
+  "kind.code_taken": {
+    "zh": "代码 {code} 已被其他类型使用",
+    "params": [
+      "code"
+    ]
+  },
+  "kind.group_invalid": {
+    "zh": "分组“{group}”无效（session 或 material）",
+    "params": [
+      "group"
+    ]
+  },
+  "kind.in_use": {
+    "zh": "有 {count} 节讲座正在使用这个类型，先把它们改成其他类型，再删除这个类型或修改它的代码与分组",
+    "params": [
+      "count"
+    ]
+  },
+  "kind.name_empty": {
+    "zh": "类型名称不能为空",
+    "params": []
+  },
+  "kind.name_taken": {
+    "zh": "已经有名为“{name}”的类型",
+    "params": [
+      "name"
+    ]
+  },
+  "kind.name_too_long": {
+    "zh": "类型名称太长（最多 {max} 个字符）",
+    "params": [
+      "max"
+    ]
+  },
+  "kind.not_found": {
+    "zh": "找不到这个讲座类型（可能已被删除）",
+    "params": []
+  },
+  "kind.nothing_to_change": {
+    "zh": "没有要修改的内容（name、code、group）",
+    "params": []
+  },
+  "kind.unknown": {
+    "zh": "没有“{kind}”这种讲座类型",
+    "params": [
+      "kind"
+    ]
+  },
+  "lecture.already_launched": {
+    "zh": "这节讲座已经启动",
+    "params": []
+  },
+  "lecture.batch_empty": {
+    "zh": "没有选择讲座（ids 为空）",
+    "params": []
+  },
+  "lecture.batch_too_many": {
+    "zh": "一次最多处理 {max} 节讲座",
+    "params": [
+      "max"
+    ]
+  },
+  "lecture.delete_timeout": {
+    "zh": "讲座的任务没有在 15 秒内停止，未删除，请稍后再试",
+    "params": []
+  },
+  "lecture.draft": {
+    "zh": "这节讲座还是草稿，请先启动",
+    "params": []
+  },
+  "lecture.media_deleted": {
+    "zh": "原始媒体文件已按设置删除（不保留原始媒体），无法重跑预处理",
+    "params": []
+  },
+  "lecture.not_draft": {
+    "zh": "只有草稿可以替换媒体文件；已启动的讲座请删除后重新上传",
+    "params": []
+  },
+  "lecture.not_found": {
+    "zh": "找不到这节讲座（可能已被删除）",
+    "params": []
+  },
+  "lecture.recorded_at_invalid": {
+    "zh": "录制时间无效：{value}（格式 YYYY-MM-DD 或 YYYY-MM-DDTHH:MM）",
+    "params": [
+      "value"
+    ]
+  },
+  "lecture.running": {
+    "zh": "「{title}」有阶段正在运行，不能直接删除；可以先取消，或确认“先取消再删除”",
+    "params": [
+      "title"
+    ]
+  },
+  "lecture.seq_readonly": {
+    "zh": "讲座序号由录制时间自动计算，不能直接修改",
+    "params": []
+  },
+  "lecture.title_empty": {
+    "zh": "标题不能为空",
+    "params": []
+  },
+  "material.bind_invalid": {
+    "zh": "课件的适用范围无效（scope 须为 week、lecture 或 course；lecture 须带 lecture_id）",
+    "params": []
+  },
+  "material.bind_lecture_other_course": {
+    "zh": "要绑定的讲座不属于这门课程",
+    "params": []
+  },
+  "material.bind_missing": {
+    "zh": "缺少适用范围：需要 bind，或 v1 的 lecture_id（整门课通用时传 null）",
+    "params": []
+  },
+  "material.bind_week_invalid": {
+    "zh": "教学周须为 1 到 60 之间的整数",
+    "params": []
+  },
+  "material.busy": {
+    "zh": "这份课件正在处理，不能删除；可以先取消，或等它结束",
+    "params": []
+  },
+  "material.lecture_id_missing": {
+    "zh": "缺少 lecture_id（整门课通用时传 null）",
+    "params": []
+  },
+  "material.lecture_id_type": {
+    "zh": "lecture_id 必须是字符串或 null",
+    "params": []
+  },
+  "material.lecture_not_in_course": {
+    "zh": "要绑定的讲座不属于这门课程",
+    "params": []
+  },
+  "material.not_found": {
+    "zh": "找不到这份课件（可能已被删除）",
+    "params": []
+  },
+  "material.pdf_only": {
+    "zh": "课件只支持 PDF 文件（收到：{filename}）",
+    "params": [
+      "filename"
+    ]
+  },
+  "media.audio_only": {
+    "zh": "这节讲座只有音频，没有视频",
+    "params": []
+  },
+  "media.corrupt": {
+    "zh": "文件不完整或已损坏",
+    "params": []
+  },
+  "media.failed": {
+    "zh": "处理这个文件时出错",
+    "params": []
+  },
+  "media.generating": {
+    "zh": "正在生成播放文件，完成前可以先用音频模式播放",
+    "params": []
+  },
+  "media.no_audio": {
+    "zh": "文件中没有音轨",
+    "params": []
+  },
+  "media.no_h264_encoder": {
+    "zh": "没有可用的 H.264 编码器，视频无法转码，先以音频播放",
+    "params": [
+      "tried"
+    ]
+  },
+  "media.no_space": {
+    "zh": "磁盘空间不足，暂未生成播放文件",
+    "params": []
+  },
+  "media.not_ready": {
+    "zh": "预处理完成后才能播放",
+    "params": []
+  },
+  "media.original_missing": {
+    "zh": "原始媒体文件已不在，无法生成播放文件",
+    "params": []
+  },
+  "media.unsupported": {
+    "zh": "文件格式不支持",
+    "params": []
+  },
+  "model_choice.snapshot_unusable": {
+    "zh": "原模型不可用，请改选“使用当前设置”",
+    "params": []
+  },
+  "needs_model_choice": {
+    "zh": "模型设置已变化，需要选择沿用原模型还是使用当前设置",
+    "params": []
+  },
+  "old_data_dir.delete_failed": {
+    "zh": "删除旧数据目录时出错（{path}），部分文件可能还在",
+    "params": [
+      "path"
+    ]
+  },
+  "old_data_dir.is_current": {
+    "zh": "这是现在正在使用的数据目录，不能删除",
+    "params": []
+  },
+  "old_data_dir.mismatch": {
+    "zh": "只能删除记录的旧数据目录：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "old_data_dir.none": {
+    "zh": "没有记录需要清理的旧数据目录",
+    "params": []
+  },
+  "old_data_dir.not_lectureflow": {
+    "zh": "“{path}”看起来不是 LectureFlow 的数据目录，为安全起见没有删除",
+    "params": [
+      "path"
+    ]
+  },
+  "onboarding.env_key_missing": {
+    "zh": "环境变量 {env} 没有设置，无法读取 {provider_type} 的 API key",
+    "params": [
+      "provider_type",
+      "env"
+    ]
+  },
+  "onboarding_state.invalid": {
+    "zh": "引导状态无效：{field}",
+    "params": [
+      "field"
+    ]
+  },
+  "onboarding_state.too_large": {
+    "zh": "引导状态太大（最多 {max_bytes}）",
+    "params": [
+      "max_bytes"
+    ]
+  },
+  "patch.changed": {
+    "zh": "这条修改的审阅状态已经变化，请刷新后再试",
+    "params": []
+  },
+  "patch.edit_empty": {
+    "zh": "编辑后的文本不能为空",
+    "params": []
+  },
+  "patch.not_found": {
+    "zh": "找不到这条修改（可能已被重新生成），请刷新",
+    "params": []
+  },
+  "patch.unknown_action": {
+    "zh": "未知的审阅操作，只支持 accept、reject、edit、reset",
+    "params": []
+  },
+  "provider.not_found": {
+    "zh": "找不到这个提供商（可能已被删除），请刷新",
+    "params": []
+  },
+  "qa.empty": {
+    "zh": "译文为空",
+    "params": []
+  },
+  "qa.length_ratio": {
+    "zh": "长度比为每个英文词 {ratio} 个字，不在 [{min}, {max}] 范围内",
+    "params": [
+      "ratio",
+      "min",
+      "max",
+      "extra"
+    ]
+  },
+  "qa.mostly_english": {
+    "zh": "译文大部分是英文（拉丁字母占 {percent}%）",
+    "params": [
+      "percent",
+      "extra"
+    ]
+  },
+  "qa.number_missing": {
+    "zh": "原句中的数字 {number} 没有出现在译文中",
+    "params": [
+      "number",
+      "extra"
+    ]
+  },
+  "qa.numbers_missing": {
+    "zh": "原句中的数字 {numbers} 没有出现在译文中",
+    "params": [
+      "numbers",
+      "extra"
+    ]
+  },
+  "qa.term_missing": {
+    "zh": "术语“{term}”必须译为“{zh}”",
+    "params": [
+      "term",
+      "zh",
+      "extra"
+    ]
+  },
+  "request.bad_json": {
+    "zh": "请求格式错误：需要 JSON",
+    "params": []
+  },
+  "request.bad_param": {
+    "zh": "参数 {name} 无效",
+    "params": [
+      "name"
+    ]
+  },
+  "request.invalid": {
+    "zh": "请求内容无效",
+    "params": []
+  },
+  "request.method_not_allowed": {
+    "zh": "只支持 GET",
+    "params": []
+  },
+  "request.nothing_to_change": {
+    "zh": "没有要修改的内容（{fields}）",
+    "params": [
+      "fields"
+    ]
+  },
+  "resume.bad_position": {
+    "zh": "播放位置无效",
+    "params": []
+  },
+  "review.busy": {
+    "zh": "处理中，稍后再审（修复或翻译正在运行）",
+    "params": []
+  },
+  "sentence.bad_idx": {
+    "zh": "句子编号无效",
+    "params": []
+  },
+  "sentence.not_found": {
+    "zh": "找不到这一句（句子可能已经重新生成），请刷新",
+    "params": []
+  },
+  "sentence.text_empty": {
+    "zh": "原文不能为空",
+    "params": []
+  },
+  "sentence.unknown_op": {
+    "zh": "未知的句子操作，只支持 edit、reset、retranslate",
+    "params": []
+  },
+  "server.internal": {
+    "zh": "服务器内部错误",
+    "params": []
+  },
+  "server.unavailable": {
+    "zh": "这项服务没有启动（{service}）",
+    "params": [
+      "service"
+    ]
+  },
+  "settings.message": {
+    "zh": "{text}",
+    "params": [
+      "text"
+    ]
+  },
+  "stage.busy": {
+    "zh": "有阶段正在运行，请等它结束后再试",
+    "params": []
+  },
+  "stage.invalid": {
+    "zh": "未知的阶段或操作（{stage} / {action}）",
+    "params": [
+      "stage",
+      "action"
+    ]
+  },
+  "stage.unknown_action": {
+    "zh": "未知的操作，只支持 cancel、retry、rerun",
+    "params": [
+      "action"
+    ]
+  },
+  "state.conflict": {
+    "zh": "当前状态不允许这个操作（状态可能刚刚变化），请刷新后再试",
+    "params": []
+  },
+  "syllabus.bad_body": {
+    "zh": "请求格式错误：需要 multipart 文件，或带 text 字段的 JSON",
+    "params": []
+  },
+  "syllabus.bad_type": {
+    "zh": "大纲只支持 .txt、.md、.pdf 文件（收到：{filename}）",
+    "params": [
+      "filename"
+    ]
+  },
+  "syllabus.busy": {
+    "zh": "正在从当前大纲提取术语，请等它结束后再替换大纲",
+    "params": []
+  },
+  "syllabus.empty": {
+    "zh": "大纲内容不能为空",
+    "params": []
+  },
+  "syllabus.format_empty": {
+    "zh": "模型没有返回任何内容，请点击“重新生成”",
+    "params": []
+  },
+  "syllabus.format_failed": {
+    "zh": "大纲整理失败",
+    "params": []
+  },
+  "syllabus.no_raw": {
+    "zh": "还没有大纲原文：请先上传文件或粘贴文本",
+    "params": []
+  },
+  "syllabus.no_text": {
+    "zh": "文件中没有可提取的文字（扫描版 PDF 没有文字层），请改传 .txt/.md 或直接粘贴文本",
+    "params": []
+  },
+  "syllabus.pdf_failed": {
+    "zh": "无法从 PDF 中提取文字",
+    "params": []
+  },
+  "system.paused_missing": {
+    "zh": "缺少 paused",
+    "params": []
+  },
+  "tariff.invalid_exclude_holidays": {
+    "zh": "节假日设置只能为空或 CN（收到：{value}）",
+    "params": [
+      "value"
+    ]
+  },
+  "tariff.invalid_holiday_data": {
+    "zh": "节假日数据无效（{year} {date}）",
+    "params": [
+      "year",
+      "date"
+    ]
+  },
+  "tariff.invalid_json": {
+    "zh": "峰谷时段配置不是有效的 JSON",
+    "params": []
+  },
+  "tariff.invalid_model_price": {
+    "zh": "模型 {model} 的价格无效",
+    "params": [
+      "model"
+    ]
+  },
+  "tariff.invalid_offpeak_multiplier": {
+    "zh": "空闲时段倍率必须大于 0 且不超过 1（收到：{value}）",
+    "params": [
+      "value"
+    ]
+  },
+  "tariff.invalid_timezone": {
+    "zh": "时区无效：{timezone}",
+    "params": [
+      "timezone"
+    ]
+  },
+  "tariff.invalid_window": {
+    "zh": "第 {index} 个高峰时段无效（{from}–{to}）",
+    "params": [
+      "index",
+      "from",
+      "to",
+      "days"
+    ]
+  },
+  "term.bad_tier": {
+    "zh": "级别只能是 enforce（强制）或 reference（参考）",
+    "params": []
+  },
+  "term.duplicate": {
+    "zh": "术语“{en}”已经在术语表中",
+    "params": [
+      "en"
+    ]
+  },
+  "term.en_empty": {
+    "zh": "英文术语不能为空",
+    "params": []
+  },
+  "term.lock_only_unlock": {
+    "zh": "只能解锁（locked: false）；修改译法、级别或启用状态时会自动锁定",
+    "params": []
+  },
+  "term.not_found": {
+    "zh": "找不到这个术语（可能已被删除）",
+    "params": []
+  },
+  "term.unlock_with_edit": {
+    "zh": "解锁不能和其他修改一起提交",
+    "params": []
+  },
+  "title.invalid_output": {
+    "zh": "模型返回的标题与简介格式不正确，可以重试",
+    "params": []
+  },
+  "title.no_summary": {
+    "zh": "摘要完成后才能生成标题与简介",
+    "params": []
+  },
+  "title.not_configured": {
+    "zh": "还没有为“标题与简介”角色选择模型，请先在设置中配置",
+    "params": []
+  },
+  "title.summary_not_ready": {
+    "zh": "摘要完成后才能生成标题与简介",
+    "params": []
+  },
+  "title.user_set": {
+    "zh": "标题是你设定的，确认后才会覆盖",
+    "params": []
+  },
+  "update.check_failed": {
+    "zh": "检查更新失败，稍后会自动再试",
+    "params": []
+  },
+  "update.download_failed": {
+    "zh": "下载更新失败，可以重试",
+    "params": []
+  },
+  "update.install_failed": {
+    "zh": "安装更新失败，下次退出时会再试",
+    "params": []
+  },
+  "update.not_available": {
+    "zh": "现在没有可以下载或安装的更新",
+    "params": []
+  },
+  "update.state_invalid": {
+    "zh": "更新状态无效（{field}）",
+    "params": [
+      "field"
+    ]
+  },
+  "upload.copy_failed": {
+    "zh": "复制文件失败：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.field_too_long": {
+    "zh": "字段 {field} 太长",
+    "params": [
+      "field"
+    ]
+  },
+  "upload.interrupted": {
+    "zh": "上传中断",
+    "params": []
+  },
+  "upload.multiple_files": {
+    "zh": "一次只能上传一个文件",
+    "params": []
+  },
+  "upload.no_file": {
+    "zh": "没有收到文件（表单字段应为 file）",
+    "params": []
+  },
+  "upload.no_filename": {
+    "zh": "缺少文件名",
+    "params": []
+  },
+  "upload.no_space": {
+    "zh": "磁盘剩余空间不足：剩余 {free_bytes}，上传后至少要保留 {keep_bytes}。请删除不需要的讲座释放空间后再上传",
+    "params": [
+      "free_bytes",
+      "keep_bytes"
+    ]
+  },
+  "upload.not_multipart": {
+    "zh": "上传格式错误：需要 multipart/form-data",
+    "params": []
+  },
+  "upload.path_in_data_dir": {
+    "zh": "这个文件已经在 LectureFlow 的数据目录里，不能再次添加：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.path_invalid": {
+    "zh": "文件路径无效：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.path_not_file": {
+    "zh": "这不是一个普通文件：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.path_not_found": {
+    "zh": "找不到文件：{path}（可能已被移动或删除）",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.path_unreadable": {
+    "zh": "无法读取文件：{path}（可能没有权限，或正被其他程序占用）",
+    "params": [
+      "path"
+    ]
+  },
+  "upload.too_large": {
+    "zh": "文件超过 {max_bytes} 上限",
+    "params": [
+      "max_bytes"
+    ]
+  }
+}

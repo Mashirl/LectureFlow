@@ -1,0 +1,6 @@
+{
+  "title_en": "Cache Hierarchy, Write-Back and Associativity",
+  "title_zh": "缓存层次结构、写回与组相联",
+  "blurb_en": "How caches locate lines with tags and indexes, and how associativity reduces conflict misses.",
+  "blurb_zh": "缓存如何通过标记与索引定位缓存行，以及相联度如何减少冲突缺失。"
+}

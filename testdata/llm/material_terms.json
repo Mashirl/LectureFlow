@@ -1,0 +1,11 @@
+{
+  "terms": [
+    {"en": "Cache", "zh": "缓存"},
+    {"en": "cache hierarchy", "zh": "缓存层次结构"},
+    {"en": "direct mapped", "zh": "直接映射"},
+    {"en": "miss rate", "zh": "缺失率"},
+    {"en": "conflict miss", "zh": "冲突缺失"},
+    {"en": "write-back", "zh": ""},
+    {"en": "eviction", "zh": "驱逐"}
+  ]
+}

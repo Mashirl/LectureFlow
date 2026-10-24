@@ -1,0 +1,16 @@
+== input
+sentence #5  01:20.000 → 01:30.530
+  text:  Before we start, let me remind you that the coursework is due next Friday, and that late submissions will lose ten percent per day.
+  asr:   (same as text)
+  words: Before[80000-80460] we[80510-80730] start,[80780-81240] let[81290-81570] me[81620-81840] remind[81890-82350] you[82400-82680] that[82730-83070] the[83120-83400] coursework[83450-84150] is[84200-84420] due[84470-84750] next[84800-85140] Friday,[85190-85710] and[86260-86540] that[86590-86930] late[86980-87320] submissions[87370-88130] will[88180-88520] lose[88570-88910] ten[88960-89240] percent[89290-89810] per[89860-90140] day.[90190-90530]
+  zh:    (not translated)
+== cues
+#5  01:20.000 → 01:21.290  (1290 ms, 16 ch)
+  en: Before we start,
+  zh: 
+#5  01:21.290 → 01:26.260  (4970 ms, 57 ch)
+  en: let me remind you that the coursework is due next Friday,
+  zh: 
+#5  01:26.260 → 01:30.530  (4270 ms, 56 ch)
+  en: and that late submissions will lose ten percent per day.
+  zh: 

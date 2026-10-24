@@ -1,0 +1,10 @@
+[BEFORE]
+A write-back cache only writes a line to memory on eviction.
+Each cache line is 64 bytes on most x86 machines.
+So the first question is how we find a line in the cache.
+[TARGET #5]
+We split the address into a tag, an index and an offset.
+[AFTER]
+The index selects a set, and the tag tells us whether we have a hit.
+With a direct mapped cache, every set has exactly one line.
+That gives us conflict misses when two addresses map to the same set.

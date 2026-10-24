@@ -1,0 +1,9 @@
+{
+  "total": 812, "offset": 0,
+  "sentences": [
+    {"idx": 0, "start_ms": 0, "end_ms": 4200, "asr_text": "Okay, let's get started.", "repaired_text": "Okay, let's get started.", "human_text": null, "text": "Okay, let's get started.", "low_conf_words": [], "zh": "好，我们开始吧。", "zh_status": "ok", "qa_error": null, "patch": null},
+    {"idx": 1, "start_ms": 4200, "end_ms": 9100, "asr_text": "Today we talk about the cash hierarchy.", "repaired_text": "Today we talk about the cache hierarchy.", "human_text": null, "text": "Today we talk about the cache hierarchy.", "low_conf_words": [{"i": 5, "w": "cash"}], "zh": "今天我们讲缓存层次结构。", "zh_status": "ok", "qa_error": null, "patch": {"id": "01JPAT0000000000000000000A", "class": "auto", "review": "none", "reason": "homophone: cash -> cache (glossary)"}},
+    {"idx": 2, "start_ms": 9100, "end_ms": 15800, "asr_text": "A right back cache only writes on eviction.", "repaired_text": "A write-back cache only writes on eviction.", "human_text": null, "text": "A write-back cache only writes on eviction.", "low_conf_words": [{"i": 1, "w": "right"}, {"i": 2, "w": "back"}], "zh": "写回缓存只在淘汰时才写入。", "zh_status": "stale", "qa_error": null, "patch": {"id": "01JPAT0000000000000000000B", "class": "decide", "review": "pending", "reason": "right back -> write-back may change meaning"}},
+    {"idx": 3, "start_ms": 15800, "end_ms": 21000, "asr_text": "It has 64 byte lines.", "repaired_text": "It has 64 byte lines.", "human_text": "It has 64-byte lines.", "text": "It has 64-byte lines.", "low_conf_words": [], "zh": "它有字节行。", "zh_status": "qa_failed", "qa_error": "number 64 missing in translation", "patch": null}
+  ]
+}

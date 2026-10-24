@@ -1,0 +1,15 @@
+TRANSCRIPT:
+Okay, let's get started with today's lecture.
+Today we talk about the cash hierarchy in modern processors.
+A right back cache only writes a line to memory on eviction.
+Each cache line is 64 bytes on most x86 machines.
+So the the first question is how we find a line in the cache.
+We split the address into a tag, an index and an offset.
+The index selects a set, and the tag tells us whether we have a hit.
+With a direct mapped cache, every set has exactly one line.
+That gives us conflict misses when two addresses map to the same set.
+A two-way set associative cache halves the number of sets.
+The miss rate drops from 5 percent to about 3 percent.
+Blah lab is something we will see in the lab next week.
+Finally, LRU replacement evicts the least recently used line.
+Any questions before we move on?

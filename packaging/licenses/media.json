@@ -1,0 +1,45 @@
+{
+  "_doc": "Media files shipped with LectureFlow (SPEC-v3 V4.3, V7). Every file under assets/ must be listed here: third-party media under \"media\" (path, title, creator, license, license_basis, at least one http(s) source, sha256 of the file; text files are hashed with CRLF normalised to LF), files written by the LectureFlow contributors under \"own\". Media licenses are judged against the general AGPL-3.0 table plus the media-only table in scripts/licaudit/policy.go (LicenseRef-Public-Domain). A missing source, license or basis, a hash mismatch or an unlisted file fails the audit.",
+  "media": [
+    {
+      "path": "assets/sample/sample-lecture.flac",
+      "title": "The Chemical History of a Candle, Lecture I (excerpt, 65.5 s)",
+      "creator": "Michael Faraday (1791-1867), author; read by Availle (LibriVox volunteer)",
+      "published": "LibriVox recording catalogued 2011-04-16; lectures published 1861",
+      "license": "LicenseRef-Public-Domain",
+      "license_basis": "LibriVox releases all its recordings into the public domain (https://librivox.org/pages/public-domain/); the archive.org item carries the Creative Commons Public Domain Mark 1.0. The text (Faraday died 1867, published 1861) is in the public domain worldwide.",
+      "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "sources": [
+        "https://librivox.org/the-chemical-history-of-a-candle-by-michael-faraday/",
+        "https://archive.org/details/chemical_history_candle_ava_librivox"
+      ],
+      "sha256": "e91ed46b8ac723f4ce520f2f2eaa9b025868adf078dc90c1bde0edcf02659d50",
+      "note": "00:00:29.500-00:01:35.000 of chemicalhistorycandle_1_faraday_64kb.mp3, converted to 16 kHz mono 16-bit FLAC; provenance in assets/sample/SOURCE.md."
+    },
+    {
+      "path": "assets/sample/reference.txt",
+      "title": "The Chemical History of a Candle, Lecture I, first two paragraphs (reference text of the sample)",
+      "creator": "Michael Faraday (1791-1867); text from Project Gutenberg eBook #14474",
+      "published": "1861",
+      "license": "LicenseRef-Public-Domain",
+      "license_basis": "Published 1861, author died 1867: public domain worldwide. Taken verbatim from Project Gutenberg eBook #14474 without the Gutenberg header, footer or trademark.",
+      "sources": [
+        "https://www.gutenberg.org/ebooks/14474"
+      ],
+      "sha256": "ab5f0e6750dbc57afbb8a2b8d2b7ddf90e07dba039fc634e4f2c97149cb76340",
+      "note": "Used as the reference transcript of the bundled sample (word error rate of the self-test)."
+    }
+  ],
+  "own": [
+    {
+      "path": "assets/sample/SOURCE.md",
+      "license": "CC0-1.0",
+      "note": "Provenance notes written by the LectureFlow contributors, dedicated to the public domain (see assets/sample/LICENSE)."
+    },
+    {
+      "path": "assets/sample/LICENSE",
+      "license": "CC0-1.0",
+      "note": "License statement of the directory, written by the LectureFlow contributors (CC0 1.0)."
+    }
+  ]
+}

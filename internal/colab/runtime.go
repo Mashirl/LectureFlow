@@ -1,0 +1,512 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
+
+package colab
+
+// The Jupyter server of an assigned runtime, reached through the runtime
+// proxy URL with the runtime proxy token (never the Google access token):
+//   - Contents API (upstream colab_cli/contents.py ContentsClient): files;
+//     the token goes in the colab-runtime-proxy-token query parameter.
+//   - Kernels API (jupyter-kernel-client 0.9.0 manager.py fetch /
+//     KernelHttpManager): start, list and delete kernels; the token goes in
+//     Authorization and X-Colab-Runtime-Proxy-Token (upstream runtime.py
+//     ColabRuntime.kernel_client).
+//   - Kernel channels over a WebSocket (jupyter-kernel-client wsclient.py,
+//     default Jupyter protocol: JSON text messages) to execute code.
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const (
+	runtimeTimeout = 60 * time.Second
+	// uploadChunk: bytes per Contents API PUT (JupyterLab's chunked
+	// upload protocol: chunk 1, 2, …, -1 for the last).
+	defaultChunkSize = 4 << 20
+	maxDownload      = 256 << 20
+)
+
+// runtimeClient talks to one runtime's Jupyter server.
+type runtimeClient struct {
+	hc    *http.Client
+	base  *url.URL
+	token string
+	agent string
+	dial  Dialer
+}
+
+func (r *runtimeClient) url(path string, q url.Values) string {
+	u := *r.base
+	u.Path = strings.TrimRight(u.Path, "/") + "/" + strings.TrimLeft(path, "/")
+	u.RawPath = ""
+	if q != nil {
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
+}
+
+// request sends one request; status codes are the caller's business except
+// that transport failures become netError.
+func (r *runtimeClient) request(ctx context.Context, method, path string, q url.Values, hdr http.Header, body []byte, timeout time.Duration) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	var rd io.Reader
+	if body != nil {
+		rd = bytes.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, r.url(path, q), rd)
+	if err != nil {
+		return 0, nil, err
+	}
+	for k, vs := range hdr {
+		req.Header[k] = vs
+	}
+	resp, err := r.hc.Do(req)
+	if err != nil {
+		if c := context.Cause(ctx); errors.Is(c, context.Canceled) {
+			return 0, nil, c
+		}
+		return 0, nil, netError{text: fmt.Sprintf("%s %s: %s", method, endpointName(path), netErrText(err))}
+	}
+	defer resp.Body.Close()
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload*2))
+	if err != nil {
+		return 0, nil, netError{text: fmt.Sprintf("%s %s: reading the answer: %s", method, endpointName(path), netErrText(err))}
+	}
+	return resp.StatusCode, b, nil
+}
+
+// endpointName is a path for messages: api/contents or api/kernels, never
+// file names or ids.
+func endpointName(path string) string {
+	p := strings.TrimLeft(path, "/")
+	for _, pre := range []string{"api/contents", "api/kernels"} {
+		if strings.HasPrefix(p, pre) {
+			return pre
+		}
+	}
+	return "runtime"
+}
+
+func runtimeStatusErr(ep string, status int) error {
+	switch {
+	case status == 401 || status == 403:
+		return &httpError{endpoint: ep, status: status}
+	case status == 404 || status == 410:
+		return &httpError{endpoint: ep, status: status}
+	case status == 429 || status >= 500:
+		return &httpError{endpoint: ep, status: status}
+	}
+	return apiChanged(ep, "HTTP "+strconv.Itoa(status))
+}
+
+// ---- kernels ----
+
+func (r *runtimeClient) kernelHeaders() http.Header {
+	return http.Header{
+		"Accept":                      {"application/json"},
+		"Content-Type":                {"application/json"},
+		"Authorization":               {"Bearer " + r.token},
+		"X-Colab-Client-Agent":        {r.agent},
+		"X-Colab-Runtime-Proxy-Token": {r.token},
+	}
+}
+
+// listKernels is GET /api/kernels: the readiness probe while booting.
+func (r *runtimeClient) listKernels(ctx context.Context) ([]string, error) {
+	const ep = "api/kernels"
+	st, b, err := r.request(ctx, http.MethodGet, "/api/kernels", nil, r.kernelHeaders(), nil, runtimeTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if st != http.StatusOK {
+		return nil, runtimeStatusErr(ep, st)
+	}
+	var list []map[string]json.RawMessage
+	if json.Unmarshal(b, &list) != nil {
+		return nil, apiChanged(ep, "answer is not a list of kernels")
+	}
+	ids := make([]string, 0, len(list))
+	for _, m := range list {
+		id, err := (obj{endpoint: ep, m: m}).str("id")
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+// startKernel is POST /api/kernels {"name":"python3","path":null}
+// (jupyter-kernel-client KernelClient.start default name).
+func (r *runtimeClient) startKernel(ctx context.Context) (string, error) {
+	const ep = "api/kernels"
+	st, b, err := r.request(ctx, http.MethodPost, "/api/kernels", nil, r.kernelHeaders(), []byte(`{"name":"python3","path":null}`), runtimeTimeout)
+	if err != nil {
+		return "", err
+	}
+	if st != http.StatusOK && st != http.StatusCreated {
+		return "", runtimeStatusErr(ep, st)
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(b, &m) != nil || m == nil {
+		return "", apiChanged(ep, "answer is not a kernel model")
+	}
+	id, err := (obj{endpoint: ep, m: m}).str("id")
+	if err != nil {
+		return "", err
+	}
+	if id == "" || strings.ContainsAny(id, "/?#") {
+		return "", apiChanged(ep, "bad kernel id")
+	}
+	return id, nil
+}
+
+// deleteKernel is DELETE /api/kernels/{id}; 404/410 count as done.
+func (r *runtimeClient) deleteKernel(ctx context.Context, id string) error {
+	st, _, err := r.request(ctx, http.MethodDelete, "/api/kernels/"+url.PathEscape(id), nil, r.kernelHeaders(), nil, runtimeTimeout)
+	if err != nil {
+		return err
+	}
+	if st == http.StatusNoContent || st == http.StatusOK || st == 404 || st == 410 {
+		return nil
+	}
+	return runtimeStatusErr("api/kernels", st)
+}
+
+// ---- contents ----
+
+func (r *runtimeClient) contentsQuery(extra url.Values) url.Values {
+	q := url.Values{"authuser": {"0"}, "colab-runtime-proxy-token": {r.token}}
+	for k, v := range extra {
+		q[k] = v
+	}
+	return q
+}
+
+func contentsPath(path string) string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	return "/api/contents/" + strings.Join(parts, "/")
+}
+
+var jsonHeader = http.Header{"Content-Type": {"application/json"}}
+
+// mkdir creates a directory (PUT {"type":"directory"}); an existing one is
+// fine.
+func (r *runtimeClient) mkdir(ctx context.Context, path string) error {
+	const ep = "api/contents"
+	body, _ := json.Marshal(map[string]any{"type": "directory"})
+	st, _, err := r.request(ctx, http.MethodPut, contentsPath(path), r.contentsQuery(nil), jsonHeader, body, runtimeTimeout)
+	if err != nil {
+		return err
+	}
+	if st == http.StatusOK || st == http.StatusCreated {
+		return nil
+	}
+	return runtimeStatusErr(ep, st)
+}
+
+// upload writes data to path in chunks (upstream ContentsClient.upload
+// sends the whole file as base64 with "chunk": 1; files larger than one
+// chunk continue with chunk 2, 3, … and -1 for the last, JupyterLab's
+// protocol). progress gets the bytes sent so far.
+func (r *runtimeClient) upload(ctx context.Context, path string, data []byte, chunkSize int, progress func(done, total int64)) error {
+	const ep = "api/contents"
+	if chunkSize <= 0 {
+		chunkSize = defaultChunkSize
+	}
+	name := path[strings.LastIndex(path, "/")+1:]
+	total := int64(len(data))
+	n := max(1, (len(data)+chunkSize-1)/chunkSize)
+	for i := 0; i < n; i++ {
+		part := data[i*chunkSize : min(len(data), (i+1)*chunkSize)]
+		chunk := i + 1
+		if n > 1 && i == n-1 {
+			chunk = -1
+		}
+		body, _ := json.Marshal(map[string]any{
+			"name": name, "path": path, "type": "file", "format": "base64",
+			"content": base64.StdEncoding.EncodeToString(part), "chunk": chunk,
+		})
+		st, _, err := r.request(ctx, http.MethodPut, contentsPath(path), r.contentsQuery(nil), jsonHeader, body, 3*runtimeTimeout)
+		if err != nil {
+			return err
+		}
+		if st != http.StatusOK && st != http.StatusCreated {
+			return runtimeStatusErr(ep, st)
+		}
+		if progress != nil {
+			progress(min(total, int64((i+1)*chunkSize)), total)
+		}
+	}
+	return nil
+}
+
+// download reads a file (GET ?content=1, as upstream ContentsClient.download;
+// format=base64&type=file asks for the exact bytes, a text answer is
+// accepted too).
+func (r *runtimeClient) download(ctx context.Context, path string) ([]byte, error) {
+	const ep = "api/contents"
+	q := r.contentsQuery(url.Values{"content": {"1"}, "format": {"base64"}, "type": {"file"}})
+	st, b, err := r.request(ctx, http.MethodGet, contentsPath(path), q, nil, nil, 3*runtimeTimeout)
+	if err != nil {
+		return nil, err
+	}
+	if st != http.StatusOK {
+		return nil, runtimeStatusErr(ep, st)
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(b, &m) != nil || m == nil {
+		return nil, apiChanged(ep, "answer is not a contents model")
+	}
+	o := obj{endpoint: ep, m: m}
+	typ, err := o.str("type")
+	if err != nil {
+		return nil, err
+	}
+	if typ != "file" {
+		return nil, apiChanged(ep, "not a file")
+	}
+	format, err := o.str("format")
+	if err != nil {
+		return nil, err
+	}
+	content, err := o.str("content")
+	if err != nil {
+		return nil, err
+	}
+	switch format {
+	case "base64":
+		data, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
+		if err != nil {
+			return nil, apiChanged(ep, "content is not base64")
+		}
+		return data, nil
+	case "text":
+		return []byte(content), nil
+	}
+	return nil, apiChanged(ep, "unknown format "+safeToken(format))
+}
+
+// remove deletes a file or an empty directory; a missing one is fine.
+func (r *runtimeClient) remove(ctx context.Context, path string) error {
+	st, _, err := r.request(ctx, http.MethodDelete, contentsPath(path), r.contentsQuery(nil), nil, nil, runtimeTimeout)
+	if err != nil {
+		return err
+	}
+	if st == http.StatusNoContent || st == http.StatusOK || st == 404 {
+		return nil
+	}
+	return runtimeStatusErr("api/contents", st)
+}
+
+// ---- kernel channels ----
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func newUUID() string {
+	h := randomHex(16)
+	return h[0:8] + "-" + h[8:12] + "-4" + h[13:16] + "-a" + h[17:20] + "-" + h[20:32]
+}
+
+// kernelMsg is a Jupyter message in the default WebSocket protocol.
+type kernelMsg struct {
+	Header       map[string]any  `json:"header"`
+	ParentHeader map[string]any  `json:"parent_header"`
+	Metadata     map[string]any  `json:"metadata"`
+	Content      json.RawMessage `json:"content"`
+	Channel      string          `json:"channel"`
+	Buffers      []any           `json:"buffers"`
+}
+
+func (m kernelMsg) msgType() string {
+	s, _ := m.Header["msg_type"].(string)
+	return s
+}
+
+func (m kernelMsg) parentID() string {
+	s, _ := m.ParentHeader["msg_id"].(string)
+	return s
+}
+
+// decodeKernelMsg reads a text message (JSON) or a binary one (default
+// protocol with buffers: big-endian count and offsets, the JSON first).
+func decodeKernelMsg(binaryMsg bool, data []byte) (kernelMsg, error) {
+	var m kernelMsg
+	if binaryMsg {
+		if len(data) < 12 {
+			return m, errors.New("short binary message")
+		}
+		n := int(binary.BigEndian.Uint32(data[:4]))
+		if n < 2 || len(data) < 4*(n+1) {
+			return m, errors.New("bad binary message")
+		}
+		start, stop := int(binary.BigEndian.Uint32(data[4:8])), int(binary.BigEndian.Uint32(data[8:12]))
+		if start < 0 || start > stop || stop > len(data) {
+			return m, errors.New("bad binary offsets")
+		}
+		data = data[start:stop]
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return m, err
+	}
+	return m, nil
+}
+
+// execOutcome is the end of one execute_request.
+type execOutcome struct {
+	Status string // execute_reply status: ok, error, aborted
+	EName  string // the error's exception name (identifier only), "" when none
+	Stderr int    // bytes of stderr the kernel streamed (discarded unread)
+}
+
+// kernelExec runs code in kernel kid and passes every stdout stream chunk
+// to onStdout. It returns when the execute_reply and the idle status for
+// the request have arrived. A connection that breaks is reopened with the
+// same session id up to three times (the Jupyter server replays what it
+// buffered for the session). Outputs other than stdout and stderr streams
+// (display data, execute results) are CodeContractViolation: the cell
+// LectureFlow runs prints only through the worker's stdout.
+func (r *runtimeClient) kernelExec(ctx context.Context, kid, code string, onStdout func(string) error, sleep func(context.Context, time.Duration) error) (execOutcome, error) {
+	session := newUUID()
+	dialOnce := func() (MessageConn, error) {
+		q := url.Values{"session_id": {session}, "token": {r.token}}
+		u := r.url("/api/kernels/"+url.PathEscape(kid)+"/channels", q)
+		u = "ws" + strings.TrimPrefix(u, "http")
+		return r.dial(ctx, u, http.Header{
+			"X-Colab-Client-Agent":        {r.agent},
+			"X-Colab-Runtime-Proxy-Token": {r.token},
+		})
+	}
+	conn, err := dialOnce()
+	if err != nil {
+		return execOutcome{}, err
+	}
+	defer func() { conn.Close() }()
+	msgID := newUUID()
+	content, _ := json.Marshal(map[string]any{
+		"code": code, "silent": false, "store_history": false, "user_expressions": map[string]any{},
+		"allow_stdin": false, "stop_on_error": true,
+	})
+	req, _ := json.Marshal(kernelMsg{
+		Header: map[string]any{
+			"msg_id": msgID, "username": "lectureflow", "session": session, "msg_type": "execute_request",
+			"version": "5.3", "date": time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
+		},
+		ParentHeader: map[string]any{}, Metadata: map[string]any{}, Content: content, Channel: "shell", Buffers: []any{},
+	})
+	if err := conn.WriteText(ctx, req); err != nil {
+		if ctx.Err() != nil {
+			return execOutcome{}, ctx.Err()
+		}
+		return execOutcome{}, netError{text: "kernel channels: sending the request: " + netErrText(err)}
+	}
+	var out execOutcome
+	gotReply, gotIdle := false, false
+	redials := 0
+	for !(gotReply && gotIdle) {
+		bin, data, err := conn.ReadMessage(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return out, ctx.Err()
+			}
+			if redials >= 3 {
+				return out, fallbackErr(CodeConnectionLost, nil, fmt.Errorf("kernel channels: %s", netErrText(err)))
+			}
+			redials++
+			conn.Close()
+			if err := sleep(ctx, time.Duration(1<<redials)*time.Second); err != nil {
+				return out, err
+			}
+			if conn, err = dialOnce(); err != nil {
+				if ctx.Err() != nil {
+					return out, ctx.Err()
+				}
+				if redials >= 3 {
+					return out, fallbackErr(CodeConnectionLost, nil, fmt.Errorf("kernel channels: %s", netErrText(err)))
+				}
+				conn = closedConn{}
+			}
+			continue
+		}
+		m, err := decodeKernelMsg(bin, data)
+		if err != nil {
+			return out, apiChanged("api/kernels/channels", "message is not a Jupyter message")
+		}
+		if m.parentID() != msgID {
+			continue
+		}
+		var c map[string]json.RawMessage
+		_ = json.Unmarshal(m.Content, &c)
+		co := obj{endpoint: "api/kernels/channels", m: c}
+		switch m.Channel {
+		case "iopub":
+			switch m.msgType() {
+			case "status":
+				if st, _ := co.str("execution_state"); st == "idle" {
+					gotIdle = true
+				}
+			case "stream":
+				name, err1 := co.str("name")
+				text, err2 := co.str("text")
+				if err1 != nil || err2 != nil {
+					return out, apiChanged("api/kernels/channels", "stream message without name or text")
+				}
+				if name == "stdout" {
+					if err := onStdout(text); err != nil {
+						return out, err
+					}
+				} else {
+					out.Stderr += len(text)
+				}
+			case "error":
+				if en, _ := co.str("ename"); excNameRe.MatchString(en) {
+					out.EName = en
+				} else {
+					out.EName = "?"
+				}
+			case "display_data", "execute_result", "update_display_data":
+				return out, violation("rich output from the cell")
+			}
+		case "shell":
+			if m.msgType() == "execute_reply" {
+				st, err := co.str("status")
+				if err != nil {
+					return out, err
+				}
+				out.Status = st
+				gotReply = true
+			}
+		}
+	}
+	return out, nil
+}
+
+// closedConn stands in after a failed redial: its next read fails at once,
+// so the loop tries again (or gives up).
+type closedConn struct{}
+
+func (closedConn) ReadMessage(context.Context) (bool, []byte, error) { return false, nil, errWSClosed }
+func (closedConn) WriteText(context.Context, []byte) error           { return errWSClosed }
+func (closedConn) Close() error                                      { return nil }

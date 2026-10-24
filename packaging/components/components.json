@@ -1,0 +1,2175 @@
+{
+  "schema": 1,
+  "serial": 1,
+  "published": "2026-10-24",
+  "app_version": "3.0.0",
+  "compat": ">=3.0.0 <4.0.0",
+  "sources": {
+    "files": {
+      "primary": "files",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.releases",
+        "values": {
+          "files": ""
+        }
+      }
+    },
+    "models": {
+      "primary": "models",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.huggingface",
+        "url": "https://huggingface.co/",
+        "values": {
+          "models": "https://huggingface.co"
+        }
+      },
+      "mirrors": [
+        {
+          "id": "hf-mirror",
+          "name_key": "compui.source.name.hf_mirror",
+          "url": "https://hf-mirror.com/",
+          "region": "cn",
+          "values": {
+            "models": "https://hf-mirror.com"
+          }
+        }
+      ]
+    },
+    "pypi": {
+      "primary": "pypi",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.pypi",
+        "url": "https://pypi.org/",
+        "values": {
+          "pypi": "https://pypi.org/simple",
+          "python": "https://github.com/astral-sh/python-build-standalone/releases/download"
+        }
+      },
+      "mirrors": [
+        {
+          "id": "tuna",
+          "name_key": "compui.source.name.tuna",
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/help/pypi/",
+          "region": "cn",
+          "values": {
+            "pypi": "https://pypi.tuna.tsinghua.edu.cn/simple",
+            "python": "https://registry.npmmirror.com/-/binary/python-build-standalone"
+          }
+        },
+        {
+          "id": "aliyun",
+          "name_key": "compui.source.name.aliyun",
+          "url": "https://developer.aliyun.com/mirror/pypi",
+          "region": "cn",
+          "values": {
+            "pypi": "https://mirrors.aliyun.com/pypi/simple",
+            "python": "https://registry.npmmirror.com/-/binary/python-build-standalone"
+          }
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "id": "core",
+      "version": "3.0.0",
+      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1",
+      "kind": "binary",
+      "bundled": true,
+      "name_key": "compui.name.core",
+      "desc_key": "compui.hint.core",
+      "license": "AGPL-3.0-or-later",
+      "license_note": "Third-party parts: THIRD_PARTY_NOTICES.md",
+      "platforms": {}
+    },
+    {
+      "id": "python",
+      "version": "1.0.0",
+      "upstream": "CPython 3.12.15 (python-build-standalone 20261013); pypdf 6.21.2, cryptography 50.0.2",
+      "kind": "python-runtime",
+      "name_key": "compui.name.python",
+      "desc_key": "compui.hint.python",
+      "license": "PSF-2.0",
+      "license_note": "python-build-standalone build scripts: BSD-3-Clause; the libraries bundled in the runtime keep their own licenses (LICENSE files inside the runtime). Base packages: pypdf BSD-3-Clause, cryptography Apache-2.0 OR BSD-3-Clause, cffi MIT-0, pycparser BSD-3-Clause.",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261013",
+      "check_imports": [
+        "pypdf",
+        "cryptography"
+      ],
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 29622607,
+          "installed_size": 113920439,
+          "installed_size_estimated": true,
+          "files": [
+            {
+              "name": "cpython-3.12.15+20261013-aarch64-apple-darwin-install_only_stripped.tar.gz",
+              "url": "{python}/20261013/cpython-3.12.15%2B20261013-aarch64-apple-darwin-install_only_stripped.tar.gz",
+              "sha256": "9866e11cf2ae9caa1e671383786f248859a52dd8bfb702fb4c0dc2c65f1d36de",
+              "size": 25052618,
+              "unpack": "tar.gz"
+            }
+          ],
+          "exe": "python/bin/python3",
+          "lock": {
+            "path": "locks/python-darwin-arm64.txt",
+            "sha256": "178256d6c8a3338b944f1b921f29cd4de6ff64ef189cc1755eafbc941e4318c1",
+            "packages": 4
+          },
+          "min_os": "13.0"
+        },
+        "windows-x64": {
+          "download_size": 26500587,
+          "installed_size": 80282374,
+          "installed_size_estimated": true,
+          "files": [
+            {
+              "name": "cpython-3.12.15+20261013-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+              "url": "{python}/20261013/cpython-3.12.15%2B20261013-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+              "sha256": "7a2aef48e5ee569e310b29b32681debbc5d888e92790d85331a47736c6b06aad",
+              "size": 22019610,
+              "unpack": "tar.gz"
+            }
+          ],
+          "exe": "python/python.exe",
+          "lock": {
+            "path": "locks/python-windows-x64.txt",
+            "sha256": "178256d6c8a3338b944f1b921f29cd4de6ff64ef189cc1755eafbc941e4318c1",
+            "packages": 4
+          },
+          "max_path": 113
+        }
+      }
+    },
+    {
+      "id": "asr-cuda",
+      "version": "1.0.0",
+      "upstream": "faster-whisper 1.2.1, CTranslate2 4.8.3, PyAV 15.1.0, NVIDIA cuBLAS 12.9 and cuDNN 9.27 runtime libraries",
+      "kind": "venv",
+      "name_key": "compui.name.asr_cuda",
+      "desc_key": "compui.hint.asr_cuda",
+      "depends": [
+        "python"
+      ],
+      "backend": "faster-whisper",
+      "license": "MIT",
+      "license_note": "faster-whisper and CTranslate2: MIT; onnxruntime: MIT; PyAV: BSD-3-Clause. nvidia-cublas-cu12, nvidia-cudnn-cu12 and nvidia-cuda-nvrtc-cu12 are NVIDIA proprietary runtime libraries (LicenseRef-NVIDIA-Proprietary) that uv downloads from PyPI on the user's computer; they are not part of the installer.",
+      "source": "https://github.com/SYSTRAN/faster-whisper",
+      "check_imports": [
+        "faster_whisper",
+        "ctranslate2",
+        "av"
+      ],
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1461190705,
+          "installed_size": 2410964664,
+          "installed_size_estimated": true,
+          "lock": {
+            "path": "locks/asr-cuda-windows-x64.txt",
+            "sha256": "53ebbe0671b5c31f16b93f74cc6e9d5166bf76cc2501ea012ae6004a20be2f17",
+            "packages": 27
+          },
+          "max_path": 123
+        }
+      }
+    },
+    {
+      "id": "asr-openvino",
+      "version": "1.0.0",
+      "upstream": "OpenVINO 2026.4.1, OpenVINO GenAI 2026.4.1.0, OpenVINO Tokenizers 2026.4.1.0",
+      "kind": "venv",
+      "name_key": "compui.name.asr_openvino",
+      "desc_key": "compui.hint.asr_openvino",
+      "depends": [
+        "python"
+      ],
+      "backend": "openvino",
+      "license": "Apache-2.0",
+      "license_note": "Runtime only: models come converted as model:openvino:* components, so the conversion packages (optimum-intel, torch, nncf) are not installed.",
+      "source": "https://github.com/openvinotoolkit/openvino.genai",
+      "check_imports": [
+        "openvino",
+        "openvino_genai",
+        "openvino_tokenizers"
+      ],
+      "platforms": {
+        "windows-x64": {
+          "download_size": 102759934,
+          "installed_size": 318555796,
+          "installed_size_estimated": true,
+          "lock": {
+            "path": "locks/asr-openvino-windows-x64.txt",
+            "sha256": "3afe7948f242c5c638d0654e1e3d281ca7381f6c751cc4a469b101928ef8e63d",
+            "packages": 5
+          },
+          "max_path": 105
+        }
+      }
+    },
+    {
+      "id": "asr-mlx",
+      "version": "1.0.0",
+      "upstream": "mlx-whisper 0.4.3, MLX 0.29.3",
+      "kind": "venv",
+      "name_key": "compui.name.asr_mlx",
+      "desc_key": "compui.hint.asr_mlx",
+      "depends": [
+        "python"
+      ],
+      "backend": "mlx",
+      "license": "MIT",
+      "license_note": "mlx-whisper: MIT (ml-explore/mlx-examples LICENSE); MLX: MIT (ml-explore/mlx LICENSE). Not verified on a Mac (SPEC-v3 appendix F).",
+      "source": "https://github.com/ml-explore/mlx-examples/tree/main/whisper",
+      "check_imports": [
+        "mlx_whisper",
+        "mlx.core"
+      ],
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 221212593,
+          "installed_size": 663637779,
+          "installed_size_estimated": true,
+          "lock": {
+            "path": "locks/asr-mlx-darwin-arm64.txt",
+            "sha256": "be859cc02881d46ae0e78280127169a7650134dc9629dbe07ef00e4568d934f9",
+            "packages": 36
+          }
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v3:float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3 (Systran/faster-whisper-large-v3@edaa852ec7e1)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v3",
+      "precision": "float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3 (MIT). The same files serve every compute type.",
+      "source": "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 3090835702,
+          "installed_size": 3090835702,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
+              "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+              "size": 2394
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
+              "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+              "size": 3087284237
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
+              "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+              "size": 2480617
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v3:int8_float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3 (Systran/faster-whisper-large-v3@edaa852ec7e1)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v3",
+      "precision": "int8_float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3 (MIT). The same files serve every compute type.",
+      "source": "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 3090835702,
+          "installed_size": 3090835702,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
+              "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+              "size": 2394
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
+              "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+              "size": 3087284237
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
+              "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+              "size": 2480617
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v3-turbo:float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3-turbo (dropbox-dash/faster-whisper-large-v3-turbo@0a363e9161cb)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v3-turbo",
+      "precision": "float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3-turbo (MIT); the repository faster-whisper 1.2.1 maps large-v3-turbo to (formerly mobiuslabsgmbh/faster-whisper-large-v3-turbo).",
+      "source": "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1621665983,
+          "installed_size": 1621665983,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json",
+              "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+              "size": 2263
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin",
+              "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+              "size": 1617884929
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json",
+              "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+              "size": 2710337
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v3-turbo:int8_float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3-turbo (dropbox-dash/faster-whisper-large-v3-turbo@0a363e9161cb)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v3-turbo",
+      "precision": "int8_float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3-turbo (MIT); the repository faster-whisper 1.2.1 maps large-v3-turbo to (formerly mobiuslabsgmbh/faster-whisper-large-v3-turbo).",
+      "source": "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1621665983,
+          "installed_size": 1621665983,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json",
+              "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+              "size": 2263
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin",
+              "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+              "size": 1617884929
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json",
+              "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+              "size": 2710337
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v2:float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v2 (Systran/faster-whisper-large-v2@f0fe81560cb8)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v2",
+      "precision": "float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v2 (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-large-v2/tree/f0fe81560cb8b68660e564f55dd99207059c092e",
+      "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 3089578858,
+          "installed_size": 3089578858,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/config.json",
+              "sha256": "d86b7a7664a12559d644aa210a32ce9a7e03913e794b7ea4fb7182de69e273a7",
+              "size": 2796
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/model.bin",
+              "sha256": "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a",
+              "size": 3086912962
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:large-v2:int8_float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v2 (Systran/faster-whisper-large-v2@f0fe81560cb8)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "large-v2",
+      "precision": "int8_float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v2 (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-large-v2/tree/f0fe81560cb8b68660e564f55dd99207059c092e",
+      "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 3089578858,
+          "installed_size": 3089578858,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/config.json",
+              "sha256": "d86b7a7664a12559d644aa210a32ce9a7e03913e794b7ea4fb7182de69e273a7",
+              "size": 2796
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/model.bin",
+              "sha256": "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a",
+              "size": 3086912962
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:medium:float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-medium (Systran/faster-whisper-medium@08e178d48790)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "medium",
+      "precision": "float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-medium (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1530571735,
+          "installed_size": 1530571735,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json",
+              "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807",
+              "size": 2257
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/model.bin",
+              "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+              "size": 1527906378
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:medium:int8_float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-medium (Systran/faster-whisper-medium@08e178d48790)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "medium",
+      "precision": "int8_float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-medium (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1530571735,
+          "installed_size": 1530571735,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json",
+              "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807",
+              "size": 2257
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/model.bin",
+              "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+              "size": 1527906378
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:small:float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-small (Systran/faster-whisper-small@536b0662742c)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "small",
+      "precision": "float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-small (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 486212372,
+          "installed_size": 486212372,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/config.json",
+              "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+              "size": 2370
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/model.bin",
+              "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+              "size": 483546902
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:faster-whisper:small:int8_float16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-small (Systran/faster-whisper-small@536b0662742c)",
+      "kind": "model",
+      "depends": [
+        "asr-cuda"
+      ],
+      "backend": "faster-whisper",
+      "model": "small",
+      "precision": "int8_float16",
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-small (MIT).",
+      "source": "https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 486212372,
+          "installed_size": 486212372,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/config.json",
+              "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+              "size": 2370
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/model.bin",
+              "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+              "size": 483546902
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:large-v3-turbo:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3-turbo (OpenVINO/whisper-large-v3-turbo-fp16-ov@0250c28d68c7)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "large-v3-turbo",
+      "precision": "fp16",
+      "license": "MIT",
+      "license_note": "OpenVINO conversion of openai/whisper-large-v3-turbo (MIT) published by the OpenVINO organisation.",
+      "source": "https://huggingface.co/OpenVINO/whisper-large-v3-turbo-fp16-ov/tree/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8",
+      "revision": "0250c28d68c7c10d6b5cb39707e876c0c66ab6f8",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1627649856,
+          "installed_size": 1627649856,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/added_tokens.json",
+              "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+              "size": 34648
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/config.json",
+              "sha256": "bfd92c097547ab12cb42abae8008be5a59a91fdc5ab39acce24489eb8a3e8a86",
+              "size": 1192
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/generation_config.json",
+              "sha256": "4617fcca458af3b91a103143aaac919c1ab6680b552d7abd10811b7248bd77b4",
+              "size": 3767
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_decoder_model.bin",
+              "sha256": "58fbe879d2e028fc7792036ba660fde0e6c8dd85b71d596cd1a144672a807b73",
+              "size": 343818396
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_decoder_model.xml",
+              "sha256": "926f88e8439e6850264ff14cb57f2737a0d87a8c5b7211870f985a78c69d68f4",
+              "size": 344388
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_detokenizer.bin",
+              "sha256": "f2b3c47825a1089525ff65c0c8e49271e1dee69a401a04fc827ac2de5b7766e4",
+              "size": 736198
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_detokenizer.xml",
+              "sha256": "cd4c080beed5a2db5b96aa7a50cf98b9e13695f99ffabeb57962893d9459fcc4",
+              "size": 9779
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_encoder_model.bin",
+              "sha256": "d36aff56fa2215fd93ffe4e4eb17be8a97fbad16f97f6c96126d79161b5e9b83",
+              "size": 1273938026
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_encoder_model.xml",
+              "sha256": "7bd76d5bd60795243ef4aa06b111ea58936d2df59885022b72415d6038d36e28",
+              "size": 1239274
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_tokenizer.bin",
+              "sha256": "adfa3d9a2920d0f314121270a960ab331ec0f05838544bb8ecaaa422282a6fd4",
+              "size": 1898973
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/openvino_tokenizer.xml",
+              "sha256": "79b781222585b8e45dc88791204c9b4bef84cfbce71c96ad505fc3870bd148b7",
+              "size": 27091
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/preprocessor_config.json",
+              "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499",
+              "size": 357
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/special_tokens_map.json",
+              "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+              "size": 2186
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/tokenizer.json",
+              "sha256": "5c1bf30c9e716e1477bedef846b01be0013daecb89e9e3ef7ab89b23c178df1b",
+              "size": 3930645
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/tokenizer_config.json",
+              "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6",
+              "size": 282873
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-fp16-ov/resolve/0250c28d68c7c10d6b5cb39707e876c0c66ab6f8/vocab.json",
+              "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971",
+              "size": 835528
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:large-v3-turbo:int8",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3-turbo (OpenVINO/whisper-large-v3-turbo-int8-ov@b568445dd5dc)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "large-v3-turbo",
+      "precision": "int8",
+      "license": "MIT",
+      "license_note": "OpenVINO INT8 weight-compressed conversion of openai/whisper-large-v3-turbo (MIT) published by the OpenVINO organisation.",
+      "source": "https://huggingface.co/OpenVINO/whisper-large-v3-turbo-int8-ov/tree/b568445dd5dc8c695bde596f8acbb4694fd6ba64",
+      "revision": "b568445dd5dc8c695bde596f8acbb4694fd6ba64",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 828087998,
+          "installed_size": 828087998,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/added_tokens.json",
+              "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+              "size": 34648
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/config.json",
+              "sha256": "bfd92c097547ab12cb42abae8008be5a59a91fdc5ab39acce24489eb8a3e8a86",
+              "size": 1192
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/generation_config.json",
+              "sha256": "4617fcca458af3b91a103143aaac919c1ab6680b552d7abd10811b7248bd77b4",
+              "size": 3767
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_config.json",
+              "sha256": "9da38e88cec069ad54699d627f1c59d36c36a3dfb54b5e1bb5cfdf5832efaf03",
+              "size": 622
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_decoder_model.bin",
+              "sha256": "c064991cbafc4381567d29972b7013dc24026de9c326d03eb1e6e4fc44aa959f",
+              "size": 172534710
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_decoder_model.xml",
+              "sha256": "aeb09fafbf1c0cbf84baf30f46763436005822faf3b365359b8de0aa04f03047",
+              "size": 391642
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_detokenizer.bin",
+              "sha256": "f2b3c47825a1089525ff65c0c8e49271e1dee69a401a04fc827ac2de5b7766e4",
+              "size": 736198
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_detokenizer.xml",
+              "sha256": "6e106a14f14b0771b46b7948a99b1d819ff93b2455b7da8f47761ab9dba9dc56",
+              "size": 9779
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_encoder_model.bin",
+              "sha256": "0590a8f35f96d57801c55990028d917821ac721026e34b7f3f59d7561fc908e6",
+              "size": 645332592
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_encoder_model.xml",
+              "sha256": "60713d4ed3a8ac8ee020e11c4737ec276d14cabc6a082537bddf2c00ba6ce070",
+              "size": 1518660
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_tokenizer.bin",
+              "sha256": "adfa3d9a2920d0f314121270a960ab331ec0f05838544bb8ecaaa422282a6fd4",
+              "size": 1898973
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/openvino_tokenizer.xml",
+              "sha256": "cba304e7bad54773b9d2cbccfbc8501117ecf2e3c0f4f5331742a0a3c9feed93",
+              "size": 27091
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/preprocessor_config.json",
+              "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499",
+              "size": 357
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/special_tokens_map.json",
+              "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+              "size": 2186
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/tokenizer.json",
+              "sha256": "5c1bf30c9e716e1477bedef846b01be0013daecb89e9e3ef7ab89b23c178df1b",
+              "size": 3930645
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/tokenizer_config.json",
+              "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6",
+              "size": 282873
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-turbo-int8-ov/resolve/b568445dd5dc8c695bde596f8acbb4694fd6ba64/vocab.json",
+              "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971",
+              "size": 835528
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:large-v3:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3 (OpenVINO/whisper-large-v3-fp16-ov@220761e60602)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "large-v3",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-large-v3 (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-large-v3-fp16-ov/tree/220761e60602a5ca694c409d5f424563b75d6820",
+      "revision": "220761e60602a5ca694c409d5f424563b75d6820",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 3099045325,
+          "installed_size": 3099045325,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/added_tokens.json",
+              "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+              "size": 34648
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/config.json",
+              "sha256": "2efba1fd9d65450929e2d917a32cf9dec2fd5682d29baa6ff48d31d3a61fb501",
+              "size": 1195
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/generation_config.json",
+              "sha256": "041bb1619064440f4cb37a53326f5394de3df380f52ca1e2bfae599535414a7b",
+              "size": 3898
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_decoder_model.bin",
+              "sha256": "13542f8948ac82e3ffa1bacb54e38de784f35383bb2cda495ddd53e9f864577e",
+              "size": 1813043356
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_decoder_model.xml",
+              "sha256": "301f769e85b11f28f0b742c4a2ad92ba59ab6267df6b8ebfc5a29ffa8ce49055",
+              "size": 2514921
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_detokenizer.bin",
+              "sha256": "f2b3c47825a1089525ff65c0c8e49271e1dee69a401a04fc827ac2de5b7766e4",
+              "size": 736198
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_detokenizer.xml",
+              "sha256": "55ba846c7ab78518b1e8f21923ef0c42fc78e86a0a5bd0b3f488a2e29a236775",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_encoder_model.bin",
+              "sha256": "76de5b22435747d7f0d7f74b003acd23ab5c10b7e1198d36373cdf0f6975b630",
+              "size": 1273938026
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_encoder_model.xml",
+              "sha256": "d913c09a5c5c1f86e6b5dced2a44df0b69b9aacf8218451d9100ee4fa12dec3d",
+              "size": 1239276
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_tokenizer.bin",
+              "sha256": "adfa3d9a2920d0f314121270a960ab331ec0f05838544bb8ecaaa422282a6fd4",
+              "size": 1898973
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/openvino_tokenizer.xml",
+              "sha256": "11ae95e07936a776ef7e547160acdce17e1b05d6b9e4da623f253120903272d6",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/preprocessor_config.json",
+              "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499",
+              "size": 357
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/special_tokens_map.json",
+              "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+              "size": 2186
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/tokenizer.json",
+              "sha256": "5c1bf30c9e716e1477bedef846b01be0013daecb89e9e3ef7ab89b23c178df1b",
+              "size": 3930645
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/tokenizer_config.json",
+              "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6",
+              "size": 282873
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-fp16-ov/resolve/220761e60602a5ca694c409d5f424563b75d6820/vocab.json",
+              "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971",
+              "size": 835528
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:large-v3:int8",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3 (OpenVINO/whisper-large-v3-int8-ov@e197310d1fe6)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "large-v3",
+      "precision": "int8",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-large-v3 (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-large-v3-int8-ov/tree/e197310d1fe6d5b40d0ce84c2614a547de21cb62",
+      "revision": "e197310d1fe6d5b40d0ce84c2614a547de21cb62",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1568403788,
+          "installed_size": 1568403788,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/added_tokens.json",
+              "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+              "size": 34648
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/config.json",
+              "sha256": "2efba1fd9d65450929e2d917a32cf9dec2fd5682d29baa6ff48d31d3a61fb501",
+              "size": 1195
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/generation_config.json",
+              "sha256": "041bb1619064440f4cb37a53326f5394de3df380f52ca1e2bfae599535414a7b",
+              "size": 3898
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_config.json",
+              "sha256": "ac8140917e9fae6585bf5a937d4a76fa83015fbaaa1000db434a5d8e39e774f5",
+              "size": 451
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_decoder_model.bin",
+              "sha256": "fdf13685d5a9c427b9aa5893c2baef362f1e4dddfbf5bf8a47fc03acb35a45ea",
+              "size": 910372790
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_decoder_model.xml",
+              "sha256": "cc4b29bb1fc4afb6dcc59db2cf3d149fe5847a7215ca66b4944cb36390b17805",
+              "size": 2869528
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_detokenizer.bin",
+              "sha256": "f2b3c47825a1089525ff65c0c8e49271e1dee69a401a04fc827ac2de5b7766e4",
+              "size": 736198
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_detokenizer.xml",
+              "sha256": "ac37fdd9b044a04130747c6773b85f395e5910e0cfb132a2c937fb533d69b4da",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_encoder_model.bin",
+              "sha256": "fffcbf47a4cfd5a1e3f57c0569f5ef706245b798ef626db5ffea7b84166ed865",
+              "size": 645332592
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_encoder_model.xml",
+              "sha256": "2a19e0ae9b77b5fbf2928793aa232eb84b0554a29fd4f16e190617583bdefcfc",
+              "size": 1518681
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_tokenizer.bin",
+              "sha256": "adfa3d9a2920d0f314121270a960ab331ec0f05838544bb8ecaaa422282a6fd4",
+              "size": 1898973
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/openvino_tokenizer.xml",
+              "sha256": "dad2092c08510c043acabeae952cdbd381bc7b9c3272eaef524fa4fbea2f9dc4",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/preprocessor_config.json",
+              "sha256": "654cf18d3e163b948ceaf9766da56ce0b52de265d58673cf61c9376f126bd499",
+              "size": 357
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/special_tokens_map.json",
+              "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+              "size": 2186
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/tokenizer.json",
+              "sha256": "5c1bf30c9e716e1477bedef846b01be0013daecb89e9e3ef7ab89b23c178df1b",
+              "size": 3930645
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/tokenizer_config.json",
+              "sha256": "3c75940dfce3a294fca7041a5faff011677f1b68fa85e47511bb8cf6dccaded6",
+              "size": 282873
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-large-v3-int8-ov/resolve/e197310d1fe6d5b40d0ce84c2614a547de21cb62/vocab.json",
+              "sha256": "6788c80b082e9b0d1393147d3a3e62ba19285ac0c82ace8e5ef00f37ead58971",
+              "size": 835528
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:medium:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-medium (OpenVINO/whisper-medium-fp16-ov@eddc8397f55a)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "medium",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-medium (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-medium-fp16-ov/tree/eddc8397f55af66a5c4e411893e1b21caf187f0b",
+      "revision": "eddc8397f55af66a5c4e411893e1b21caf187f0b",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 1538851081,
+          "installed_size": 1538851081,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/added_tokens.json",
+              "sha256": "9715fd2243b6f06a5858b5e32950d2853f73dd5bc201aafcf76f5082a2d8acd1",
+              "size": 34604
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/config.json",
+              "sha256": "468a4c8675c49b8ab27717fe02223b6ae2565dc2b6411d017e7e04aec8497dec",
+              "size": 1326
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/generation_config.json",
+              "sha256": "d5dd0ffb1125f44ecae80a93f04c06c8127c2a2aff4ea2feec171d2fda919612",
+              "size": 3750
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_decoder_model.bin",
+              "sha256": "d89a0b3d8a77cb4b619a3555db9fdee5bf82b2254ff0a50ae8dc9edc1d0aec25",
+              "size": 913283228
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_decoder_model.xml",
+              "sha256": "8fb57e209b791338b46e3f5b63e572ab216c7e10ad3141071d984b3ce470ab8f",
+              "size": 1893862
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_detokenizer.bin",
+              "sha256": "2542d1fe6c4c5d838e7b7c61b24996b94ae0cb54e64ff6dbaab2b9dd5ddd7ca0",
+              "size": 736181
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_detokenizer.xml",
+              "sha256": "3789bfaca5c267e67967bd7429b370f0ee9c65c03395aa091b0b59fc14f475ba",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_encoder_model.bin",
+              "sha256": "8784a18663a2794dfe89624e6f775de29fe24546acffc4da4fd8bb2b0173cf33",
+              "size": 614432874
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_encoder_model.xml",
+              "sha256": "9a539021be2a7e39aa7a0a0fb58f74356200220bc0d78580ed0d7eaf8c85ffc8",
+              "size": 931771
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_tokenizer.bin",
+              "sha256": "846f3c65f7a71f120fce7aaaf41b342f0767eb13e3c4e7c2a54f1d49b5c38fda",
+              "size": 1898933
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/openvino_tokenizer.xml",
+              "sha256": "fe367cf66aa051a81dffa6e0b2865a201a5e603df6c527f14457b99a30981459",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/preprocessor_config.json",
+              "sha256": "994838f1fa6462c8b9b3c90edada831f11f3dd8b4664634e18f4694d005c9dbf",
+              "size": 356
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/special_tokens_map.json",
+              "sha256": "e67ae3a0aaa99abcd9f187138e12db1f65c16a14761c50ef10eef2c174a7a691",
+              "size": 2194
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/tokenizer.json",
+              "sha256": "7b469ff15eb7816315aa45eec391f5943d639b9d73d110f5c003df5192fd54e3",
+              "size": 3930494
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/tokenizer_config.json",
+              "sha256": "21a4fc0483c14b87f4e0bbc177a9a357479bfa7c95aaf21ad53d71e9c5afafb9",
+              "size": 282713
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-medium-fp16-ov/resolve/eddc8397f55af66a5c4e411893e1b21caf187f0b/vocab.json",
+              "sha256": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9",
+              "size": 835550
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:medium:int8",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-medium (OpenVINO/whisper-medium-int8-ov@8d43cce84672)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "medium",
+      "precision": "int8",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-medium (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-medium-int8-ov/tree/8d43cce846729381f56bd45a1c70925cee2222ff",
+      "revision": "8d43cce846729381f56bd45a1c70925cee2222ff",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 784020780,
+          "installed_size": 784020780,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/added_tokens.json",
+              "sha256": "9715fd2243b6f06a5858b5e32950d2853f73dd5bc201aafcf76f5082a2d8acd1",
+              "size": 34604
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/config.json",
+              "sha256": "468a4c8675c49b8ab27717fe02223b6ae2565dc2b6411d017e7e04aec8497dec",
+              "size": 1326
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/generation_config.json",
+              "sha256": "d5dd0ffb1125f44ecae80a93f04c06c8127c2a2aff4ea2feec171d2fda919612",
+              "size": 3750
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_config.json",
+              "sha256": "fab0fd49ebf95e151c28007a44c0ca1dad31576e02b2e054e1c5767994bae19f",
+              "size": 447
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_decoder_model.bin",
+              "sha256": "4ff8ba47640c78e30fdfd6b1c91f69ead9f67047877ee38baf83349927b429eb",
+              "size": 459016627
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_decoder_model.xml",
+              "sha256": "ddc857598959ed2b6f290172da1478cfa29249f1b5b8080ed91e8048e266f7fa",
+              "size": 2160825
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_detokenizer.bin",
+              "sha256": "2542d1fe6c4c5d838e7b7c61b24996b94ae0cb54e64ff6dbaab2b9dd5ddd7ca0",
+              "size": 736181
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_detokenizer.xml",
+              "sha256": "9adb820ef4576d3c317bf897afa04255f1fe1f87f63650e60143894e6ff6f2ba",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_encoder_model.bin",
+              "sha256": "e74ff119334068b54a6da0b039d9f8a7a8caa5a2b0a5e940f11eb4a20b2251e1",
+              "size": 313391216
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_encoder_model.xml",
+              "sha256": "fbd9387fee6a1da4ebb779227aeb77f4520370f388c0af8e215f0ad1a7cb2a44",
+              "size": 1142319
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_tokenizer.bin",
+              "sha256": "846f3c65f7a71f120fce7aaaf41b342f0767eb13e3c4e7c2a54f1d49b5c38fda",
+              "size": 1898933
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/openvino_tokenizer.xml",
+              "sha256": "f15e4c9573899623a9dee76f43ec204901d7bb2721f1e21531b3e82c63fc6362",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/preprocessor_config.json",
+              "sha256": "994838f1fa6462c8b9b3c90edada831f11f3dd8b4664634e18f4694d005c9dbf",
+              "size": 356
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/special_tokens_map.json",
+              "sha256": "e67ae3a0aaa99abcd9f187138e12db1f65c16a14761c50ef10eef2c174a7a691",
+              "size": 2194
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/tokenizer.json",
+              "sha256": "7b469ff15eb7816315aa45eec391f5943d639b9d73d110f5c003df5192fd54e3",
+              "size": 3930494
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/tokenizer_config.json",
+              "sha256": "21a4fc0483c14b87f4e0bbc177a9a357479bfa7c95aaf21ad53d71e9c5afafb9",
+              "size": 282713
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-medium-int8-ov/resolve/8d43cce846729381f56bd45a1c70925cee2222ff/vocab.json",
+              "sha256": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9",
+              "size": 835550
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:small:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-small (OpenVINO/whisper-small-fp16-ov@2410d022171c)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "small",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-small (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-small-fp16-ov/tree/2410d022171ca8a97343182f88eec8807a324db9",
+      "revision": "2410d022171ca8a97343182f88eec8807a324db9",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 493208911,
+          "installed_size": 493208911,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/added_tokens.json",
+              "sha256": "9715fd2243b6f06a5858b5e32950d2853f73dd5bc201aafcf76f5082a2d8acd1",
+              "size": 34604
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/config.json",
+              "sha256": "2d1cf9f56daeb3c1afabb7fbd9df05e9d9e00d4aca728be033097cd9ab8ebf1f",
+              "size": 1325
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/generation_config.json",
+              "sha256": "bf619a40ae65e028b089124d04b294b0e8aabfbc0f9f8c5b93b584652d15ec5e",
+              "size": 3841
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_decoder_model.bin",
+              "sha256": "31ce50290e94bf7d59e9011514cc62fc8d24621026a1aba9982c02a8ba217e29",
+              "size": 307161756
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_decoder_model.xml",
+              "sha256": "703dd97dbb9a175990b0498099c2fa15a686f2442d66057266006f8e5fd02c27",
+              "size": 960207
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_detokenizer.bin",
+              "sha256": "2542d1fe6c4c5d838e7b7c61b24996b94ae0cb54e64ff6dbaab2b9dd5ddd7ca0",
+              "size": 736181
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_detokenizer.xml",
+              "sha256": "abce72395c3a9d54fba270bae4464e79b13721b051158b04010c0dc187764484",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_encoder_model.bin",
+              "sha256": "771c2f08bc68f51d19d0c1e5ce13111ed9828a7e475df98eddb4043dd756f3f2",
+              "size": 176308330
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_encoder_model.xml",
+              "sha256": "6be017fe6d700dbcac71dbc888068afa9dcfaf0aaac17382314f96d87f965a02",
+              "size": 469182
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_tokenizer.bin",
+              "sha256": "846f3c65f7a71f120fce7aaaf41b342f0767eb13e3c4e7c2a54f1d49b5c38fda",
+              "size": 1898933
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/openvino_tokenizer.xml",
+              "sha256": "7bc0e5c42c380282f065b53d6597860df3ac51c5becc145d48bcef9b6dd4238b",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/preprocessor_config.json",
+              "sha256": "994838f1fa6462c8b9b3c90edada831f11f3dd8b4664634e18f4694d005c9dbf",
+              "size": 356
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/special_tokens_map.json",
+              "sha256": "e67ae3a0aaa99abcd9f187138e12db1f65c16a14761c50ef10eef2c174a7a691",
+              "size": 2194
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/tokenizer.json",
+              "sha256": "7b469ff15eb7816315aa45eec391f5943d639b9d73d110f5c003df5192fd54e3",
+              "size": 3930494
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/tokenizer_config.json",
+              "sha256": "21a4fc0483c14b87f4e0bbc177a9a357479bfa7c95aaf21ad53d71e9c5afafb9",
+              "size": 282713
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-small-fp16-ov/resolve/2410d022171ca8a97343182f88eec8807a324db9/vocab.json",
+              "sha256": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9",
+              "size": 835550
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:openvino:small:int8",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-small (OpenVINO/whisper-small-int8-ov@5b831719e093)",
+      "kind": "model",
+      "depends": [
+        "asr-openvino"
+      ],
+      "backend": "openvino",
+      "model": "small",
+      "precision": "int8",
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-small (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "source": "https://huggingface.co/OpenVINO/whisper-small-int8-ov/tree/5b831719e093f86e1970be663e524fe001489f9b",
+      "revision": "5b831719e093f86e1970be663e524fe001489f9b",
+      "platforms": {
+        "windows-x64": {
+          "download_size": 256754307,
+          "installed_size": 256754307,
+          "files": [
+            {
+              "name": "added_tokens.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/added_tokens.json",
+              "sha256": "9715fd2243b6f06a5858b5e32950d2853f73dd5bc201aafcf76f5082a2d8acd1",
+              "size": 34604
+            },
+            {
+              "name": "config.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/config.json",
+              "sha256": "2d1cf9f56daeb3c1afabb7fbd9df05e9d9e00d4aca728be033097cd9ab8ebf1f",
+              "size": 1325
+            },
+            {
+              "name": "generation_config.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/generation_config.json",
+              "sha256": "bf619a40ae65e028b089124d04b294b0e8aabfbc0f9f8c5b93b584652d15ec5e",
+              "size": 3841
+            },
+            {
+              "name": "merges.txt",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/merges.txt",
+              "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+              "size": 493869
+            },
+            {
+              "name": "normalizer.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/normalizer.json",
+              "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+              "size": 52666
+            },
+            {
+              "name": "openvino_config.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_config.json",
+              "sha256": "dce6b43e54dab3eb21d6995fd113dc49f337fd2e650e3c63ed849bcf7bfbd54d",
+              "size": 445
+            },
+            {
+              "name": "openvino_decoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_decoder_model.bin",
+              "sha256": "836642928d3354f0f239a45a4166bdd42647cc0e085b7e9d85b303d050e55a3b",
+              "size": 154571955
+            },
+            {
+              "name": "openvino_decoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_decoder_model.xml",
+              "sha256": "d44d10b6ff3ce686f1d24cc932c3a178dde693fc1a4107474ce79aaafe6d33bd",
+              "size": 1092851
+            },
+            {
+              "name": "openvino_detokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_detokenizer.bin",
+              "sha256": "2542d1fe6c4c5d838e7b7c61b24996b94ae0cb54e64ff6dbaab2b9dd5ddd7ca0",
+              "size": 736181
+            },
+            {
+              "name": "openvino_detokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_detokenizer.xml",
+              "sha256": "2a3166e38653bb5531a44bab187ffabefdb49f70069ab3d7a05f2b7dd816dfa0",
+              "size": 9699
+            },
+            {
+              "name": "openvino_encoder_model.bin",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_encoder_model.bin",
+              "sha256": "cb4ce5067a24d0edf1f29ce4ed7162958be9c5efa7f4cc357b23aaac224d736e",
+              "size": 92204656
+            },
+            {
+              "name": "openvino_encoder_model.xml",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_encoder_model.xml",
+              "sha256": "778225a033690a0661cfdfd79352c569e34943754ef394234df8ffb507049430",
+              "size": 574964
+            },
+            {
+              "name": "openvino_tokenizer.bin",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_tokenizer.bin",
+              "sha256": "846f3c65f7a71f120fce7aaaf41b342f0767eb13e3c4e7c2a54f1d49b5c38fda",
+              "size": 1898933
+            },
+            {
+              "name": "openvino_tokenizer.xml",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/openvino_tokenizer.xml",
+              "sha256": "9b362d31bae5855e5c4f5e2e1a2196337264b84f546161333027e34ed92a44dd",
+              "size": 27011
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/preprocessor_config.json",
+              "sha256": "994838f1fa6462c8b9b3c90edada831f11f3dd8b4664634e18f4694d005c9dbf",
+              "size": 356
+            },
+            {
+              "name": "special_tokens_map.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/special_tokens_map.json",
+              "sha256": "e67ae3a0aaa99abcd9f187138e12db1f65c16a14761c50ef10eef2c174a7a691",
+              "size": 2194
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/tokenizer.json",
+              "sha256": "7b469ff15eb7816315aa45eec391f5943d639b9d73d110f5c003df5192fd54e3",
+              "size": 3930494
+            },
+            {
+              "name": "tokenizer_config.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/tokenizer_config.json",
+              "sha256": "21a4fc0483c14b87f4e0bbc177a9a357479bfa7c95aaf21ad53d71e9c5afafb9",
+              "size": 282713
+            },
+            {
+              "name": "vocab.json",
+              "url": "{models}/OpenVINO/whisper-small-int8-ov/resolve/5b831719e093f86e1970be663e524fe001489f9b/vocab.json",
+              "sha256": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9",
+              "size": 835550
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:mlx:large-v3-turbo:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3-turbo (mlx-community/whisper-large-v3-turbo-fp16@258e98b1f53d)",
+      "kind": "model",
+      "depends": [
+        "asr-mlx"
+      ],
+      "backend": "mlx",
+      "model": "large-v3-turbo",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-large-v3-turbo (MIT) by mlx-community, published under Apache-2.0. model.safetensors is byte-identical to weights.safetensors of mlx-community/whisper-large-v3-turbo (the mlx-whisper format; that repository has no license field) and is installed under that name. Not verified on a Mac.",
+      "source": "https://huggingface.co/mlx-community/whisper-large-v3-turbo-fp16/tree/258e98b1f53da60a0a51c1e45e480ffa3ec71e23",
+      "revision": "258e98b1f53da60a0a51c1e45e480ffa3ec71e23",
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 1613977880,
+          "installed_size": 1613977880,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/mlx-community/whisper-large-v3-turbo-fp16/resolve/258e98b1f53da60a0a51c1e45e480ffa3ec71e23/config.json",
+              "sha256": "b34fc29e4e11e0a25e812775dd67f4dd16fc2c8eb43d28ae25ff7d660ecb6379",
+              "size": 268
+            },
+            {
+              "name": "weights.safetensors",
+              "url": "{models}/mlx-community/whisper-large-v3-turbo-fp16/resolve/258e98b1f53da60a0a51c1e45e480ffa3ec71e23/model.safetensors",
+              "sha256": "951ed3fc1203e6a62467abb2144a96ce7eafca8fa77e3704fdb8635ff3e7f8a6",
+              "size": 1613977612
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:mlx:large-v3:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-large-v3 (mlx-community/whisper-large-v3-mlx@49e6aa286ad6)",
+      "kind": "model",
+      "depends": [
+        "asr-mlx"
+      ],
+      "backend": "mlx",
+      "model": "large-v3",
+      "precision": "fp16",
+      "license": "MIT",
+      "license_note": "MLX conversion of openai/whisper-large-v3 (MIT) by mlx-community, published under MIT. Not verified on a Mac.",
+      "source": "https://huggingface.co/mlx-community/whisper-large-v3-mlx/tree/49e6aa286ad60c14352c404340ded53710378a11",
+      "revision": "49e6aa286ad60c14352c404340ded53710378a11",
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 3083520685,
+          "installed_size": 3083520685,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/mlx-community/whisper-large-v3-mlx/resolve/49e6aa286ad60c14352c404340ded53710378a11/config.json",
+              "sha256": "34982ce6ae286095000f82ae9583b3431639e8b092bf60c961f203745e6500e3",
+              "size": 269
+            },
+            {
+              "name": "weights.npz",
+              "url": "{models}/mlx-community/whisper-large-v3-mlx/resolve/49e6aa286ad60c14352c404340ded53710378a11/weights.npz",
+              "sha256": "05ff791ce3630fae47e7c51004e9666204d786246ec07cac6110af768099b40d",
+              "size": 3083520416
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:mlx:medium:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-medium (mlx-community/whisper-medium-fp16@d2152aba82a7)",
+      "kind": "model",
+      "depends": [
+        "asr-mlx"
+      ],
+      "backend": "mlx",
+      "model": "medium",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-medium (MIT) by mlx-community (mlx-audio-plus), published under Apache-2.0; installed as weights.safetensors, the name mlx-whisper loads. Not verified on a Mac.",
+      "source": "https://huggingface.co/mlx-community/whisper-medium-fp16/tree/d2152aba82a7ba7eee265796582a1359c56cd51a",
+      "revision": "d2152aba82a7ba7eee265796582a1359c56cd51a",
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 1524744485,
+          "installed_size": 1524744485,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/mlx-community/whisper-medium-fp16/resolve/d2152aba82a7ba7eee265796582a1359c56cd51a/config.json",
+              "sha256": "3ff0b3f17a5a3a614327ffd835a3c8f6c78f39cbd39e84dbff4b0ae267c4d2e4",
+              "size": 268
+            },
+            {
+              "name": "weights.safetensors",
+              "url": "{models}/mlx-community/whisper-medium-fp16/resolve/d2152aba82a7ba7eee265796582a1359c56cd51a/model.safetensors",
+              "sha256": "99124dd47fbc696d18fa706f107812b2b07faee830c00977d31b977c9b6e452f",
+              "size": 1524744217
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "model:mlx:small:fp16",
+      "version": "1.0.0",
+      "upstream": "openai/whisper-small (mlx-community/whisper-small-fp16@fa19eb059396)",
+      "kind": "model",
+      "depends": [
+        "asr-mlx"
+      ],
+      "backend": "mlx",
+      "model": "small",
+      "precision": "fp16",
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-small (MIT) by mlx-community (mlx-audio-plus), published under Apache-2.0; installed as weights.safetensors, the name mlx-whisper loads. Not verified on a Mac.",
+      "source": "https://huggingface.co/mlx-community/whisper-small-fp16/tree/fa19eb05939653a9334d81bec7e053db81970170",
+      "revision": "fa19eb05939653a9334d81bec7e053db81970170",
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 481215628,
+          "installed_size": 481215628,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/mlx-community/whisper-small-fp16/resolve/fa19eb05939653a9334d81bec7e053db81970170/config.json",
+              "sha256": "e8f58e638208af66d5d5d67801259dc7a12d199e971967a9f9d33a8e3635668e",
+              "size": 266
+            },
+            {
+              "name": "weights.safetensors",
+              "url": "{models}/mlx-community/whisper-small-fp16/resolve/fa19eb05939653a9334d81bec7e053db81970170/model.safetensors",
+              "sha256": "7408174e70bffbff6a189cadc3621512be0d1d26bb8c9122d3eeace1652d1b54",
+              "size": 481215362
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "presets": {
+    "default": "standard",
+    "tiers": [
+      {
+        "id": "standard",
+        "name_key": "onboarding.tier.standard.name",
+        "desc_key": "onboarding.tier.standard.desc",
+        "cost_key": "onboarding.tier.standard.cost",
+        "night_processing": false,
+        "transcribe_only": false,
+        "roles": {
+          "chapters": {
+            "provider": "deepseek"
+          },
+          "glossary": {
+            "provider": "deepseek"
+          },
+          "glossary_janitor": {
+            "provider": "deepseek"
+          },
+          "organizer": {
+            "provider": "deepseek"
+          },
+          "repair": {
+            "provider": "deepseek"
+          },
+          "summary": {
+            "provider": "deepseek"
+          },
+          "syllabus_format": {
+            "provider": "deepseek"
+          },
+          "translate": {
+            "provider": "deepseek"
+          }
+        }
+      },
+      {
+        "id": "saver",
+        "name_key": "onboarding.tier.saver.name",
+        "desc_key": "onboarding.tier.saver.desc",
+        "cost_key": "onboarding.tier.saver.cost",
+        "night_processing": false,
+        "transcribe_only": false,
+        "roles": {
+          "chapters": {
+            "provider": "$free"
+          },
+          "glossary": {
+            "provider": "deepseek"
+          },
+          "glossary_janitor": {
+            "provider": "$free"
+          },
+          "organizer": {
+            "provider": "$free"
+          },
+          "repair": {
+            "provider": "deepseek"
+          },
+          "summary": {
+            "provider": "deepseek"
+          },
+          "syllabus_format": {
+            "provider": "$free"
+          },
+          "translate": {
+            "provider": "deepseek"
+          }
+        }
+      },
+      {
+        "id": "free",
+        "name_key": "onboarding.tier.free.name",
+        "desc_key": "onboarding.tier.free.desc",
+        "cost_key": "onboarding.tier.free.cost",
+        "night_processing": true,
+        "transcribe_only": false,
+        "roles": {
+          "chapters": {
+            "provider": "$free"
+          },
+          "glossary": {
+            "provider": "$free"
+          },
+          "glossary_janitor": {
+            "provider": "$free"
+          },
+          "organizer": {
+            "provider": "$free"
+          },
+          "repair": {
+            "provider": "$free"
+          },
+          "summary": {
+            "provider": "$free"
+          },
+          "syllabus_format": {
+            "provider": "$free"
+          },
+          "translate": {
+            "provider": "$free"
+          }
+        }
+      },
+      {
+        "id": "transcribe_only",
+        "name_key": "onboarding.tier.transcribe_only.name",
+        "desc_key": "onboarding.tier.transcribe_only.desc",
+        "cost_key": "onboarding.tier.transcribe_only.cost",
+        "night_processing": false,
+        "transcribe_only": true
+      }
+    ],
+    "providers": [
+      {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "type": "openai",
+        "base_url": "https://api.deepseek.com",
+        "default_model": "deepseek-flash",
+        "free": false,
+        "terms_notice": false,
+        "signup_url": "https://platform.deepseek.com/sign_up",
+        "keys_url": "https://platform.deepseek.com/api_keys",
+        "pricing_url": "https://api-docs.deepseek.com/quick_start/pricing",
+        "steps_keys": [
+          "onboarding.preset.deepseek.step1",
+          "onboarding.preset.deepseek.step2",
+          "onboarding.preset.deepseek.step3"
+        ],
+        "cost_key": "onboarding.preset.deepseek.cost",
+        "max_concurrency": 8,
+        "rpm": 300,
+        "balance_api": "deepseek",
+        "refs": [
+          "https://api-docs.deepseek.com/quick_start/rate_limit"
+        ]
+      },
+      {
+        "id": "gemini",
+        "name": "Google Gemini",
+        "type": "openai",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "default_model": "gemini-3.8-flash",
+        "free": true,
+        "terms_notice": true,
+        "terms_url": "https://ai.google.dev/gemini-api/terms",
+        "signup_url": "https://aistudio.google.com/",
+        "keys_url": "https://aistudio.google.com/apikey",
+        "pricing_url": "https://ai.google.dev/gemini-api/docs/pricing",
+        "steps_keys": [
+          "onboarding.preset.gemini.step1",
+          "onboarding.preset.gemini.step2",
+          "onboarding.preset.gemini.step3"
+        ],
+        "cost_key": "onboarding.preset.gemini.cost",
+        "max_concurrency": 1,
+        "rpm": 5,
+        "refs": [
+          "https://ai.google.dev/gemini-api/docs/openai",
+          "https://ai.google.dev/gemini-api/docs/pricing",
+          "https://ai.google.dev/gemini-api/docs/rate-limits"
+        ]
+      },
+      {
+        "id": "zhipu",
+        "name": "智谱 BigModel (GLM)",
+        "type": "openai",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        "default_model": "glm-4.7-flash",
+        "free": true,
+        "terms_notice": true,
+        "terms_url": "https://bigmodel.cn/",
+        "regions": [
+          "cn"
+        ],
+        "signup_url": "https://open.bigmodel.cn/",
+        "keys_url": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+        "pricing_url": "https://bigmodel.cn/pricing",
+        "steps_keys": [
+          "onboarding.preset.zhipu.step1",
+          "onboarding.preset.zhipu.step2",
+          "onboarding.preset.zhipu.step3"
+        ],
+        "cost_key": "onboarding.preset.zhipu.cost",
+        "max_concurrency": 1,
+        "rpm": 30,
+        "refs": [
+          "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction",
+          "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+          "https://docs.bigmodel.cn/cn/guide/start/quick-start"
+        ]
+      }
+    ],
+    "free": {
+      "default": "gemini",
+      "by_region": {
+        "cn": "zhipu"
+      }
+    }
+  }
+}

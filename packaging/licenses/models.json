@@ -1,0 +1,4 @@
+{
+  "_doc": "Fallback license table of the speech recognition models (SPEC-v3 V7). The component manifest (packaging/components/components.json) is authoritative: every model object there carries license, license_note, source and revision, and section 5 of THIRD_PARTY_NOTICES.md is generated from it. An entry here (keyed by backend + model name, any precision; fields backend, name, license, source, upstream, note) is used only for a manifest model without a license field. An entry that contradicts the manifest fails the audit; one that repeats it or matches no manifest model gives a warning. The previous entries (checked 2026-10-24 against the Hugging Face model cards) agreed with the manifest and were removed on 2026-10-24 to keep a single source.",
+  "models": []
+}

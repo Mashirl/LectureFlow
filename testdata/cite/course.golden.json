@@ -1,0 +1,149 @@
+{
+  "schema": "lectureflow.cite/v3",
+  "how_to_cite": "Cite statements with the ref field in square brackets, e.g. [CA W??-01JK8ZQ5BB@12:34]. Use the sentence id when an exact reference is needed.",
+  "course": {
+    "id": "01JCOURSEARCH",
+    "code": null,
+    "name": "Computer Architecture"
+  },
+  "kinds": [
+    {
+      "id": "lecture",
+      "code": "L",
+      "name": "Lecture"
+    }
+  ],
+  "lectures": [
+    {
+      "id": "01JK8ZQ5BBBB",
+      "label": "W??-01JK8ZQ5BB",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": null,
+      "n": null,
+      "recorded_at": "2026-09-01T09:00",
+      "title": "Welcome",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 2000,
+      "summary": "Course logistics.",
+      "sentences": [
+        {
+          "id": "CA.W??-01JK8ZQ5BB.s0001",
+          "ref": "CA W??-01JK8ZQ5BB@00:01",
+          "start_ms": 1000,
+          "end_ms": 2000,
+          "en": "Welcome.",
+          "zh": "欢迎。",
+          "edited": false
+        }
+      ]
+    },
+    {
+      "id": "01JLEC01",
+      "label": "W01L1",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": 1,
+      "n": 1,
+      "recorded_at": "2026-09-30",
+      "title": "Pipelines",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 1000,
+      "summary": "Pipelining.",
+      "sentences": [
+        {
+          "id": "CA.W01L1.s0001",
+          "ref": "CA W01L1@00:00",
+          "start_ms": 0,
+          "end_ms": 1000,
+          "en": "Five stages.",
+          "zh": "五级。",
+          "edited": false
+        }
+      ]
+    },
+    {
+      "id": "01JLEC02",
+      "label": "W01L2",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": 1,
+      "n": 2,
+      "recorded_at": "2026-09-30",
+      "title": "Caches",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 12000,
+      "summary": "Cache basics.",
+      "sentences": [
+        {
+          "id": "CA.W01L2.s0001",
+          "ref": "CA W01L2@00:05",
+          "start_ms": 5000,
+          "end_ms": 9000,
+          "en": "A cache is small and fast.",
+          "zh": "缓存小而快。",
+          "edited": false
+        },
+        {
+          "id": "CA.W01L2.s0002",
+          "ref": "CA W01L2@00:09",
+          "start_ms": 9000,
+          "end_ms": 12000,
+          "en": "Misses are expensive.",
+          "zh": null,
+          "edited": false
+        }
+      ]
+    },
+    {
+      "id": "01JLEC12",
+      "label": "W03L1",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": 3,
+      "n": 1,
+      "recorded_at": "2026-10-13T10:00",
+      "title": "Virtual Memory",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 64000,
+      "summary": "Paging and TLBs.",
+      "sentences": [
+        {
+          "id": "CA.W03L1.s0001",
+          "ref": "CA W03L1@01:01",
+          "start_ms": 61000,
+          "end_ms": 64000,
+          "en": "The TLB caches translations.",
+          "zh": "TLB 缓存地址转换。",
+          "edited": false
+        }
+      ]
+    },
+    {
+      "id": "01JK8ZQ5AAAA",
+      "label": "W??-01JK8ZQ5AA",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": null,
+      "n": null,
+      "recorded_at": null,
+      "title": "Empty",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 0,
+      "summary": "",
+      "sentences": []
+    }
+  ],
+  "glossary": [],
+  "generated_at": "2026-10-23T20:00:00Z"
+}

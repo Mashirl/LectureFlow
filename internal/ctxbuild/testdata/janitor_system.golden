@@ -1,0 +1,28 @@
+You are the glossary curator for a university course. The glossary is used in two ways:
+1. Terms in the "enforce" tier MUST be translated exactly as given, and translations are automatically checked for them.
+2. Terms in the "reference" tier are shown to the translator as the preferred translation when the word is used in its technical sense; they are not enforced.
+A wrong "enforce" entry actively damages translations: for example, enforcing "public => 公钥" forces "public knowledge" to be mistranslated. Your job is to prevent that, and to keep the glossary consistent.
+
+For each entry, decide:
+- "enforce": proper nouns, named algorithms, standards and attacks, acronyms, multi-word technical terms, and single words that in this course are used almost exclusively in their technical sense.
+- "reference": words that have a technical meaning in this course but are also common in everyday or general academic English (the lecturer will use them both ways).
+- "disable": generic words with no specific technical meaning in this course (e.g. "world", "analysis", "practical", "data" when used generically), and entries that are not terms at all.
+- "merge": duplicates and plural or inflected forms of another entry; give the id to merge into.
+- "fix_zh": the Chinese translation is wrong, non-standard, or inconsistent with a related entry (for example an acronym and its expansion must use the same translation). Use the standard term from Chinese university textbooks. Use "" for terms that Chinese speakers normally keep in English.
+Leave an entry out of your answer if it is already correct.
+
+Use the contexts to see how each word is actually used in this course. Never act on entries marked "locked"; use them only as reference for consistency.
+Give a short reason in English (under 15 words) for every action.
+
+Respond with JSON only: {"actions": [{"id": "...", "action": "...", "into": "...", "zh": "...", "reason": "..."}]}
+
+COURSE: Cryptography (CSC1003)
+
+SYLLABUS.md:
+# CSC1003 Cryptography
+
+## Weekly Topics
+| Week | Topic |
+|---|---|
+| 1 | Classical ciphers: Caesar and the Vigenère cipher |
+| 2 | Public key cryptography |

@@ -1,0 +1,187 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+
+/* ---- settings: App section (SPEC-v3 V11, settings_app.js) ---- */
+.app-path {
+  display: block; max-width: 100%; padding: 6px 10px; border: 1px solid var(--border-1); border-radius: var(--r-md);
+  background: var(--bg-sunken); color: var(--text-1); font-size: var(--fs-sm); line-height: 1.5; overflow-wrap: anywhere; user-select: all;
+}
+.app-usage { font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.app-desktop-only { display: inline-flex; align-items: center; gap: 4px; }
+.app-move { display: flex; flex-direction: column; gap: 6px; width: min(100%, 420px); }
+.app-move-text { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.app-move-text .icon { color: var(--accent); flex: none; }
+.app-move-meter { width: 100%; }
+.app-old {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; width: 100%;
+  padding: 8px 10px; border: 1px dashed var(--border-2); border-radius: var(--r-md);
+}
+.app-old-text { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.app-old-text .icon { color: var(--text-3); flex: none; }
+.app-path-sm { font-size: var(--fs-xs); color: var(--text-2); overflow-wrap: anywhere; }
+.app-diag-btns { flex-wrap: wrap; gap: 8px; }
+.app-move-points { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 4px; padding: 0; list-style: none; }
+.app-move-points li { display: flex; align-items: flex-start; gap: 8px; color: var(--text-2); line-height: 1.5; }
+.app-move-points .icon { margin-top: 3px; flex: none; color: var(--accent); }
+
+/* ---- settings: About section (settings_about.js) ---- */
+.about-version { flex-wrap: wrap; gap: 8px; }
+.about-version-num { font-size: var(--fs-md); font-weight: 600; color: var(--text-1); }
+.about-text { margin: 0; max-width: 62ch; color: var(--text-2); line-height: 1.6; }
+.about-foot { margin-top: 10px; }
+.about-dlg { width: min(880px, calc(100vw - 32px)); }
+.about-doc {
+  max-height: min(64vh, 680px); margin: 0 0 4px; padding: 14px 16px; overflow: auto;
+  border: 1px solid var(--border-1); border-radius: var(--r-md); background: var(--bg-card);
+}
+.about-doc:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.about-license { white-space: pre-wrap; font-size: var(--fs-sm); line-height: 1.55; color: var(--text-1); }
+.about-notices { font-size: var(--fs-md); }
+.about-notices td { overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .about-doc { max-height: 58vh; padding: 10px 12px; }
+}
+
+/* ---- settings: Components section (SPEC-v3 V11, settings_components.js) ---- */
+.comp-body { display: flex; flex-direction: column; gap: 18px; }
+.comp-intro { margin: 0; max-width: 72ch; color: var(--text-2); line-height: 1.6; }
+.comp-sec { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.comp-sec-title { margin: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.comp-sec-hint { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }
+.comp-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border-1); border-radius: var(--r-lg); background: var(--bg-content); }
+.comp-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 10px 12px; border-top: 1px solid var(--border-1); }
+.comp-row:first-child { border-top: 0; }
+.comp-row-icon { display: flex; padding-top: 2px; color: var(--text-3); }
+.comp-row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.comp-row-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-weight: 500; overflow-wrap: anywhere; }
+.comp-chip { display: inline-flex; align-items: center; gap: 3px; font-weight: 500; }
+.comp-row-hint { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.45; }
+.comp-row-meta { font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.comp-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.comp-plan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.comp-plan-text { font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.comp-tasks { gap: 10px; }
+.comp-task { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--border-1); border-radius: var(--r-lg); background: var(--bg-content); min-width: 0; }
+.comp-task-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.comp-task-title { min-width: 0; font-size: var(--fs-sm); color: var(--text-2); overflow-wrap: anywhere; }
+.comp-form { padding-top: 0; }
+.comp-form .set-row:first-child { border-top: 1px solid var(--border-1); }
+.comp-sources { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.comp-sources .cu-src-row { grid-template-columns: minmax(110px, 150px) minmax(0, 1fr); }
+.comp-sources-foot:empty, .comp-sources-foot:has(> [hidden]:only-child) { display: none; }
+.comp-sources-foot { display: flex; justify-content: flex-start; }
+.comp-import-busy { flex-wrap: wrap; gap: 8px; font-size: var(--fs-sm); color: var(--text-2); }
+.comp-import-busy .icon { color: var(--accent); }
+
+@media (max-width: 720px) {
+  .comp-row { grid-template-columns: auto minmax(0, 1fr); }
+  .comp-row-actions { grid-column: 2; justify-content: flex-start; }
+  .comp-sources .cu-src-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- application update hint (SPEC-v3 V8, update_hint.js) ---- */
+.upd-hint { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.upd-hint[hidden] { display: none; }
+.upd-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.upd-line > .icon { flex: none; color: var(--accent-text); }
+.upd-hint[data-state="error"] .upd-line > .icon { color: var(--warn); }
+.upd-text { min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.upd-tools { display: inline-flex; gap: 6px; }
+.upd-sub { margin: 0; color: var(--text-3); line-height: 1.5; }
+.upd-sub.is-warn { color: var(--warn); }
+.upd-meter { width: min(100%, 320px); }
+.upd-dashboard { margin-top: 18px; padding: 10px 14px; border-top: 1px solid var(--border-1); }
+.upd-settings { margin-top: 6px; }
+.comp-body [hidden] { display: none !important; }
+
+/* ---- Colab remote transcription (SPEC-v3 V14.5; resources.js, pipeline.js,
+   view_dashboard.js, settings_colab.js, asr_devices.js) ---- */
+/* resource panel: the remote GPU area between the active and the other devices */
+.insp-remote-slot[hidden] { display: none; }
+.insp-remote .insp-sec-head { margin-bottom: 6px; }
+.rc-link { font-size: var(--fs-xs); color: var(--accent-text); text-decoration: none; white-space: nowrap; }
+.rc-link:hover { text-decoration: underline; }
+.rc-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+.rc-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.rc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.rc-head > .icon { flex: none; color: var(--accent-text); }
+.rc-name { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: var(--fs-sm); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.rc-window .metric-v { font-variant-numeric: tabular-nums; }
+.rc-left { margin: 0; font-size: var(--fs-sm); font-weight: 500; color: var(--text-1); }
+.rc-kv { display: grid; grid-template-columns: minmax(64px, max-content) minmax(0, 1fr); gap: 8px; font-size: var(--fs-xs); line-height: 1.45; }
+.rc-k { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); white-space: nowrap; }
+.rc-v { display: flex; flex-direction: column; min-width: 0; color: var(--text-1); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.rc-sub { color: var(--text-3); }
+.rc-body .insp-note { margin: 0; }
+.rc-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rc-actions .btn { flex: 1 1 auto; justify-content: center; }
+.insp-remote.is-line { padding: 8px 12px; }
+.rc-line { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.rc-line > .icon { flex: none; color: var(--text-3); }
+.rc-line-t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.insp-remote.is-line .insp-note { margin: 6px 0 0; }
+
+/* pipeline: the remote mark of an asr segment and the hover card's steps */
+.seg-wrap.is-remote .seg { position: relative; }
+.seg-remote {
+  position: absolute; top: 0; right: 1px; display: grid; place-items: center; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--bg-card); color: var(--accent-text); box-shadow: 0 0 0 1px var(--border-2); pointer-events: none;
+}
+.seg-remote .icon { width: 9px; height: 9px; }
+.rsteps { list-style: none; margin: 4px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.rstep { display: grid; grid-template-columns: 14px auto minmax(0, 1fr); align-items: center; gap: 6px; color: var(--text-3); }
+.rstep-dot { display: grid; place-items: center; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--border-2); color: var(--accent-fg); }
+.rstep-dot .icon { width: 9px; height: 9px; }
+.rstep.is-done { color: var(--text-2); }
+.rstep.is-done .rstep-dot { background: var(--ok); border-color: var(--ok); }
+.rstep.is-now { color: var(--text-1); font-weight: 600; }
+.rstep.is-now .rstep-dot { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 2.5px var(--bg-card); background-color: var(--accent); }
+.rstep-detail { min-width: 0; font-weight: 400; color: var(--text-2); overflow-wrap: anywhere; }
+
+/* workbench: the Colab line under the title */
+.dash-colab-slot[hidden] { display: none; }
+.dash-colab {
+  display: flex; align-items: flex-start; gap: 8px; margin: -8px 0 16px; padding: 8px 12px;
+  border: 1px solid var(--border-1); border-radius: var(--r-md); background: var(--accent-soft);
+  font-size: var(--fs-sm); color: var(--text-1); line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.dash-colab .icon { flex: none; margin-top: 3px; color: var(--accent-text); }
+.dash-colab span { min-width: 0; overflow-wrap: anywhere; }
+
+/* settings: the Colab section */
+.colab-form .colab-sub { margin: 14px 0 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.colab-privacy {
+  display: flex; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border-1));
+  border-radius: var(--r-md); background: var(--warn-soft); color: var(--text-1);
+}
+.colab-privacy > .icon { flex: none; margin-top: 2px; color: var(--warn); }
+.colab-privacy-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; line-height: 1.55; }
+.colab-privacy-text p { margin: 0; max-width: 72ch; font-size: var(--fs-sm); color: var(--text-2); }
+.colab-privacy-text .dim { color: var(--text-3); }
+.colab-steps { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 4px; padding-left: 22px; color: var(--text-1); line-height: 1.55; }
+.colab-steps li { padding-left: 2px; }
+.colab-cmd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 6px; min-width: 0; }
+.colab-cmd-text {
+  flex: 1 1 320px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border-1); border-radius: var(--r-md);
+  background: var(--bg-sunken); font-size: var(--fs-xs); line-height: 1.5; overflow-wrap: anywhere; user-select: all;
+}
+.colab-check { flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; }
+.colab-check .set-note { margin: 0; }
+.colab-import { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.colab-import-line { flex-wrap: wrap; gap: 8px; }
+.colab-days-wrap { gap: 6px; }
+.colab-days, .colab-wait { width: 5.5em; }
+.colab-auth { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.colab-auth-line { flex-wrap: wrap; gap: 6px; }
+.colab-auth-left { font-size: var(--fs-sm); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.colab-model-line { flex-wrap: wrap; gap: 8px; }
+.colab-model { width: 13em; max-width: 100%; }
+.colab-sel { min-width: 8em; }
+.colab-points { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; padding: 0; list-style: none; }
+.colab-points li { display: flex; align-items: flex-start; gap: 8px; color: var(--text-2); line-height: 1.5; }
+.colab-points .icon { margin-top: 3px; flex: none; color: var(--accent); }
+/* device list: the colab:remote row */
+.dev-remote { display: flex; flex-direction: column; gap: 6px; }
+.dev-remote .set-note { margin: 0; }

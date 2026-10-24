@@ -1,0 +1,20 @@
+{
+  "checks": [
+    {"name": "data_dir", "status": "ok", "detail": "./data 可写", "hint": "", "detail_info": {"code": "check.dir_writable", "params": {"path": "./data"}}},
+    {"name": "ffmpeg", "status": "ok", "detail": "ffmpeg version 9.0.1", "hint": ""},
+    {"name": "python", "status": "ok", "detail": "Python 3.13.15", "hint": ""},
+    {"name": "faster-whisper", "status": "ok", "detail": "可以导入 faster_whisper", "hint": "", "detail_info": {"code": "check.import_ok", "params": {"module": "faster_whisper"}}},
+    {"name": "pypdf", "status": "ok", "detail": "可以导入 pypdf", "hint": "", "detail_info": {"code": "check.import_ok", "params": {"module": "pypdf"}}},
+    {"name": "gpu", "status": "ok", "detail": "总显存 12227 MB，剩余 11883 MB", "hint": "", "detail_info": {"code": "check.gpu_vram", "params": {"total": 12227, "free": 11883}}},
+    {"name": "cuda", "status": "warn", "detail": "尚未运行（点击“重新检查”运行）", "hint": "", "detail_info": {"code": "check.not_run"}},
+    {"name": "api_key:deepseek", "status": "error", "detail": "环境变量 DEEPSEEK_API_KEY 未设置", "hint": "设置环境变量 DEEPSEEK_API_KEY 后重启服务", "detail_info": {"code": "check.key_env_unset", "params": {"env": "DEEPSEEK_API_KEY"}}, "hint_info": {"code": "check.hint_key_env", "params": {"env": "DEEPSEEK_API_KEY"}}},
+    {"name": "api:deepseek", "status": "warn", "detail": "未检查：缺少 API key", "hint": "", "detail_info": {"code": "check.api_skipped_no_key"}},
+    {"name": "disk", "status": "ok", "detail": "剩余 117.2 GB", "hint": "", "detail_info": {"code": "check.disk_free", "params": {"free_mb": 120000}}}
+  ],
+  "gpu": {"total_mb": 12227, "free_mb": 11883, "paused": false, "slots_used": 0, "slots_max": 1, "estimated_job_mb": 5000},
+  "api": {"deepseek": {"inflight": 3, "max": 8, "rpm_limit": 300}},
+  "usage_today": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null},
+  "budget_hit": false,
+  "disk": {"free_mb": 120000, "data_mb": 3400, "courses_mb": {"01JCRS0000000000000000000A": 3400}},
+  "config": {"listen": "127.0.0.1:8420", "data_dir": "./data"}
+}

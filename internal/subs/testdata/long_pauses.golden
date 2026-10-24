@@ -1,0 +1,62 @@
+== input
+sentence #0  14:56.000 → 15:01.470
+  text:  Remember the definition: what you learn afterwards is the same as before.
+  asr:   (same as text)
+  words: Remember[896000-896580] the[896630-896910] definition:[896960-897720] what[897770-898110] you[898160-898440] learn[898490-898890] afterwards[898940-899640] is[899690-899910] the[899960-900240] same[900290-900630] as[900680-900900] before.[900950-901470]
+  zh:    请记住定义：之后你知道的东西与之前完全相同。
+sentence #1  15:01.470 → 15:15.230
+  text:  Is it obvious why this scheme is not secure?
+  asr:   (same as text)
+  words: Is[901470-901690] it[912040-912260] obvious[912310-912830] why[912880-913160] this[913210-913550] scheme[913600-914060] is[914110-914330] not[914380-914660] secure?[914710-915230]
+  zh:    大家明白为什么这个方案不安全吗？
+sentence #2  21:40.000 → 21:55.150
+  text:  So, it must be a value that you have not used before. Exactly.
+  asr:   (same as text)
+  words: So,[1300000-1300280] it[1300330-1300550] must[1300600-1300940] be[1300990-1301210] a[1301260-1301420] value[1301470-1301870] that[1301920-1302260] you[1302310-1302590] have[1302640-1302980] not[1303030-1303310] used[1303360-1303700] before.[1303750-1304270] Exactly.[1314570-1315150]
+  zh:    所以，它必须是你以前没有用过的值。没错。
+sentence #3  21:55.190 → 21:57.360
+  text:  So, you have to discard it.
+  asr:   (same as text)
+  words: So,[1315190-1315470] you[1315520-1315800] have[1315850-1316190] to[1316240-1316460] discard[1316510-1317030] it.[1317080-1317360]
+  zh:    所以你必须丢弃它。
+sentence #4  44:27.000 → 44:40.410
+  text:  these are the bytes here, okay?
+  asr:   (same as text)
+  words: these[2667000-2667400] are[2667450-2667730] the[2667780-2668060] bytes[2668110-2668510] here,[2668560-2668960] okay?[2680010-2680410]
+  zh:    就是这里的这些字节，明白吗？
+sentence #5  48:51.000 → 49:21.080
+  text:  So the matrices, the matrices, just like you repeat these rows,
+  asr:   (same as text)
+  words: So[2931000-2931220] the[2931270-2931550] matrices,[2931600-2932240] the[2932290-2932570] matrices,[2957920-2958560] just[2958610-2958950] like[2959000-2959340] you[2959390-2959670] repeat[2959720-2960180] these[2960230-2960630] rows,[2960680-2961080]
+  zh:    所以矩阵，矩阵，就像你重复这些行，
+== cues
+#0  14:56.000 → 15:01.470  (5470 ms, 73 ch)
+  en: Remember the definition: what you learn afterwards is the same as before.
+  zh: 请记住定义：之后你知道的东西与之前完全相同。
+#1  15:01.470 → 15:03.190  (1720 ms, 2 ch)
+  en: Is
+  zh: 大家明白为什么这个方案不安全吗？
+#1  15:12.040 → 15:15.230  (3190 ms, 41 ch)
+  en: it obvious why this scheme is not secure?
+  zh: 大家明白为什么这个方案不安全吗？
+#2  21:40.000 → 21:45.770  (5770 ms, 53 ch)
+  en: So, it must be a value that you have not used before.
+  zh: 所以，它必须是你以前没有用过的值。
+#2  21:54.570 → 21:55.190  (620 ms, 8 ch)
+  en: Exactly.
+  zh: 没错。
+#3  21:55.190 → 21:57.360  (2170 ms, 27 ch)
+  en: So, you have to discard it.
+  zh: 所以你必须丢弃它。
+#4  44:27.000 → 44:30.460  (3460 ms, 25 ch)
+  en: these are the bytes here,
+  zh: 就是这里的这些字节，
+#4  44:40.010 → 44:40.410  (400 ms, 5 ch)
+  en: okay?
+  zh: 明白吗？
+#5  48:51.000 → 48:54.070  (3070 ms, 20 ch)
+  en: So the matrices, the
+  zh: 所以矩阵，
+#5  49:17.920 → 49:21.080  (3160 ms, 42 ch)
+  en: matrices, just like you repeat these rows,
+  zh: 矩阵，就像你重复这些行，

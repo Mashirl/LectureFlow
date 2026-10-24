@@ -1,0 +1,78 @@
+## ^COMP2001 (?P<day>\d{2}) (?P<month>[A-Za-z]{3}) (?P<hour>\d{2})(?P<minute>\d{2})\.mp4$
+uploaded 2026-10-20 21:00 Tue
+COMP2001 07 Oct 0935.mp4
+  status=ok recorded_at=2026-10-07 09:35 Wed has_time=true
+uploaded 2027-01-05 08:00 Tue
+COMP2001 15 Dec 1400.mp4
+  status=ok recorded_at=2026-12-15 14:00 Tue has_time=true
+uploaded 2027-01-05 08:00 Tue
+COMP2001 05 Jan 1000.mp4
+  status=ok recorded_at=2027-01-05 10:00 Tue has_time=true
+uploaded 2027-01-05 08:00 Tue
+COMP2001 06 Jan 1000.mp4
+  status=ok recorded_at=2026-01-06 10:00 Tue has_time=true
+uploaded 2028-03-10 08:00 Fri
+COMP2001 29 Feb 1000.mp4
+  status=ok recorded_at=2028-02-29 10:00 Tue has_time=true
+uploaded 2027-03-10 08:00 Wed
+COMP2001 29 Feb 1000.mp4
+  status=invalid recorded_at=- has_time=false
+  error=日期不合法：2027-02-29
+uploaded 2026-10-20 21:00 Tue
+COMP2001 07 OCT 0935.mp4
+  status=ok recorded_at=2026-10-07 09:35 Wed has_time=true
+uploaded 2026-10-20 21:00 Tue
+COMP2001 7 Oct 0935.mp4
+  status=unmatched recorded_at=- has_time=false
+  error=文件名与规则不匹配
+
+## ^(?P<title>[A-Za-z_ ]+?) - (?P<month>[A-Za-z]+\.?) (?P<day>\d{1,2}(?:st|nd|rd|th)?),? (?P<year>\d{4}) (?P<hour>\d{1,2}):(?P<minute>\d{2}) ?(?P<ampm>[AaPp]\.?[Mm]\.?)\.mp4$
+uploaded 2026-10-20 21:00 Tue
+Block_Ciphers - October 7th, 2026 9:35 AM.mp4
+  status=ok recorded_at=2026-10-07 09:35 Wed has_time=true title="Block Ciphers"
+uploaded 2026-10-20 21:00 Tue
+Stream  Ciphers - Sept. 30th, 2026 2:05 pm.mp4
+  status=ok recorded_at=2026-09-30 14:05 Wed has_time=true title="Stream Ciphers"
+uploaded 2026-10-20 21:00 Tue
+Hash Functions - October 14, 2026 12:10 PM.mp4
+  status=ok recorded_at=2026-10-14 12:10 Wed has_time=true title="Hash Functions"
+uploaded 2026-10-20 21:00 Tue
+Late Lab - October 13, 2026 12:30 a.m..mp4
+  status=ok recorded_at=2026-10-13 00:30 Tue has_time=true title="Late Lab"
+uploaded 2026-10-20 21:00 Tue
+Bad Time - October 14, 2026 13:10 PM.mp4
+  status=invalid recorded_at=- has_time=false title="Bad Time"
+  error=时间不合法：13:10 PM
+uploaded 2026-10-20 21:00 Tue
+Old Notes - May 2nd, 2024 10:00 am.mp4
+  status=suspicious recorded_at=2024-05-02 10:00 Thu has_time=true title="Old Notes"
+
+## ^Lec_(?P<day>\d{2})(?P<month>\d{2})(?P<year>\d{2})\.mp4$
+uploaded 2026-10-20 21:00 Tue
+Lec_071026.mp4
+  status=ok recorded_at=2026-10-07 --:-- Wed has_time=false
+uploaded 2026-11-02 21:00 Mon
+Lec_311026.mp4
+  status=ok recorded_at=2026-10-31 --:-- Sat has_time=false
+uploaded 2026-10-20 21:00 Tue
+Lec_310926.mp4
+  status=invalid recorded_at=- has_time=false
+  error=日期不合法：2026-09-31
+
+## ^W\d+ (?P<month>\d{1,2})-(?P<day>\d{1,2})\.mp4$ (year_default 2025)
+uploaded 2026-10-20 21:00 Tue
+W3 10-7.mp4
+  status=ok recorded_at=2025-10-07 --:-- Tue has_time=false
+uploaded 2026-10-20 21:00 Tue
+notes.mp4
+  status=unmatched recorded_at=- has_time=false
+  error=文件名与规则不匹配
+
+## (?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})|(?P<day>\d{1,2})\.(?P<month>\d{1,2})\.(?P<year>\d{4})
+uploaded 2026-10-20 21:00 Tue
+Lec 2026-10-07.mp4
+  status=ok recorded_at=2026-10-07 --:-- Wed has_time=false
+uploaded 2026-10-20 21:00 Tue
+Lec 7.10.2026.mp4
+  status=ok recorded_at=2026-10-07 --:-- Wed has_time=false
+

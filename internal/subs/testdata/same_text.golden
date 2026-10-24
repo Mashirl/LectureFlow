@@ -1,0 +1,17 @@
+== input
+sentence #4  01:01.000 → 01:09.830
+  text:  Today we look at block ciphers, and in particular at how AES turns a key and a block of plaintext into ciphertext.
+  asr:   (same as text)
+  words: Today[61000-61400] we[61450-61670] look[61720-62060] at[62110-62330] block[62380-62780] ciphers,[62830-63410] and[63460-63740] in[63790-64010] particular[64060-64760] at[64810-65030] how[65080-65360] AES[65410-65690] turns[65740-66140] a[66190-66350] key[66400-66680] and[66730-67010] a[67060-67220] block[67270-67670] of[67720-67940] plaintext[67990-68630] into[68680-69020] ciphertext.[69070-69830]
+  zh:    今天我们来看分组密码，特别是 AES 如何把密钥和一个明文分组变成密文。
+  times: Today[61000-61400] we[61450-61670] look[61720-62060] at[62110-62330] block[62380-62780] ciphers,[62830-63410] and[63460-63740] in[63790-64010] particular[64060-64760] at[64810-65030] how[65080-65360] AES[65410-65690] turns[65740-66140] a[66190-66350] key[66400-66680] and[66730-67010] a[67060-67220] block[67270-67670] of[67720-67940] plaintext[67990-68630] into[68680-69020] ciphertext.[69070-69830]
+== cues
+#4  01:01.000 → 01:03.460  (2460 ms, 31 ch)
+  en: Today we look at block ciphers,
+  zh: 今天我们来看分组密码，
+#4  01:03.460 → 01:06.730  (3270 ms, 40 ch)
+  en: and in particular at how AES turns a key
+  zh: 特别是 AES 如何把
+#4  01:06.730 → 01:09.830  (3100 ms, 41 ch)
+  en: and a block of plaintext into ciphertext.
+  zh: 密钥和一个明文分组变成密文。

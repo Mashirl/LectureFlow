@@ -1,0 +1,40 @@
+{
+  "python": ".venv-ov\\Scripts\\python.exe",
+  "available": true,
+  "version": "2026.4.1-22982-e213a147257-releases/2026/4",
+  "genai_version": "2026.4.1.0-3408-ab01d1771e4",
+  "can_convert": true,
+  "devices": [
+    {
+      "name": "GPU.0",
+      "kind": "igpu",
+      "full_name": "Intel(R) Graphics (iGPU)",
+      "driver_version": "32.0.101.8724",
+      "device_id": "ov:GPU"
+    },
+    {
+      "name": "NPU",
+      "kind": "npu",
+      "full_name": "Intel(R) AI Boost",
+      "driver_version": "32.0.100.4841",
+      "device_id": "ov:NPU"
+    },
+    {
+      "name": "CPU",
+      "kind": "cpu",
+      "full_name": "Intel(R) Core(TM) Ultra 9 386H",
+      "driver_version": "",
+      "device_id": "ov:CPU"
+    }
+  ],
+  "ignored": [
+    {
+      "name": "GPU.1",
+      "kind": "",
+      "full_name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU (dGPU)",
+      "driver_version": "",
+      "reason": "not_intel"
+    }
+  ],
+  "detected_at": "2026-10-24T08:00:00Z"
+}

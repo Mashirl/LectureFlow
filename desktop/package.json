@@ -1,0 +1,25 @@
+{
+  "name": "lectureflow-desktop",
+  "productName": "LectureFlow",
+  "version": "3.0.0",
+  "description": "LectureFlow desktop shell: starts the local LectureFlow service and shows it in a window.",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "author": "LectureFlow contributors",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"test/unit/**/*.test.js\"",
+    "test:e2e": "playwright test",
+    "stage": "node scripts/stage.js",
+    "dist": "node scripts/dist.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
+  }
+}

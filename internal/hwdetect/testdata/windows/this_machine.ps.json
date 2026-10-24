@@ -1,0 +1,76 @@
+{
+ "video": [
+  {
+   "Name": "MuMuPlayer Virtual Display Adapter",
+   "AdapterCompatibility": "MuMuPlayer",
+   "AdapterRAM": null,
+   "PNPDeviceID": "ROOT\\DISPLAY\\0000",
+   "DriverVersion": "22.3.52.447"
+  },
+  {
+   "Name": "Intel(R) Graphics",
+   "AdapterCompatibility": "Intel Corporation",
+   "AdapterRAM": 2147479552,
+   "PNPDeviceID": "PCI\\VEN_8086&DEV_B0A0",
+   "DriverVersion": "32.0.101.8724"
+  },
+  {
+   "Name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+   "AdapterCompatibility": "NVIDIA",
+   "AdapterRAM": 4293918720,
+   "PNPDeviceID": "PCI\\VEN_10DE&DEV_2F58",
+   "DriverVersion": "32.0.15.9200"
+  }
+ ],
+ "vram": [
+  {
+   "DriverDesc": "Intel(R) Graphics",
+   "HardwareInformation.qwMemorySize": null
+  },
+  {
+   "DriverDesc": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+   "HardwareInformation.qwMemorySize": 12820938752
+  },
+  {
+   "DriverDesc": "MuMuPlayer Virtual Display Adapter",
+   "HardwareInformation.qwMemorySize": null
+  }
+ ],
+ "pnp": [
+  {
+   "Name": "USB Input Device",
+   "PNPClass": "HIDClass",
+   "Manufacturer": "(Standard system devices)"
+  },
+  {
+   "Name": "Intel(R) NPU",
+   "PNPClass": "ComputeAccelerator",
+   "Manufacturer": "Intel Corporation"
+  },
+  {
+   "Name": "Microsoft Input Configuration Device",
+   "PNPClass": "HIDClass",
+   "Manufacturer": "Microsoft"
+  },
+  {
+   "Name": "USB Input Device",
+   "PNPClass": "HIDClass",
+   "Manufacturer": "(Standard system devices)"
+  }
+ ],
+ "cpu": [
+  {
+   "Name": "Intel(R) Core(TM) Ultra 9 386H"
+  }
+ ],
+ "cs": [
+  {
+   "TotalPhysicalMemory": 68060700672
+  }
+ ],
+ "battery": [
+  {
+   "Name": "Battery"
+  }
+ ]
+}

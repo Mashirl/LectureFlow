@@ -1,0 +1,27 @@
+ok=true matched=4/5
+
+CSC1003-L01-01 Wed Oct 07 09-35-00 BST 2026.mp4
+  status=ok recorded_at=2026-10-07 09:35 Wed has_time=true
+CSC1003-L01-01 Wed Oct 14 09-35-00 BST 2026.mp4
+  status=ok recorded_at=2026-10-14 09:35 Wed has_time=true
+CSC1003-L01-01 Wed Sep 30 09-35-00 BST 2026.mp4
+  status=ok recorded_at=2026-09-30 09:35 Wed has_time=true
+CSC1003-L02-01 Tue Sep 29 12-35-00 BST 2026.mp4
+  status=ok recorded_at=2026-09-29 12:35 Tue has_time=true
+lecture recording (1).mp4
+  status=unmatched recorded_at=- has_time=false
+  error=文件名与规则不匹配
+
+recorded_at:
+  filename 2026-10-07 09:35 Wed  CSC1003-L01-01 Wed Oct 07 09-35-00 BST 2026.mp4
+  filename 2026-10-14 09:35 Wed  CSC1003-L01-01 Wed Oct 14 09-35-00 BST 2026.mp4
+  filename 2026-09-30 09:35 Wed  CSC1003-L01-01 Wed Sep 30 09-35-00 BST 2026.mp4
+  filename 2026-09-29 12:35 Tue  CSC1003-L02-01 Tue Sep 29 12-35-00 BST 2026.mp4
+  metadata 2026-10-02 11:00 Fri  lecture recording (1).mp4
+
+lectures:
+ 1 W01L1  ok=true  w=1 n=1 2026-09-29 12:35 Tue  CSC1003-L02-01 Tue Sep 29 12-35-00 BST 2026.mp4
+ 2 W01L2  ok=true  w=1 n=2 2026-09-30 09:35 Wed  CSC1003-L01-01 Wed Sep 30 09-35-00 BST 2026.mp4
+ 3 W01L3  ok=true  w=1 n=3 2026-10-02 11:00 Fri  lecture recording (1).mp4
+ 4 W02L1  ok=true  w=2 n=1 2026-10-07 09:35 Wed  CSC1003-L01-01 Wed Oct 07 09-35-00 BST 2026.mp4
+ 5 W03L1  ok=true  w=3 n=1 2026-10-14 09:35 Wed  CSC1003-L01-01 Wed Oct 14 09-35-00 BST 2026.mp4

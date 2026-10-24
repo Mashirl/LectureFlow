@@ -1,0 +1,47 @@
+== input
+sentence #0  00:05.000 → 00:05.000
+  text:  Zero length.
+  asr:   (same as text)
+  words: none
+  zh:    零长度。
+  times: Zero[5000-5000] length.[5000-5000]
+sentence #1  00:07.000 → 00:09.000
+  text:  every word here was stamped at the same instant by a broken decoder and only the last one has a duration
+  asr:   (same as text)
+  words: every[7000-7000] word[7000-7000] here[7000-7000] was[7000-7000] stamped[7000-7000] at[7000-7000] the[7000-7000] same[7000-7000] instant[7000-7000] by[7000-7000] a[7000-7000] broken[7000-7000] decoder[7000-7000] and[7000-7000] only[7000-7000] the[7000-7000] last[7000-7000] one[7000-7000] has[7000-7000] a[7000-7000] duration[7000-9000]
+  zh:    (not translated)
+  times: every[7000-7000] word[7000-7000] here[7000-7000] was[7000-7000] stamped[7000-7000] at[7000-7000] the[7000-7000] same[7000-7000] instant[7000-7000] by[7000-7000] a[7000-7000] broken[7000-7000] decoder[7000-7000] and[7000-7000] only[7000-7000] the[7000-7000] last[7000-7000] one[7000-7000] has[7000-7000] a[7000-7000] duration[7000-9000]
+sentence #2  00:10.000 → 00:12.000
+  text:    
+  asr:   
+  words: none
+  zh:    只有中文。
+  times: 
+sentence #3  00:09.500 → 00:11.000
+  text:  Out of order.
+  asr:   (same as text)
+  words: none
+  zh:    顺序错乱。
+  times: Out[9500-9846] of[9961-10192] order.[10307-11000]
+sentence #4  00:20.000 → 00:19.000
+  text:  Inverted times.
+  asr:   (same as text)
+  words: none
+  zh:    (not translated)
+  times: Inverted[20000-20000] times.[20000-20000]
+== cues
+#0  00:05.000 → 00:07.000  (2000 ms, 12 ch)
+  en: Zero length.
+  zh: 零长度。
+#1  00:07.000 → 00:10.000  (3000 ms, 104 ch)
+  en: every word here was stamped at the same instant by a broken decoder and only the last one has a duration
+  zh: 
+#2  00:10.000 → 00:12.000  (2000 ms, 0 ch)
+  en: 
+  zh: 只有中文。
+#3  00:12.000 → 00:13.500  (1500 ms, 13 ch)
+  en: Out of order.
+  zh: 顺序错乱。
+#4  00:20.000 → 00:21.000  (1000 ms, 15 ch)
+  en: Inverted times.
+  zh: 

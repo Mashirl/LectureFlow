@@ -1,0 +1,23 @@
+{
+  "id": "01JCRS0000000000000000000A", "name": "CSC1002 Computer Architecture", "created_at": "2026-09-28T10:00:00Z",
+  "glossary_version": 4,
+  "syllabus": {"filename": "syllabus.pdf", "chars": 18234},
+  "stages": [
+    {"stage": "glossary_seed", "status": "done", "progress": 1, "attempt": 0, "error": null, "allowed_actions": ["rerun"], "started_at": "2026-09-28T10:00:05Z", "finished_at": "2026-09-28T10:00:35Z", "duration_ms": 30000, "stats": {"prompt_tokens": 6000, "cache_hit_tokens": 0, "completion_tokens": 3000, "estimated_cost": null}}
+  ],
+  "materials": [
+    {"id": "01JMAT0000000000000000000A", "course_id": "01JCRS0000000000000000000A", "lecture_id": null, "filename": "intro.pdf", "pages": 34, "text_warning": "text_incomplete", "can_delete": false, "created_at": "2026-09-28T10:01:00Z",
+     "stages": [
+       {"stage": "material_extract", "status": "done", "progress": 1, "attempt": 0, "error": null, "allowed_actions": ["rerun"], "started_at": null, "finished_at": null, "duration_ms": null, "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+       {"stage": "material_terms", "status": "running", "progress": 0.5, "attempt": 0, "error": null, "allowed_actions": ["cancel"], "started_at": null, "finished_at": null, "duration_ms": null, "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}}
+     ]},
+    {"id": "01JMAT0000000000000000000B", "course_id": "01JCRS0000000000000000000A", "lecture_id": "01JLEC0000000000000000000A", "filename": "week3-caching.pdf", "pages": 0, "can_delete": true, "created_at": "2026-10-23T19:00:00Z",
+     "stages": [
+       {"stage": "material_extract", "status": "queued", "progress": 0, "attempt": 0, "error": null, "allowed_actions": ["cancel"], "started_at": null, "finished_at": null, "duration_ms": null, "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}},
+       {"stage": "material_terms", "status": "pending", "progress": 0, "attempt": 0, "error": null, "allowed_actions": [], "waiting_for": "upstream:material_extract", "started_at": null, "finished_at": null, "duration_ms": null, "stats": {"prompt_tokens": 0, "cache_hit_tokens": 0, "completion_tokens": 0, "estimated_cost": null}}
+     ]}
+  ],
+  "term_count": 87,
+  "lecture_count": 2,
+  "janitor": {"configured": true, "running": false, "last_at": "2026-09-28T10:02:10Z", "last_model": "Anthropic / claude-opus-5-5", "last_version": 4, "last_changes": 12}
+}

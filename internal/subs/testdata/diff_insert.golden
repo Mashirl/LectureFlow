@@ -1,0 +1,14 @@
+== input
+sentence #7  02:00.000 → 02:06.370
+  text:  The shared key is kept secret by both parties, and it is never sent over the network.
+  asr:   the key is kept secret by both parties and never sent over the network
+  words: the[120000-120280] key[120330-120610] is[120660-120880] kept[120930-121270] secret[121320-121780] by[121830-122050] both[122100-122440] parties[122490-123010] and[123960-124240] never[124290-124690] sent[124740-125080] over[125130-125470] the[125520-125800] network[125850-126370]
+  zh:    双方都对共享密钥保密，并且它从不通过网络发送。
+  times: The[120000-120280] shared[120280-120330] key[120330-120610] is[120660-120880] kept[120930-121270] secret[121320-121780] by[121830-122050] both[122100-122440] parties,[122490-123010] and[123960-124240] it[124240-124260] is[124270-124290] never[124290-124690] sent[124740-125080] over[125130-125470] the[125520-125800] network.[125850-126370]
+== cues
+#7  02:00.000 → 02:03.960  (3960 ms, 46 ch)
+  en: The shared key is kept secret by both parties,
+  zh: 双方都对共享密钥保密，
+#7  02:03.960 → 02:06.370  (2410 ms, 38 ch)
+  en: and it is never sent over the network.
+  zh: 并且它从不通过网络发送。

@@ -1,0 +1,19 @@
+== input
+sentence #6  01:30.000 → 01:45.220
+  text:  Okay, so the next thing I want to show you is the definition we will use for the rest of the course, and it is going to come up again and again in the exercises.
+  asr:   (same as text)
+  words: Okay,[90000-90400] so[91250-91470] the[91520-91800] next[91850-92190] thing[92240-92640] I[92690-92850] want[92900-93240] to[93290-93510] show[93560-93900] you[93950-94230] is[95080-95300] the[95350-95630] definition[95680-96380] we[96430-96650] will[96700-97040] use[97090-97370] for[97420-97700] the[97750-98030] rest[98080-98420] of[98470-98690] the[98740-99020] course,[99070-99590] and[100440-100720] it[100770-100990] is[101040-101260] going[101310-101710] to[101760-101980] come[102030-102370] up[102420-102640] again[102690-103090] and[103140-103420] again[103470-103870] in[103920-104140] the[104190-104470] exercises.[104520-105220]
+  zh:    好，下面是本课程通用的定义。
+== cues
+#6  01:30.000 → 01:31.250  (1250 ms, 5 ch)
+  en: Okay,
+  zh: 好，
+#6  01:31.250 → 01:35.680  (4430 ms, 43 ch)
+  en: so the next thing I want to show you is the
+  zh: 好，
+#6  01:35.680 → 01:40.440  (4760 ms, 50 ch)
+  en: definition we will use for the rest of the course,
+  zh: 下面是本课程通用的
+#6  01:40.440 → 01:45.220  (4780 ms, 60 ch)
+  en: and it is going to come up again and again in the exercises.
+  zh: 定义。

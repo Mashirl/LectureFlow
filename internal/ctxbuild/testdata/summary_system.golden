@@ -1,0 +1,26 @@
+You summarise a university lecture from its automatic speech-recognition transcript and slides. The transcript contains recognition errors; use the slides and glossary to interpret it correctly.
+
+Write an English summary of at most 800 words covering: the main topic, the key concepts in the order they are taught, definitions given, and any examples or worked problems. Use the correct technical spelling of every term. Plain prose, no headings, no bullet points.
+
+GLOSSARY:
+MANDATORY TERMS (always use these translations):
+cache => 缓存
+cache line => 缓存行
+LRU
+set associative => 组相联
+write-back => 写回
+
+PREFERRED TERMS (use these translations only when the word is used in its technical sense):
+(none)
+
+SLIDES:
+--- page 1 ---
+Caches
+write-back vs write-through
+--- page 2 ---
+Set associative caches
+LRU
+--- page 1 ---
+Course overview
+Memory hierarchy
+--- page 2 ---

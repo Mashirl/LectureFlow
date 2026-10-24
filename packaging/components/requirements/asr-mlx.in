@@ -1,0 +1,4 @@
+# Component "asr-mlx": mlx-whisper on Apple Silicon (SPEC-v3 V3.1, V5).
+# mlx-whisper 0.4.3: MIT (PyPI metadata; ml-explore/mlx-examples LICENSE is MIT);
+# mlx: MIT (ml-explore/mlx LICENSE).
+mlx-whisper==0.4.3

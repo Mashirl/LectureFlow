@@ -1,0 +1,91 @@
+{
+  "schema": "lectureflow.cite/v2",
+  "how_to_cite": "Cite statements with the ref field in square brackets, e.g. [CSC1003 W02L1@12:34]. Use the sentence id when an exact reference is needed.",
+  "course": {
+    "id": "01JCOURSECRYPTO",
+    "code": "CSC1003",
+    "name": "Cryptography"
+  },
+  "lectures": [
+    {
+      "id": "01JLECTURE03",
+      "label": "W02L1",
+      "week": 2,
+      "n": 1,
+      "recorded_at": "2026-10-06T09:05",
+      "title": "Block Ciphers and Modes",
+      "title_zh": "分组密码与工作模式",
+      "blurb_en": "How block ciphers work and how modes chain blocks.",
+      "blurb_zh": "分组密码的原理，以及工作模式如何连接各个分组。",
+      "duration_ms": 3741200,
+      "summary": "The lecture introduces block ciphers.",
+      "sentences": [
+        {
+          "id": "CSC1003.W02L1.s0001",
+          "ref": "CSC1003 W02L1@00:00",
+          "start_ms": 0,
+          "end_ms": 3800,
+          "en": "Okay, let's begin with x < y && y > z.",
+          "zh": "好，我们从 x < y && y > z 开始。",
+          "edited": false
+        },
+        {
+          "id": "CSC1003.W02L1.s0002",
+          "ref": "CSC1003 W02L1@12:34",
+          "start_ms": 754000,
+          "end_ms": 758600,
+          "en": "A block cipher works on fixed-size blocks.",
+          "zh": "分组密码处理固定大小的分组。",
+          "edited": true
+        },
+        {
+          "id": "CSC1003.W02L1.s0003",
+          "ref": "CSC1003 W02L1@12:34",
+          "start_ms": 754300,
+          "end_ms": 756000,
+          "en": "Same second, different sentence.",
+          "zh": null,
+          "edited": false
+        },
+        {
+          "id": "CSC1003.W02L1.s0004",
+          "ref": "CSC1003 W02L1@1:02:05",
+          "start_ms": 3725000,
+          "end_ms": 3729999,
+          "en": "Past the hour: AES rounds.",
+          "zh": null,
+          "edited": false
+        },
+        {
+          "id": "CSC1003.W02L1.s0005",
+          "ref": "CSC1003 W02L1@1:02:09",
+          "start_ms": 3729999,
+          "end_ms": 3735000,
+          "en": "A stale translation is not cited.",
+          "zh": null,
+          "edited": false
+        },
+        {
+          "id": "CSC1003.W02L1.s0006",
+          "ref": "CSC1003 W02L1@1:02:15",
+          "start_ms": 3735000,
+          "end_ms": 3741200,
+          "en": "Reset edit.",
+          "zh": "重置的修改。",
+          "edited": false
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "en": "AES",
+      "zh": ""
+    },
+    {
+      "en": "block cipher",
+      "zh": "分组密码"
+    }
+  ],
+  "generated_at": "2026-10-23T12:00:00Z"
+}

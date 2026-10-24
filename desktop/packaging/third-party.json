@@ -1,0 +1,257 @@
+{
+  "_doc": "Third-party programs bundled into resources/bin by scripts/stage.js (SPEC-v3 V7, V10). Every download is pinned by URL and SHA-256 and verified before use; the cache is desktop/.cache (git-ignored). Keep packaging/licenses/binaries.json in step with this file.",
+  "ffmpeg": {
+    "version": "9.0.2",
+    "license": "LGPL-2.1-or-later",
+    "windows-x64": {
+      "build": "built from source by scripts/build-ffmpeg-windows.sh: Linux, mingw-w64 cross compiler (CI: ubuntu runner; locally: Docker)",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+      "size": 12040788,
+      "root": "ffmpeg-9.0.2",
+      "source_code": [
+        {
+          "what": "FFmpeg 9.0.2 release tarball (build script: desktop/scripts/build-ffmpeg-windows.sh)",
+          "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+        },
+        {
+          "what": "zlib 1.3.1 (commit 51b7f2abdade)",
+          "url": "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz"
+        },
+        {
+          "what": "nv-codec-headers 12.1.14.0 (commit 1889e62e2d35)",
+          "url": "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz"
+        },
+        {
+          "what": "OpenH264 2.6.0 (commit 652bdb7719f3)",
+          "url": "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz"
+        },
+        {
+          "what": "libvpl 2.16.0 (commit 778a66d6c653)",
+          "url": "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz"
+        },
+        {
+          "what": "MinGW-w64 runtime 11.0.1 as packaged by Ubuntu 24.04 (static CRT parts)",
+          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1"
+        },
+        {
+          "what": "GCC 13.2.0 for MinGW-w64 as packaged by Ubuntu 24.04 (static libgcc, libstdc++)",
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1"
+        }
+      ],
+      "docker_image": "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+      "apt_packages": [
+        "ca-certificates",
+        "curl",
+        "xz-utils",
+        "gcc",
+        "libc6-dev",
+        "make",
+        "cmake",
+        "nasm",
+        "pkgconf",
+        "python3",
+        "gcc-mingw-w64-x86-64-win32",
+        "g++-mingw-w64-x86-64-win32",
+        "binutils-mingw-w64-x86-64",
+        "mingw-w64-x86-64-dev",
+        "mingw-w64-common"
+      ],
+      "deps": [
+        {
+          "name": "zlib",
+          "version": "1.3.1",
+          "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+          "license": "Zlib",
+          "url": "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz",
+          "sha256": "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
+          "root": "zlib-1.3.1",
+          "licenses": [
+            "LICENSE"
+          ]
+        },
+        {
+          "name": "nv-codec-headers",
+          "version": "12.1.14.0",
+          "commit": "1889e62e2d35ff7aa9baca2bceb14f053785e6f1",
+          "license": "MIT",
+          "url": "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz",
+          "sha256": "2fefaa227d2a3b4170797796425a59d1dd2ed5fd231db9b4244468ba327acd0b",
+          "root": "nv-codec-headers-n12.1.14.0",
+          "licenses": []
+        },
+        {
+          "name": "OpenH264",
+          "version": "2.6.0",
+          "commit": "652bdb7719f30b52b08e506645a7322ff1b2cc6f",
+          "license": "BSD-2-Clause",
+          "url": "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz",
+          "sha256": "558544ad358283a7ab2930d69a9ceddf913f4a51ee9bf1bfb9e377322af81a69",
+          "root": "openh264-2.6.0",
+          "licenses": [
+            "LICENSE"
+          ]
+        },
+        {
+          "name": "libvpl",
+          "version": "2.16.0",
+          "commit": "778a66d6c6537f08eabb91955dbbf1bce3812894",
+          "license": "MIT",
+          "url": "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
+          "sha256": "d60931937426130ddad9f1975c010543f0da99e67edb1c6070656b7947f633b6",
+          "root": "libvpl-2.16.0",
+          "licenses": [
+            "LICENSE"
+          ]
+        }
+      ],
+      "configure": [
+        "--prefix=PREFIX",
+        "--arch=x86_64",
+        "--target-os=mingw32",
+        "--cross-prefix=x86_64-w64-mingw32-",
+        "--pkg-config=pkg-config",
+        "--pkg-config-flags=--static",
+        "--disable-gpl",
+        "--disable-nonfree",
+        "--disable-version3",
+        "--disable-autodetect",
+        "--enable-w32threads",
+        "--enable-zlib",
+        "--enable-d3d11va",
+        "--enable-dxva2",
+        "--enable-ffnvcodec",
+        "--enable-nvenc",
+        "--enable-libvpl",
+        "--enable-libopenh264",
+        "--enable-shared",
+        "--disable-static",
+        "--disable-doc",
+        "--disable-ffplay",
+        "--disable-debug",
+        "--extra-cflags=-IDEPS/include",
+        "--extra-ldflags=-LDEPS/lib -static-libgcc"
+      ],
+      "bin": [
+        "bin/ffmpeg.exe",
+        "bin/ffprobe.exe",
+        "bin/*.dll"
+      ],
+      "licenses": [
+        "COPYING.LGPLv2.1",
+        "LICENSE.md",
+        "thirdparty/*"
+      ],
+      "allowed_imports": [
+        "KERNEL32.dll",
+        "USER32.dll",
+        "ADVAPI32.dll",
+        "SHELL32.dll",
+        "ole32.dll",
+        "OLEAUT32.dll",
+        "bcrypt.dll",
+        "WS2_32.dll",
+        "SECUR32.dll",
+        "msvcrt.dll",
+        "PSAPI.DLL",
+        "GDI32.dll",
+        "SHLWAPI.dll",
+        "AVICAP32.dll",
+        "api-ms-win-*",
+        "avcodec-*.dll",
+        "avdevice-*.dll",
+        "avfilter-*.dll",
+        "avformat-*.dll",
+        "avutil-*.dll",
+        "swresample-*.dll",
+        "swscale-*.dll"
+      ],
+      "note": "Minimal LGPL build (gate fix 2, lead ruling): FFmpeg 9.0.2 with only its internal codecs and formats plus NVENC (nv-codec-headers, headers only; NVIDIA driver 531.61 or newer at run time), Intel Quick Sync (libvpl dispatcher) and OpenH264 built from source (not Cisco's binary). Shared DLLs next to ffmpeg.exe and ffprobe.exe, so they can be replaced (LGPL). The GCC runtime (libgcc, libstdc++) and parts of the MinGW-w64 runtime are linked statically; no other DLL than Windows system libraries is needed.",
+      "toolchain": {
+        "gcc-mingw-w64-x86-64-win32": "13.2.0-6ubuntu1+26.1",
+        "g++-mingw-w64-x86-64-win32": "13.2.0-6ubuntu1+26.1",
+        "mingw-w64-x86-64-dev": "11.0.1-3build1"
+      }
+    },
+    "darwin-arm64": {
+      "build": "built from source in CI (scripts/build-ffmpeg-macos.sh)",
+      "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "source_code": [
+        {
+          "what": "FFmpeg 9.0.2 release tarball (this URL; the build script is desktop/scripts/build-ffmpeg-macos.sh)",
+          "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+        }
+      ],
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+      "size": 12040788,
+      "root": "ffmpeg-9.0.2",
+      "configure": [
+        "--prefix=PREFIX",
+        "--arch=arm64",
+        "--cc=clang",
+        "--enable-pthreads",
+        "--disable-gpl",
+        "--disable-nonfree",
+        "--disable-autodetect",
+        "--enable-zlib",
+        "--enable-videotoolbox",
+        "--enable-audiotoolbox",
+        "--enable-static",
+        "--disable-shared",
+        "--disable-doc",
+        "--disable-ffplay",
+        "--disable-debug"
+      ],
+      "bin": [
+        "bin/ffmpeg",
+        "bin/ffprobe"
+      ],
+      "licenses": [
+        "COPYING.LGPLv2.1",
+        "LICENSE.md"
+      ],
+      "note": "Static executables (no dylib paths to fix). --disable-autodetect keeps optional libraries that a CI image may happen to have (some of them GPL) out of the build; only zlib, pthreads and the macOS frameworks named here are enabled."
+    },
+    "forbidden_configure": [
+      "--enable-gpl",
+      "--enable-nonfree",
+      "--enable-version3",
+      "--enable-libx264",
+      "--enable-libx265"
+    ]
+  },
+  "uv": {
+    "version": "0.13.1",
+    "license": "MIT OR Apache-2.0",
+    "windows-x64": {
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-x86_64-pc-windows-msvc.zip",
+      "sha256": "3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672",
+      "root": "",
+      "bin": [
+        "uv.exe"
+      ],
+      "licenses": []
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/astral-sh/uv/releases/download/0.13.1/uv-aarch64-apple-darwin.tar.gz",
+      "sha256": "cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2",
+      "root": "uv-aarch64-apple-darwin",
+      "bin": [
+        "uv"
+      ],
+      "licenses": []
+    },
+    "license_texts": [
+      {
+        "name": "LICENSE-MIT",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/0.13.1/LICENSE-MIT",
+        "sha256": "860e3d7a86b84e6a7012c7a635fc64df475cebc6cce34dfeb73a5982ec58176c"
+      },
+      {
+        "name": "LICENSE-APACHE",
+        "url": "https://raw.githubusercontent.com/astral-sh/uv/0.13.1/LICENSE-APACHE",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    ]
+  }
+}

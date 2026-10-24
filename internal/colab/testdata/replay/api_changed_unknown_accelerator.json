@@ -1,0 +1,158 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py Accelerator 枚举构造，非真实录制：应答中的加速器不在上游枚举之内。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Accelerator",
+   "colab_cli/client.py#PostAssignmentResponse"
+  ]
+ },
+ "recorded": false,
+ "steps": [
+  {
+   "name": "refresh the access token",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/token",
+    "headers": {
+     "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "form": {
+     "grant_type": "refresh_token",
+     "client_id": "replay-client.apps.googleusercontent.com",
+     "client_secret": "replay-client-secret-abcdef",
+     "refresh_token": "1//replay-refresh-token-0123456789",
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "access_token": "ya29.replay-access-token-1",
+     "expires_in": 3599,
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory",
+     "token_type": "Bearer"
+    }
+   }
+  },
+  {
+   "name": "ccu-info",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/ccu-info",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "currentBalance": 95.5,
+     "consumptionRateHourly": 0,
+     "assignmentsCount": 0
+    }
+   }
+  },
+  {
+   "name": "assign: GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "acc": "T4",
+     "nbh": "the_notebook_hash",
+     "token": "xsrf-assign-replay-1",
+     "variant": "GPU"
+    }
+   }
+  },
+  {
+   "name": "assign: POST (accelerator Z9)",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-assign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "accelerator": "Z9",
+     "endpoint": "gpu-t4-s-replay1",
+     "runtimeProxyInfo": {
+      "token": "proxy-token-replay-1",
+      "tokenExpiresInSeconds": 3600,
+      "url": "{{runtime_url}}"
+     },
+     "variant": 1
+    }
+   }
+  },
+  {
+   "name": "give up: GET to confirm nothing was assigned",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "acc": "T4",
+     "nbh": "the_notebook_hash",
+     "token": "xsrf-assign-replay-1",
+     "variant": "GPU"
+    }
+   }
+  }
+ ]
+}

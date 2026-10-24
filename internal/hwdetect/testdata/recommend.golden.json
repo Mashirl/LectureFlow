@@ -1,0 +1,1470 @@
+[
+  {
+    "name": "this_machine_nvidia_12gb_igpu_npu",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 386H",
+      "ram_mb": 64907,
+      "disk_free_mb": 3155806,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "Intel(R) NPU",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:float16",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+            "vram_gb": 12
+          }
+        },
+        {
+          "code": "hw.reason.npu_battery",
+          "params": {
+            "name": "Intel(R) NPU"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_24gb",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 24576,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 24
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_10240_float16_boundary",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 10240,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 10
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_10239_int8_float16",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 10239,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 10
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_8gb",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 8192,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 8
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_6000_large_boundary",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 6000,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 6
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_5999_turbo",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 5999,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3-turbo:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 6
+          }
+        },
+        {
+          "code": "hw.reason.nvidia_small_vram",
+          "params": {
+            "model": "large-v3-turbo",
+            "vram_gb": 6
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_4000_turbo_boundary",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 4000,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3-turbo:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 4
+          }
+        },
+        {
+          "code": "hw.reason.nvidia_small_vram",
+          "params": {
+            "model": "large-v3-turbo",
+            "vram_gb": 4
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_3999_medium",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 3999,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:medium:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 4
+          }
+        },
+        {
+          "code": "hw.reason.nvidia_small_vram",
+          "params": {
+            "model": "medium",
+            "vram_gb": 4
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_2gb_medium",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 2048,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:medium:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 2
+          }
+        },
+        {
+          "code": "hw.reason.nvidia_small_vram",
+          "params": {
+            "model": "medium",
+            "vram_gb": 2
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_vram_unknown",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce GTX 1060",
+          "vram_mb": 0,
+          "driver": "",
+          "source": "wmi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3-turbo:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia_vram_unknown",
+          "params": {
+            "name": "NVIDIA GeForce GTX 1060"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.vram_unknown"
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_two_gpus_picks_largest",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 4096,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        },
+        {
+          "name": "NVIDIA RTX A4000",
+          "vram_mb": 16384,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA RTX A4000",
+            "vram_gb": 16
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_with_npu",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 8192,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": true,
+      "intel_gpu_name": "",
+      "intel_npu_name": "Intel(R) AI Boost",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:int8_float16",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 8
+          }
+        },
+        {
+          "code": "hw.reason.npu_battery",
+          "params": {
+            "name": "Intel(R) AI Boost"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_small_with_npu",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 4096,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": true,
+      "intel_gpu_name": "",
+      "intel_npu_name": "Intel(R) AI Boost",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3-turbo:int8_float16",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 4
+          }
+        },
+        {
+          "code": "hw.reason.nvidia_small_vram",
+          "params": {
+            "model": "large-v3-turbo",
+            "vram_gb": 4
+          }
+        },
+        {
+          "code": "hw.reason.npu_battery",
+          "params": {
+            "name": "Intel(R) AI Boost"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_with_igpu_only",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 8192,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": false,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:int8_float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX Test",
+            "vram_gb": 8
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "intel_igpu_and_npu",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "Intel(R) AI Boost",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.intel_gpu",
+          "params": {
+            "name": "Intel(R) Graphics"
+          }
+        },
+        {
+          "code": "hw.reason.intel_npu",
+          "params": {
+            "name": "Intel(R) AI Boost"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "intel_igpu_only",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": true,
+      "intel_npu": false,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.intel_gpu",
+          "params": {
+            "name": "Intel(R) Graphics"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "intel_npu_only",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": true,
+      "intel_gpu_name": "",
+      "intel_npu_name": "Intel(R) AI Boost",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.intel_npu",
+          "params": {
+            "name": "Intel(R) AI Boost"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "intel_npu_unnamed",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": true,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.intel_npu",
+          "params": {
+            "name": "Intel NPU"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_32gb",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 32768,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 32768,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_16gb",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 16384,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 16384,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_8gb_turbo_boundary",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 8192,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 8192,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_8191_small",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 8191,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 8191,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:small:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        },
+        {
+          "code": "hw.reason.apple_small_mem",
+          "params": {
+            "mem_gb": 8,
+            "model": "small"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_memory_unknown",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 0,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "apple_no_chip_name",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 16384,
+      "disk_free_mb": 100000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "",
+      "unified_mem_mb": 16384,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple Silicon"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "cpu_only",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:small:int8"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.cpu_only",
+          "params": {
+            "cpu": "Intel(R) Core(TM) i7-12700H"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.cpu_slow"
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "cpu_only_no_cpu_name",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 32768,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:small:int8"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.cpu_only",
+          "params": {
+            "cpu": "CPU"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.cpu_slow"
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "cpu_only_low_ram_4gb",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 4096,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:small:int8"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.cpu_only",
+          "params": {
+            "cpu": "Intel(R) Core(TM) i7-12700H"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.cpu_slow"
+        },
+        {
+          "code": "hw.note.low_ram",
+          "params": {
+            "ram_gb": 4
+          }
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "cpu_only_low_ram_7999",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 7999,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:small:int8"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.cpu_only",
+          "params": {
+            "cpu": "Intel(R) Core(TM) i7-12700H"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.cpu_slow"
+        },
+        {
+          "code": "hw.note.low_ram",
+          "params": {
+            "ram_gb": 8
+          }
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "cpu_only_ram_8000_no_note",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-12700H",
+      "ram_mb": 8000,
+      "disk_free_mb": 200000,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-openvino",
+        "model:openvino:small:int8"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.cpu_only",
+          "params": {
+            "cpu": "Intel(R) Core(TM) i7-12700H"
+          }
+        }
+      ],
+      "notes": [
+        {
+          "code": "hw.note.cpu_slow"
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "intel_mac_unsupported",
+    "hw": {
+      "os": "darwin",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+      "ram_mb": 16384,
+      "disk_free_mb": 0,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python"
+      ],
+      "reasons": [],
+      "notes": [
+        {
+          "code": "hw.note.unsupported",
+          "params": {
+            "arch": "amd64",
+            "os": "darwin"
+          }
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "linux_unsupported",
+    "hw": {
+      "os": "linux",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 0,
+      "disk_free_mb": 0,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 24576,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python"
+      ],
+      "reasons": [],
+      "notes": [
+        {
+          "code": "hw.note.unsupported",
+          "params": {
+            "arch": "amd64",
+            "os": "linux"
+          }
+        }
+      ],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "nvidia_ignored_on_macos",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M3",
+      "ram_mb": 16384,
+      "disk_free_mb": 100000,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX Test",
+          "vram_mb": 8192,
+          "driver": "560.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M3",
+      "unified_mem_mb": 16384,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-mlx",
+        "model:mlx:large-v3-turbo:fp16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.apple",
+          "params": {
+            "chip": "Apple M3"
+          }
+        }
+      ],
+      "notes": [],
+      "download_mb": 0
+    }
+  },
+  {
+    "name": "empty_hw",
+    "hw": {
+      "os": "",
+      "arch": "",
+      "cpu": "",
+      "ram_mb": 0,
+      "disk_free_mb": 0,
+      "nvidia": null,
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "recommendation": {
+      "components": [
+        "python"
+      ],
+      "reasons": [],
+      "notes": [
+        {
+          "code": "hw.note.unsupported",
+          "params": {
+            "arch": "",
+            "os": ""
+          }
+        }
+      ],
+      "download_mb": 0
+    }
+  }
+]

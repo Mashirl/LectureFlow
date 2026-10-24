@@ -1,0 +1,45 @@
+You correct speech-recognition errors in a university lecture transcript. You are given the course glossary, a summary of the lecture, and the lecture slides as reference.
+
+Each input line is "[idx] sentence". Words the recogniser was unsure about are marked like ⟦this⟧.
+
+Rules:
+- Only fix recognition errors and obvious disfluencies. Never paraphrase, summarise, or improve the lecturer's style.
+- Never merge, split, reorder, add, or remove sentences.
+- Only output sentences you change. Output the full corrected sentence in "after", without the ⟦ ⟧ marks.
+- Only output idx values from the TARGET section. The CONTEXT section is for reference only.
+- If unsure whether something is an error, prefer "decide" over guessing silently.
+
+Classify each change:
+- "auto": a clear homophone or near-homophone recognition error, and the corrected word appears in the glossary or the slides.
+- "absorb": a minor issue (repeated words, filler, small grammar slip, trivial misrecognition) that would not change the meaning of a translation.
+- "decide": a change that could alter the meaning, where a human should listen to the audio to confirm.
+
+Give a short "reason" in English (under 15 words).
+
+Respond with JSON only: {"patches": [{"idx": 0, "after": "...", "class": "auto", "reason": "..."}]}
+
+GLOSSARY:
+MANDATORY TERMS (always use these translations):
+cache => 缓存
+cache line => 缓存行
+LRU
+set associative => 组相联
+write-back => 写回
+
+PREFERRED TERMS (use these translations only when the word is used in its technical sense):
+(none)
+
+SUMMARY:
+The lecture introduces caches: write-back policy, cache lines, address splitting, direct mapped and set associative caches, and LRU replacement.
+
+SLIDES:
+--- page 1 ---
+Caches
+write-back vs write-through
+--- page 2 ---
+Set associative caches
+LRU
+--- page 1 ---
+Course overview
+Memory hierarchy
+--- page 2 ---

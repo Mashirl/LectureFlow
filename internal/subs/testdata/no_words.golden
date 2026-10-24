@@ -1,0 +1,13 @@
+== input
+sentence #2  00:10.000 → 00:17.400
+  text:  This lecture was transcribed before word timestamps existed, so its time is spread over the characters.
+  asr:   (same as text)
+  words: none
+  zh:    这节课在有词级时间戳之前就已转写，因此时间按字符平均分配。
+== cues
+#2  00:10.000 → 00:14.382  (4382 ms, 60 ch)
+  en: This lecture was transcribed before word timestamps existed,
+  zh: 这节课在有词级时间戳之前就已转写，
+#2  00:14.382 → 00:17.400  (3018 ms, 42 ch)
+  en: so its time is spread over the characters.
+  zh: 因此时间按字符平均分配。

@@ -1,0 +1,824 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
+
+package main
+
+// Colab remote transcription in the mock (SPEC-v3 V14.2, V14.4, V14.5;
+// .claude/v3-brief.md §8): GET /api/colab, its settings, importing,
+// checking and disconnecting the authorization, the two shutdown buttons
+// and "改用 Colab 处理" (POST /api/lectures/{id}/use-colab), with the bodies
+// of internal/api/handlers_colab.go.
+//
+// Scenarios (?mock=…; every other scenario starts with Colab switched off
+// and not authorized, and can be set up from the settings page):
+//
+//	colab_off        switched off, not authorized; gcloud's credential file
+//	                 is "found" after the first 检测授权 (the guide's flow)
+//	colab_none       on and authorized, no session ("远端 GPU：未使用"); the
+//	                 first queued asr stage carries remote.back_to_local
+//	colab_queued     a session waiting for a T4 (排队等卡); the first running
+//	                 asr stage runs remotely at the step wait_accelerator
+//	colab_running    a session 1 h 47 min into its usage window; the first
+//	                 running asr stage runs remotely (upload → transcribe →
+//	                 download → verify follow its progress)
+//	colab_exhausted  as colab_running, 3 h 56 min into the window:
+//	                 use-colab answers 409 remote.unavailable {remote_window}
+//
+// The resource snapshot ("remote"), the lecture views (stats.remote and the
+// Colab snapshot of the remote asr stage), the device list (the colab:remote
+// row) and the SSE "resources" events get the Colab parts through overlays
+// registered for the loopback host names: the routing tree prefers patterns
+// with a host, so the overlay runs the request through main.go's own handler
+// (with the host rewritten) and edits its JSON, without changing main.go
+// (v3-brief §7.5). Without Colab switched on the overlays pass everything
+// through unchanged.
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"time"
+
+	"lectureflow/internal/api"
+	"lectureflow/internal/colab"
+	"lectureflow/internal/model"
+)
+
+const (
+	colabADCPath   = `C:\Users\Student\AppData\Roaming\gcloud\application_default_credentials.json`
+	colabInnerHost = "mock-inner.invalid"
+)
+
+// compute units per hour by accelerator (mock figures)
+var colabCUPerHour = map[string]float64{"T4": 1.84, "L4": 4.82, "G4": 6.1, "A100": 11.77, "H100": 18.7}
+
+func init() {
+	mockV3Routes = append(mockV3Routes, func(m *mock, mux *http.ServeMux) {
+		a := m.api
+		mux.HandleFunc("GET /api/colab", a(m.colabGet))
+		mux.HandleFunc("PUT /api/colab/settings", a(m.colabPutSettings))
+		mux.HandleFunc("POST /api/colab/auth/import", a(m.colabImport))
+		mux.HandleFunc("POST /api/colab/auth/check", a(m.colabCheck))
+		mux.HandleFunc("DELETE /api/colab/auth", a(m.colabDisconnect))
+		mux.HandleFunc("POST /api/colab/shutdown", a(m.colabShutdown))
+		mux.HandleFunc("POST /api/lectures/{id}/use-colab", a(m.colabUse))
+		for _, host := range []string{"127.0.0.1", "localhost"} {
+			for _, p := range []string{"/api/resources", "/api/lectures/{id}", "/api/courses/{id}/lectures", "/api/dashboard", "/api/settings", "/api/asr/devices"} {
+				mux.HandleFunc("GET "+host+p, m.colabOverlay(mux))
+			}
+			mux.HandleFunc("GET "+host+"/api/events", m.colabEvents(mux))
+		}
+	})
+}
+
+// ---------- state ----------
+
+type colabSession struct {
+	start       time.Time // requested (the window counts from here)
+	queuedUntil time.Time
+	bootUntil   time.Time
+	stopAt      time.Time // zero = not stopping
+	stopReason  string
+}
+
+type colabMock struct {
+	mu            sync.Mutex
+	enabled       bool
+	batteryPrefer bool
+	settings      colab.Settings
+	auth          *colab.CredentialInfo
+	adcFound      bool
+	held          bool
+	afterCurrent  bool
+	sess          *colabSession
+	lastRelease   *colab.ReleaseInfo
+	planned       int
+	exhausted     bool
+	pinned        map[string]bool // lectures sent to Colab with use-colab
+	backToLocal   bool            // colab_none: the first queued asr carries remote.back_to_local
+}
+
+var colabStates sync.Map // *mock + scenario → *colabMock
+
+type colabKey struct {
+	m  *mock
+	sc string
+}
+
+func (m *mock) colabState(r *http.Request) *colabMock {
+	k := colabKey{m, scenario(r)}
+	if v, ok := colabStates.Load(k); ok {
+		return v.(*colabMock)
+	}
+	v, _ := colabStates.LoadOrStore(k, newColabMock(k.sc, time.Now()))
+	return v.(*colabMock)
+}
+
+func colabAuth(lifecycle string, days int, now time.Time) *colab.CredentialInfo {
+	imported := now
+	info := &colab.CredentialInfo{Present: true, Lifecycle: lifecycle, ImportedAt: &imported, RemainingSec: -1,
+		Scopes: []string{"openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/colaboratory"}}
+	if days > 0 {
+		exp := imported.Add(time.Duration(days) * 24 * time.Hour)
+		info.ExpiresAt = &exp
+	}
+	return info
+}
+
+func newColabMock(sc string, now time.Time) *colabMock {
+	c := &colabMock{settings: colab.DefaultSettings(), pinned: map[string]bool{}}
+	switch sc {
+	case "colab_none", "colab_queued", "colab_running", "colab_exhausted":
+		c.enabled, c.adcFound = true, true
+		// imported a few hours ago with the default 7 days
+		c.auth = colabAuth("7d", 7, now.Add(-4*time.Hour-12*time.Minute))
+	}
+	switch sc {
+	case "colab_none":
+		c.backToLocal = true
+	case "colab_queued":
+		c.sess = &colabSession{start: now.Add(-3 * time.Minute), queuedUntil: now.Add(2 * time.Hour), bootUntil: now.Add(2 * time.Hour)}
+		c.planned = 2
+	case "colab_running":
+		c.sess = &colabSession{start: now.Add(-107 * time.Minute), queuedUntil: now.Add(-105 * time.Minute), bootUntil: now.Add(-103 * time.Minute)}
+		c.planned = 3
+	case "colab_exhausted":
+		c.sess = &colabSession{start: now.Add(-236 * time.Minute), queuedUntil: now.Add(-230 * time.Minute), bootUntil: now.Add(-228 * time.Minute)}
+		c.planned, c.exhausted = 2, true
+	}
+	return c
+}
+
+// on: the overlays add Colab (the real server: enabled; the resource
+// snapshot has "remote" from then on, also without a credential).
+func (c *colabMock) on() bool { return c.enabled }
+
+// advance ends a stopping session (3 s after the button).
+func (c *colabMock) advance(now time.Time) {
+	if s := c.sess; s != nil && !s.stopAt.IsZero() && now.After(s.stopAt.Add(3*time.Second)) {
+		c.lastRelease = &colab.ReleaseInfo{Reason: s.stopReason, At: s.stopAt.Add(3 * time.Second)}
+		c.sess = nil
+		c.afterCurrent = false
+	}
+}
+
+func (c *colabMock) sessionState(now time.Time) string {
+	s := c.sess
+	switch {
+	case s == nil && c.lastRelease != nil:
+		return colab.StateReleased
+	case s == nil:
+		return colab.StateNone
+	case !s.stopAt.IsZero():
+		return colab.StateStopping
+	case now.Before(s.queuedUntil):
+		return colab.StateQueued
+	case now.Before(s.bootUntil):
+		return colab.StateBooting
+	}
+	return colab.StateRunning
+}
+
+// remoteLecture is the lecture whose asr runs on Colab: the first running
+// asr stage of the store while a session is queued, booting or running.
+type remoteLecture struct {
+	id       string
+	progress float64
+	started  time.Time
+}
+
+func (c *colabMock) remoteLecture(s *store, now time.Time) *remoteLecture {
+	st := c.sessionState(now)
+	if st != colab.StateQueued && st != colab.StateBooting && st != colab.StateRunning {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, l := range s.lectures {
+		j := stageIndex(&l, model.StageASR)
+		if j < 0 || l.Stages[j].Status != model.StatusRunning {
+			continue
+		}
+		rl := &remoteLecture{id: l.ID, progress: l.Stages[j].Progress, started: now.Add(-6 * time.Minute)}
+		if p := l.Stages[j].StartedAt; p != nil {
+			if t, err := time.Parse(time.RFC3339, *p); err == nil {
+				rl.started = t
+			}
+		}
+		return rl
+	}
+	return nil
+}
+
+// step of the remote lecture: its progress mapped on the five steps.
+func (c *colabMock) step(rl *remoteLecture, now time.Time) model.RemoteStats {
+	rs := model.RemoteStats{Steps: append([]string{}, model.RemoteSteps...), Accelerator: c.settings.Accelerator, EtaSec: -1}
+	switch st := c.sessionState(now); {
+	case st == colab.StateQueued || st == colab.StateBooting:
+		rs.Step = model.RemoteStepWaitAccelerator
+		if st == colab.StateQueued {
+			rs.WaitingFor = model.WaitRemoteQueue
+		}
+		return rs
+	case rl.progress < 0.03:
+		rs.Step = model.RemoteStepUploadAudio
+	case rl.progress < 0.93:
+		rs.Step, rs.Stage = model.RemoteStepRemoteTranscribe, "transcribe"
+	case rl.progress < 0.97:
+		rs.Step = model.RemoteStepDownloadResult
+	default:
+		rs.Step = model.RemoteStepVerify
+	}
+	rs.EtaSec = int64((1 - rl.progress) * 26 * 60)
+	return rs
+}
+
+func (c *colabMock) cuPerHour() float64 {
+	if v, ok := colabCUPerHour[c.settings.Accelerator]; ok {
+		return v
+	}
+	return 2
+}
+
+func (c *colabMock) status(rl *remoteLecture, now time.Time) colab.Status {
+	st := colab.Status{
+		Service: "colab", Configured: c.auth != nil, Accelerator: c.settings.Accelerator, Tier: c.settings.Tier,
+		State: c.sessionState(now), WindowTotalSec: int64(colab.FairWindow.Seconds()), CUPerHour: c.cuPerHour(),
+		ShutdownAfter: c.afterCurrent, LastRelease: c.lastRelease, Planned: c.planned,
+	}
+	if c.auth != nil {
+		st.Auth = *c.authInfo(now)
+	}
+	if c.settings.Tier == colab.TierPaid && c.auth != nil {
+		b := 87.42
+		st.BalanceCU = &b
+	}
+	left := 4
+	if s := c.sess; s != nil {
+		used := now.Sub(s.start)
+		if used > colab.FairWindow {
+			used = colab.FairWindow
+		}
+		st.WindowUsedSec = int64(used.Seconds())
+		if now.After(s.queuedUntil) {
+			st.SessionSpentCU = round2(now.Sub(s.queuedUntil).Hours() * c.cuPerHour())
+		}
+		left = int((colab.FairWindow - used).Minutes() / 50)
+	}
+	if c.exhausted {
+		left = 0
+	}
+	st.LecturesLeft = left
+	if c.planned > 0 {
+		st.PlannedFit = min(c.planned, left)
+		st.LecturesLeft = st.PlannedFit
+		st.PlanCostCU = round2(float64(st.PlannedFit) * 0.45 * c.cuPerHour())
+	}
+	if rl != nil {
+		rs := c.step(rl, now)
+		overall := rl.progress
+		if rs.Step == model.RemoteStepWaitAccelerator {
+			overall = 0
+		}
+		st.Current = &colab.JobInfo{ID: asrJobID(rl.id), Step: rs.Step, Stage: rs.Stage, Fraction: -1, Overall: overall,
+			ETASec: float64(rs.EtaSec), StartedAt: rl.started}
+	}
+	return st
+}
+
+func round2(v float64) float64 { return float64(int64(v*100+0.5)) / 100 }
+
+func (c *colabMock) authInfo(now time.Time) *colab.CredentialInfo {
+	if c.auth == nil {
+		return &colab.CredentialInfo{RemainingSec: -1}
+	}
+	a := *c.auth
+	a.RemainingSec = -1
+	if a.ExpiresAt != nil {
+		a.RemainingSec = max(0, int64(a.ExpiresAt.Sub(now).Seconds()))
+	}
+	return &a
+}
+
+func (c *colabMock) adc() api.ColabADCView {
+	v := api.ColabADCView{Detected: c.adcFound, Path: colabADCPath, Found: c.adcFound, LoginCommand: colab.GcloudLoginCommand()}
+	if !c.adcFound {
+		v.Problem = colab.CodeADCNotFound
+	}
+	return v
+}
+
+func (m *mock) colabView(r *http.Request, c *colabMock) api.ColabView {
+	now := time.Now()
+	c.advance(now)
+	rl := c.remoteLecture(m.storeFor(r), now)
+	return api.ColabView{
+		Status:   c.status(rl, now),
+		Settings: api.ColabSettingsView{Settings: c.settings, Enabled: c.enabled, BatteryPrefer: c.batteryPrefer},
+		ADC:      c.adc(),
+		Held:     c.held,
+	}
+}
+
+// ---------- endpoints ----------
+
+func (m *mock) colabGet(w http.ResponseWriter, r *http.Request, _ *store) {
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	writeJSON(w, http.StatusOK, m.colabView(r, c))
+}
+
+func (m *mock) colabPutSettings(w http.ResponseWriter, r *http.Request, _ *store) {
+	var p api.ColabSettingsPatch
+	if err := decodeBody(r, &p); err != nil {
+		writeErr(w, err)
+		return
+	}
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	set := c.settings
+	if p.Accelerator != nil {
+		set.Accelerator = *p.Accelerator
+	}
+	if p.Tier != nil {
+		set.Tier = *p.Tier
+	}
+	if p.MaxQueueWaitMin != nil {
+		set.MaxQueueWaitMin = *p.MaxQueueWaitMin
+	}
+	if p.Model != nil {
+		set.Model = *p.Model
+	}
+	if p.ComputeType != nil {
+		set.ComputeType = *p.ComputeType
+	}
+	if p.IdleReleaseMin != nil {
+		set.IdleReleaseMin = *p.IdleReleaseMin
+	}
+	if p.WindowCooldownMin != nil {
+		set.WindowCooldownMin = *p.WindowCooldownMin
+	}
+	if p.HighMem != nil {
+		set.HighMem = *p.HighMem
+	}
+	if err := set.Validate(); err != nil {
+		var info model.ErrorInfo
+		var ce *model.CodedError
+		if errors.As(err, &ce) {
+			info = model.ErrorInfo{Code: ce.Info.Code, Params: ce.Info.Params}
+		} else {
+			info = model.ErrorInfo{Code: colab.CodeSettingsInvalid, Params: map[string]any{"field": "settings"}}
+		}
+		writeJSON(w, http.StatusBadRequest, api.ErrorBody{Error: info})
+		return
+	}
+	c.settings = set
+	if p.Enabled != nil {
+		c.enabled = *p.Enabled
+		if c.enabled {
+			c.held = false
+		}
+	}
+	if p.BatteryPrefer != nil {
+		c.batteryPrefer = *p.BatteryPrefer
+	}
+	m.storeFor(r).notify(api.ChangedEvent{Kind: "settings"})
+	writeJSON(w, http.StatusOK, m.colabView(r, c))
+}
+
+func (m *mock) colabImport(w http.ResponseWriter, r *http.Request, _ *store) {
+	var req api.ColabImportRequest
+	if err := decodeBody(r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.adcFound {
+		codedError(w, http.StatusBadRequest, colab.CodeADCNotFound, map[string]any{"path": colabADCPath})
+		return
+	}
+	now := time.Now()
+	switch req.Lifecycle {
+	case "", colab.LifecycleDays:
+		days := req.Days
+		if days == 0 {
+			days = 7
+		}
+		if days < 1 || days > 90 {
+			codedError(w, http.StatusBadRequest, colab.CodeLifecycleInvalid, map[string]any{"value": req.Lifecycle})
+			return
+		}
+		c.auth = colabAuth(itoa(days)+"d", days, now)
+	case colab.LifecycleSession, colab.LifecycleManual:
+		c.auth = colabAuth(req.Lifecycle, 0, now)
+	default:
+		codedError(w, http.StatusBadRequest, colab.CodeLifecycleInvalid, map[string]any{"value": req.Lifecycle})
+		return
+	}
+	m.storeFor(r).notify(api.ChangedEvent{Kind: "settings"})
+	writeJSON(w, http.StatusOK, c.authInfo(now))
+}
+
+func itoa(n int) string {
+	b, _ := json.Marshal(n)
+	return string(b)
+}
+
+// 检测授权: the guide's flow — after the first check the file is "there".
+func (m *mock) colabCheck(w http.ResponseWriter, r *http.Request, _ *store) {
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.adcFound = true
+	writeJSON(w, http.StatusOK, api.ColabCheckView{ADC: c.adc(), Auth: *c.authInfo(time.Now())})
+}
+
+func (m *mock) colabDisconnect(w http.ResponseWriter, r *http.Request, _ *store) {
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	v := api.ColabDisconnectView{Warnings: []model.ErrorInfo{}, Notes: []model.ErrorInfo{}}
+	if c.sess != nil {
+		c.sess = nil
+		c.lastRelease = &colab.ReleaseInfo{Reason: "disconnect", At: now}
+		v.Released = true
+	}
+	if c.auth != nil {
+		c.auth = nil
+		v.Revoked = true
+		v.Notes = append(v.Notes, model.ErrorInfo{Code: "remote.gcloud_signed_out"})
+	}
+	c.adcFound = false // gcloud's application-default login used the same token
+	m.storeFor(r).notify(api.ChangedEvent{Kind: "settings"})
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (m *mock) colabShutdown(w http.ResponseWriter, r *http.Request, _ *store) {
+	var req api.ColabShutdownRequest
+	if err := decodeBody(r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	switch req.Mode {
+	case "after_current":
+		c.afterCurrent = true
+		if c.remoteLecture(m.storeFor(r), now) == nil && c.sess != nil {
+			c.sess.stopAt, c.sess.stopReason = now, "after_current"
+		}
+	case "now":
+		if c.sess != nil {
+			c.sess.stopAt, c.sess.stopReason = now, "shutdown_now"
+		}
+	default:
+		codedError(w, http.StatusBadRequest, "request.bad_param", map[string]any{"name": "mode"})
+		return
+	}
+	c.held = true
+	c.planned = 0
+	clear(c.pinned)
+	writeJSON(w, http.StatusOK, m.colabView(r, c))
+}
+
+func (m *mock) colabUse(w http.ResponseWriter, r *http.Request, s *store) {
+	id := r.PathValue("id")
+	c := m.colabState(r)
+	c.mu.Lock()
+	if !c.enabled {
+		c.mu.Unlock()
+		codedError(w, http.StatusConflict, "remote.disabled", nil)
+		return
+	}
+	if c.auth == nil {
+		c.mu.Unlock()
+		codedError(w, http.StatusConflict, "remote.unavailable", map[string]any{"waiting_for": model.WaitRemoteAuth})
+		return
+	}
+	if c.exhausted && c.sessionState(time.Now()) == colab.StateRunning {
+		c.mu.Unlock()
+		codedError(w, http.StatusConflict, "remote.unavailable", map[string]any{"waiting_for": model.WaitRemoteWindow})
+		return
+	}
+	c.mu.Unlock()
+	s.mu.Lock()
+	l, err := s.findLecture(id)
+	if err != nil {
+		s.mu.Unlock()
+		writeErr(w, err)
+		return
+	}
+	j := stageIndex(l, model.StageASR)
+	status := ""
+	if j >= 0 {
+		status = l.Stages[j].Status
+	}
+	s.mu.Unlock()
+	switch status {
+	case model.StatusQueued, model.StatusRunning, model.StatusFailed, model.StatusCancelled:
+	default:
+		codedError(w, http.StatusConflict, "state.conflict", map[string]any{"stage": model.StageASR, "status": status})
+		return
+	}
+	c.mu.Lock()
+	c.pinned[id] = true
+	c.held = false
+	c.mu.Unlock()
+	s.notify(api.ChangedEvent{Kind: "lecture", ID: id})
+	// the lecture view through the overlay (the pinned snapshot)
+	r2 := r.Clone(r.Context())
+	r2.Method, r2.Host, r2.Body = http.MethodGet, colabInnerHost, http.NoBody
+	r2.URL.Path = "/api/lectures/" + id
+	rec := httptest.NewRecorder()
+	m.colabOverlayServe(rec, r2, s, c)
+	for k, v := range rec.Header() {
+		w.Header()[k] = v
+	}
+	w.WriteHeader(rec.Code)
+	_, _ = w.Write(rec.Body.Bytes())
+}
+
+// ---------- overlays ----------
+
+func innerRequest(r *http.Request) *http.Request {
+	r2 := r.Clone(r.Context())
+	r2.Host = colabInnerHost
+	return r2
+}
+
+func (m *mock) colabOverlay(mux *http.ServeMux) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := m.colabState(r)
+		c.mu.Lock()
+		on := c.on() || len(c.pinned) > 0
+		c.mu.Unlock()
+		if !on {
+			mux.ServeHTTP(w, innerRequest(r))
+			return
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, innerRequest(r))
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		body := rec.Body.Bytes()
+		if rec.Code == http.StatusOK {
+			body = m.colabFix(r, c, r.URL.Path, body)
+		}
+		for k, v := range rec.Header() {
+			w.Header()[k] = v
+		}
+		w.Header().Del("Content-Length")
+		w.WriteHeader(rec.Code)
+		_, _ = w.Write(body)
+	}
+}
+
+// colabOverlayServe answers r2 (a GET of the lecture view) with the overlay.
+func (m *mock) colabOverlayServe(w http.ResponseWriter, r2 *http.Request, s *store, c *colabMock) {
+	rec := httptest.NewRecorder()
+	m.api(m.getLecture)(rec, withPath(r2, "id", strings.TrimPrefix(r2.URL.Path, "/api/lectures/")))
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	body := rec.Body.Bytes()
+	if rec.Code == http.StatusOK {
+		body = m.colabFix(r2, c, r2.URL.Path, body)
+	}
+	writeRaw(w, rec.Code, body)
+}
+
+func withPath(r *http.Request, k, v string) *http.Request {
+	r.SetPathValue(k, v)
+	return r
+}
+
+func writeRaw(w http.ResponseWriter, status int, b []byte) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_, _ = w.Write(b)
+}
+
+// colabFix edits one JSON response of path. c.mu is held.
+func (m *mock) colabFix(r *http.Request, c *colabMock, path string, body []byte) []byte {
+	var v any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&v); err != nil {
+		return body
+	}
+	now := time.Now()
+	c.advance(now)
+	rl := c.remoteLecture(m.storeFor(r), now)
+	switch {
+	case path == "/api/resources":
+		v = c.fixResources(v, rl, now)
+	case path == "/api/settings":
+		if obj, ok := v.(map[string]any); ok {
+			if list, ok := obj["devices"].([]any); ok {
+				obj["devices"] = c.fixDevices(list)
+			}
+		}
+	case path == "/api/asr/devices":
+		if list, ok := v.([]any); ok {
+			v = c.fixDevices(list)
+		}
+	default:
+		v = c.fixLectures(v, rl, c.backToLocalLecture(m.storeFor(r)), now)
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return body
+	}
+	return buf.Bytes()
+}
+
+// fixResources adds "remote" (while switched on) and takes the remote
+// lecture off the local device cards.
+func (c *colabMock) fixResources(v any, rl *remoteLecture, now time.Time) any {
+	obj, ok := v.(map[string]any)
+	if !ok || !c.on() {
+		return v
+	}
+	obj["remote"] = toJSON(c.status(rl, now))
+	if rl == nil {
+		return v
+	}
+	if devs, ok := obj["devices"].([]any); ok {
+		for _, d := range devs {
+			dm, ok := d.(map[string]any)
+			if !ok {
+				continue
+			}
+			tasks, _ := dm["tasks"].([]any)
+			keep := []any{}
+			for _, tk := range tasks {
+				if tm, ok := tk.(map[string]any); ok && tm["lecture_id"] == rl.id {
+					if num, ok := dm["slots_used"].(json.Number); ok {
+						if n, err := num.Int64(); err == nil && n > 0 {
+							dm["slots_used"] = n - 1
+						}
+					}
+					continue
+				}
+				keep = append(keep, tk)
+			}
+			if tasks != nil {
+				dm["tasks"] = keep
+			}
+		}
+	}
+	return v
+}
+
+func toJSON(x any) any {
+	b, _ := json.Marshal(x)
+	var v any
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	_ = dec.Decode(&v)
+	return v
+}
+
+// fixDevices appends the colab:remote row while Colab is on and authorized
+// (the device table of the real server, NOTES v14-colab-integrate 3).
+func (c *colabMock) fixDevices(list []any) []any {
+	if !c.on() || c.auth == nil {
+		return list
+	}
+	row := api.ASRDeviceView{
+		ID: model.DeviceColab, Backend: "colab", Kind: model.DeviceKindRemote, Label: "Google Colab · " + c.settings.Accelerator,
+		Enabled: true, Model: c.settings.Model, Precision: c.settings.ComputeType, MaxParallel: 1, Priority: 5, Present: true,
+		SelfTest: api.SelfTestView{DeviceID: model.DeviceColab, State: "idle"}, Running: []api.DeviceTaskView{},
+		Options: api.DeviceOptions{Models: []string{c.settings.Model}, Precisions: []string{c.settings.ComputeType}},
+	}
+	return append(list, toJSON(row))
+}
+
+// fixLectures walks a lecture view, a lecture list or the dashboard: the
+// remote lecture's asr stage gets stats.remote and the Colab snapshot; a
+// pinned queued one the Colab snapshot; in colab_none the first queued asr
+// stage the note remote.back_to_local.
+func (c *colabMock) fixLectures(v any, rl *remoteLecture, backID string, now time.Time) any {
+	var walk func(x any)
+	walk = func(x any) {
+		switch t := x.(type) {
+		case []any:
+			for _, e := range t {
+				walk(e)
+			}
+		case map[string]any:
+			if stages, ok := t["stages"].([]any); ok {
+				id, _ := t["id"].(string)
+				for _, s := range stages {
+					sm, ok := s.(map[string]any)
+					if !ok || sm["stage"] != model.StageASR {
+						continue
+					}
+					status, _ := sm["status"].(string)
+					switch {
+					case rl != nil && id == rl.id && status == model.StatusRunning:
+						rs := c.step(rl, now)
+						stats, _ := sm["stats"].(map[string]any)
+						if stats == nil {
+							stats = map[string]any{}
+							sm["stats"] = stats
+						}
+						stats["remote"] = toJSON(rs)
+						sm["model"] = c.snapshot()
+					case c.pinned[id] && (status == model.StatusQueued || status == model.StatusRunning):
+						sm["model"] = c.snapshot()
+					case id == backID && status == model.StatusQueued && sm["note_info"] == nil:
+						sm["note_info"] = toJSON(model.ErrorInfo{Code: "remote.back_to_local", Params: map[string]any{"cause": colab.CodeSessionReclaimed}})
+					}
+				}
+			}
+			for _, e := range t {
+				walk(e)
+			}
+		}
+	}
+	walk(v)
+	return v
+}
+
+// backToLocalLecture is the lecture of colab_none's remote.back_to_local
+// note: the first one (store order) whose asr stage is queued and not pinned.
+func (c *colabMock) backToLocalLecture(s *store) string {
+	if !c.backToLocal {
+		return ""
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, l := range s.lectures {
+		if j := stageIndex(&l, model.StageASR); j >= 0 && l.Stages[j].Status == model.StatusQueued && !c.pinned[l.ID] {
+			return l.ID
+		}
+	}
+	return ""
+}
+
+func (c *colabMock) snapshot() any {
+	s := c.settings
+	return toJSON(api.StageModel{
+		Label: "Google Colab · " + s.Accelerator + " · " + s.Model + " · " + s.ComputeType + " · en", Model: s.Model,
+		ASR: &model.ASRSnapshot{DeviceID: model.DeviceColab, Backend: "colab", Model: s.Model, Precision: s.ComputeType, Language: "en"},
+	})
+}
+
+// ---------- SSE ----------
+
+// sseFix rewrites the "resources" events of the stream.
+type sseFix struct {
+	http.ResponseWriter
+	fl  http.Flusher
+	fix func([]byte) []byte
+}
+
+func (f *sseFix) Write(p []byte) (int, error) {
+	const head = "event: resources\ndata: "
+	if bytes.HasPrefix(p, []byte(head)) {
+		data := bytes.TrimSuffix(p[len(head):], []byte("\n\n"))
+		out := append([]byte(head), bytes.TrimRight(f.fix(data), "\n")...)
+		out = append(out, '\n', '\n')
+		if _, err := f.ResponseWriter.Write(out); err != nil {
+			return 0, err
+		}
+		return len(p), nil
+	}
+	return f.ResponseWriter.Write(p)
+}
+
+func (f *sseFix) Flush() { f.fl.Flush() }
+
+func (m *mock) colabEvents(mux *http.ServeMux) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		c := m.colabState(r)
+		fl, ok := w.(http.Flusher)
+		if !ok {
+			mux.ServeHTTP(w, innerRequest(r))
+			return
+		}
+		fw := &sseFix{ResponseWriter: w, fl: fl, fix: func(b []byte) []byte {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			if !c.on() {
+				return b
+			}
+			return m.colabFix(r, c, "/api/resources", b)
+		}}
+		mux.ServeHTTP(fw, innerRequest(r))
+	}
+}

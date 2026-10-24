@@ -1,0 +1,179 @@
+{
+ "prompt_terms_used": 3,
+ "sentences": [
+  {
+   "start_ms": 0,
+   "end_ms": 3800,
+   "text": "Okay, let's get started with today's lecture.",
+   "low_conf_words": [],
+   "words": [
+    {"w": "Okay,", "s": 0, "e": 440},
+    {"w": "let's", "s": 500, "e": 940},
+    {"w": "get", "s": 1000, "e": 1300},
+    {"w": "started", "s": 1360, "e": 1950},
+    {"w": "with", "s": 2010, "e": 2380},
+    {"w": "today's", "s": 2440, "e": 3020},
+    {"w": "lecture.", "s": 3080, "e": 3800}
+   ]
+  },
+  {
+   "start_ms": 3800,
+   "end_ms": 8200,
+   "text": "Today we talk about the cash hierarchy in modern processors.",
+   "low_conf_words": [
+    {
+     "i": 5,
+     "w": "cash"
+    }
+   ],
+   "words": [
+    {"w": "Today", "s": 3800, "e": 4170},
+    {"w": "we", "s": 4230, "e": 4420},
+    {"w": "talk", "s": 4480, "e": 4790},
+    {"w": "about", "s": 4850, "e": 5230},
+    {"w": "the", "s": 5290, "e": 5540},
+    {"w": "cash", "s": 5600, "e": 5910},
+    {"w": "hierarchy", "s": 5970, "e": 6590},
+    {"w": "in", "s": 6650, "e": 6840},
+    {"w": "modern", "s": 6900, "e": 7330},
+    {"w": "processors.", "s": 7390, "e": 8200}
+   ]
+  },
+  {
+   "start_ms": 8200,
+   "end_ms": 12600,
+   "text": "A right back cache only writes a line to memory on eviction.",
+   "low_conf_words": [
+    {
+     "i": 1,
+     "w": "right"
+    },
+    {
+     "i": 2,
+     "w": "back"
+    }
+   ]
+  },
+  {
+   "start_ms": 12600,
+   "end_ms": 16000,
+   "text": "Each cache line is 64 bytes on most x86 machines.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 16000,
+   "end_ms": 20400,
+   "text": "So the the first question is how we find a line in the cache.",
+   "low_conf_words": [],
+   "words": [
+    {"w": "So", "s": 16000, "e": 16170},
+    {"w": "the", "s": 16230, "e": 16460},
+    {"w": "the", "s": 16520, "e": 16750},
+    {"w": "first", "s": 16810, "e": 17160},
+    {"w": "question", "s": 17220, "e": 17730},
+    {"w": "is", "s": 17790, "e": 17970},
+    {"w": "how", "s": 18030, "e": 18260},
+    {"w": "we", "s": 18320, "e": 18490},
+    {"w": "find", "s": 18550, "e": 18830},
+    {"w": "a", "s": 18890, "e": 19010},
+    {"w": "line", "s": 19070, "e": 19360},
+    {"w": "in", "s": 19420, "e": 19590},
+    {"w": "the", "s": 19650, "e": 19880},
+    {"w": "cache.", "s": 19940, "e": 20400}
+   ]
+  },
+  {
+   "start_ms": 20400,
+   "end_ms": 25100,
+   "text": "We split the address into a tag, an index and an offset.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 25100,
+   "end_ms": 29800,
+   "text": "The index selects a set, and the tag tells us whether we have a hit.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 29800,
+   "end_ms": 34500,
+   "text": "With a direct mapped cache, every set has exactly one line.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 34500,
+   "end_ms": 39000,
+   "text": "That gives us conflict misses when two addresses map to the same set.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 39000,
+   "end_ms": 44200,
+   "text": "A two-way set associative cache halves the number of sets.",
+   "low_conf_words": [
+    {
+     "i": 1,
+     "w": "two-way"
+    }
+   ],
+   "words": [
+    {"w": "A", "s": 39000, "e": 39170},
+    {"w": "two-way", "s": 39230, "e": 39840},
+    {"w": "set", "s": 39900, "e": 40220},
+    {"w": "associative", "s": 40280, "e": 41200},
+    {"w": "cache", "s": 41260, "e": 41730},
+    {"w": "halves", "s": 41790, "e": 42330},
+    {"w": "the", "s": 42390, "e": 42710},
+    {"w": "number", "s": 42770, "e": 43310},
+    {"w": "of", "s": 43370, "e": 43610},
+    {"w": "sets.", "s": 43670, "e": 44200}
+   ]
+  },
+  {
+   "start_ms": 44200,
+   "end_ms": 48300,
+   "text": "The miss rate drops from 5 percent to about 3 percent.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 48300,
+   "end_ms": 52700,
+   "text": "Blah lab is something we will see in the lab next week.",
+   "low_conf_words": [
+    {
+     "i": 0,
+     "w": "Blah"
+    },
+    {
+     "i": 1,
+     "w": "lab"
+    }
+   ]
+  },
+  {
+   "start_ms": 52700,
+   "end_ms": 56900,
+   "text": "Finally, LRU replacement evicts the least recently used line.",
+   "low_conf_words": [
+    {
+     "i": 1,
+     "w": "LRU"
+    }
+   ]
+  },
+  {
+   "start_ms": 56900,
+   "end_ms": 60000,
+   "text": "Any questions before we move on?",
+   "low_conf_words": [],
+   "words": [
+    {"w": "Any", "s": 56900, "e": 57240},
+    {"w": "questions", "s": 57300, "e": 58110},
+    {"w": "before", "s": 58170, "e": 58750},
+    {"w": "we", "s": 58810, "e": 59070},
+    {"w": "move", "s": 59130, "e": 59540},
+    {"w": "on?", "s": 59600, "e": 60000}
+   ]
+  }
+ ]
+}

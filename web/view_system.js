@@ -1,0 +1,607 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
+// #/system: diagnostics (SPEC §9.2, §17.1) — checks in green / amber / red
+// with the back end's fix hints and "check again" — plus GPU, API, today's
+// usage, disk (per course, §17.5) and the read-only configuration (§9.10).
+// v1.1: providers and keys live on the settings page; the configuration
+// shown here never contains a key (the back end sends key_hint only).
+// v2 P14.3: the check details and hints come as codes (detail_info,
+// hint_info: t("errors."+code)); a detail without a code is a program's own
+// output (ffmpeg -version, python --version) and is shown as it is.
+// SPEC-v2 I10 (phase 3b): the OpenVINO checks form their own group (at most
+// warn), and a card lists the transcription devices, the power state and
+// the OpenVINO environment ("check again" also runs the device detection,
+// on the server).
+// SPEC-v3 (V12.2 acceptance, item 5): in desktop mode (GET /api/app mode)
+// Python, faster-whisper, pypdf, the CUDA self-test and the OpenVINO
+// environment come from the component manager, so their development hints
+// (.venv, README, requirements.txt) give way to "install it in Settings →
+// Components" with a link there; web mode keeps the server's hints.
+
+import { api } from './api.js';
+import { h, clear, btn, skeleton, errorBlock, preserveFocus, copyText, toast } from './dom.js';
+import { icon } from './icons.js';
+import * as U from './util.js';
+import { t } from './i18n.js';
+import { obApi } from './onboarding_api.js';
+
+// The detail code of a check that is still running (internal/api/system.go).
+const CHECK_PENDING = 'check.checking';
+// Fix hints that point at a development setup (.venv, requirements.txt):
+// in desktop mode the components replace them.
+const COMPONENT_HINTS = new Set(['check.hint_python', 'check.hint_python_version', 'check.hint_pip', 'check.hint_selftest', 'check.hint_openvino_venv']);
+// The application's mode (GET /api/app), fetched once per page load.
+let appMode = null;
+const GROUPS = [
+  ['env', 'layers', (n) => ['data_dir', 'ffmpeg', 'python', 'faster-whisper', 'pypdf'].includes(n)],
+  ['gpu', 'cpu', (n) => n === 'gpu' || n === 'cuda'],
+  ['openvino', 'cpu', (n) => ['openvino_venv', 'openvino', 'openvino_devices', 'npu_driver'].includes(n)],
+  ['api', 'server', (n) => n.startsWith('api_key:') || n.startsWith('api:') || n.startsWith('role_model:')],
+  ['disk', 'hard-drive', (n) => n === 'disk'],
+];
+const STATUS_ICON = { ok: 'circle-check', warn: 'triangle-alert', error: 'circle-alert', pending: 'loader-circle' };
+const statusText = (st) => t(`system.status.${st}`);
+// Options of config.toml and the settings sections described by
+// system.config.label.{key}.
+const CONFIG_KEYS = new Set([
+  'listen',
+  'data_dir',
+  'python',
+  'python_openvino',
+  'ffmpeg',
+  'nvidia_smi',
+  'worker_dir',
+  'log_level',
+  'asr',
+  'general',
+  'asr.model',
+  'asr.compute_type',
+  'asr.device',
+  'asr.language',
+  'asr.max_parallel',
+  'asr.vram_reserve_mb',
+  'asr.vram_per_job_mb',
+  'asr.fake_result',
+  'asr.fake_result_openvino',
+  'general.keep_original_media',
+  'general.notifications',
+  'general.daily_budget',
+]);
+// SPEC-v2 I8 settings in the configuration: named like on the settings page
+const CONFIG_SETTING_LABELS = {
+  'asr.device_mode': 'settings.asr.device_label',
+  'asr.manual_devices': 'settings.asr.manual_label', // power management (manual mode)
+  'asr.multi_device': 'settings.asr.multi_device',
+  'asr.mem_reserve_mb': 'settings.asr.mem_reserve_label',
+};
+// Settings the configuration table no longer lists: battery_aware was
+// retired by power management (still sent by the back end, ignored by the
+// policy; "复制" keeps the whole configuration).
+const CONFIG_HIDDEN = new Set(['asr.battery_aware']);
+const configLabel = (key) => (CONFIG_KEYS.has(key) ? t(`system.config.label.${key}`) : CONFIG_SETTING_LABELS[key] ? t(CONFIG_SETTING_LABELS[key]) : '');
+
+function checkState(c) {
+  return c.detail_info && c.detail_info.code === CHECK_PENDING ? 'pending' : c.status;
+}
+
+// The text of a coded detail or hint; the untranslated string when there is
+// no code (or no translation). Free space comes in MB (free_mb).
+function checkText(info, text) {
+  if (info && info.params && typeof info.params.free_mb === 'number') info = { ...info, params: { ...info.params, free_mb: U.fmtMB(info.params.free_mb) } };
+  return U.errorInfoText(info, text);
+}
+
+// A sentence with a link in place of {link}.
+function withLink(text, link) {
+  const i = text.indexOf('{link}');
+  return i < 0 ? [text, link] : [text.slice(0, i), link, text.slice(i + '{link}'.length)];
+}
+
+export function mountSystem(root, ctx) {
+  let alive = true;
+  let checking = false;
+  let error = '';
+  let gpuKey = '';
+  const el = h('div', { class: 'page page-system' });
+  root.append(el);
+  if (!appMode) {
+    appMode = obApi
+      .app({ quiet: true })
+      .then((info) => (info && info.mode) || 'web')
+      .catch(() => {
+        appMode = null; // try again on the next visit
+        return 'web';
+      });
+  }
+  let desktopMode = false;
+  appMode.then((m) => {
+    if (!alive || m !== 'desktop') return;
+    desktopMode = true;
+    if (ctx.system()) preserveFocus(render);
+  });
+
+  async function refresh() {
+    try {
+      await ctx.refreshSystem();
+      error = '';
+    } catch (e) {
+      if (!ctx.system()) error = e.message || t('common.load_failed');
+    }
+    if (alive) preserveFocus(render);
+  }
+
+  async function recheck() {
+    if (checking) return;
+    checking = true;
+    preserveFocus(render);
+    try {
+      const sys = await api.recheck();
+      if (alive && sys) ctx.setSystem(sys);
+    } catch {
+      // shown by the API layer
+    } finally {
+      checking = false;
+      if (alive) preserveFocus(render);
+    }
+  }
+
+  function render() {
+    const sys = ctx.system();
+    clear(el);
+    el.append(
+      h(
+        'header',
+        { class: 'page-head' },
+        h('div', { class: 'page-titles' }, h('h1', { class: 'page-title' }, t('system.title')), h('p', { class: 'page-sub' }, t('system.subtitle'))),
+        h(
+          'div',
+          { class: 'page-actions' },
+          h(
+            'button',
+            { type: 'button', class: 'btn btn-primary', disabled: checking, dataset: { fkey: 'sys:recheck' }, onclick: recheck },
+            icon('rotate-cw', { size: 16, class: checking ? 'spin' : '' }),
+            h('span', { class: 'btn-label' }, checking ? t('system.rechecking') : t('system.recheck')),
+          ),
+        ),
+      ),
+    );
+    if (!sys) {
+      el.append(
+        error
+          ? h('section', { class: 'card' }, h('div', { class: 'card-bd' }, errorBlock(error, () => ((error = ''), render(), refresh()))))
+          : [h('section', { class: 'card sys-summary is-loading' }, h('div', { class: 'card-bd' }, skeleton(2))), h('section', { class: 'card' }, h('div', { class: 'card-bd' }, skeleton(8)))],
+      );
+      return;
+    }
+    el.append(summary(sys), checksCard(sys), sys.devices || sys.openvino ? devicesCard(sys) : null, h('div', { class: 'sys-grid' }, gpuCard(sys), apiCard(sys), usageCard(sys), diskCard(sys)), configCard(sys.config || {}));
+    gpuKey = gpuSig();
+  }
+
+  // ---- summary ----
+
+  function summary(sys) {
+    const states = sys.checks.map(checkState);
+    const n = (s) => states.filter((x) => x === s).length;
+    const errors = n('error');
+    const warns = n('warn');
+    const pending = n('pending');
+    let tone = 'ok';
+    let title = t('system.summary.ok_title');
+    let text = t('system.summary.ok_text');
+    if (errors) {
+      tone = 'err';
+      title = t('system.summary.err_title', { n: errors });
+      text = t('system.summary.err_text');
+    } else if (pending || checking) {
+      tone = 'run';
+      title = t('system.summary.run_title');
+      text = t('system.summary.run_text');
+    } else if (warns) {
+      tone = 'warn';
+      title = t('system.summary.warn_title', { n: warns });
+      text = t('system.summary.warn_text');
+    }
+    const noCourses = ctx.coursesLoaded() && ctx.courses().length === 0;
+    return h(
+      'section',
+      { class: `card sys-summary tone-${tone}`, 'aria-live': 'polite' },
+      h('div', { class: 'sys-summary-icon' }, icon(tone === 'ok' ? 'circle-check' : tone === 'err' ? 'circle-alert' : tone === 'run' ? 'loader-circle' : 'triangle-alert', { size: 22, class: tone === 'run' ? 'spin' : '' })),
+      h('div', { class: 'sys-summary-main' }, h('div', { class: 'sys-summary-title' }, title), h('div', { class: 'sys-summary-text' }, text)),
+      h(
+        'div',
+        { class: 'sys-counts' },
+        countPill('ok', n('ok')),
+        countPill('warn', warns),
+        countPill('error', errors),
+        pending ? countPill('pending', pending) : null,
+      ),
+      !errors && noCourses ? h('div', { class: 'sys-summary-cta' }, h('span', null, t('system.summary.cta')), btn(t('system.summary.add_course'), { kind: 'primary', size: 'sm', icon: 'plus', onclick: ctx.newCourse, fkey: 'sys:add' })) : null,
+    );
+  }
+
+  function countPill(state, count) {
+    return h('span', { class: `sys-count is-${state}` + (count ? '' : ' is-zero') }, icon(STATUS_ICON[state], { size: 13 }), h('b', null, String(count)), statusText(state));
+  }
+
+  // ---- checks ----
+
+  function checksCard(sys) {
+    const groups = GROUPS.map(([key, ic, match]) => ({ key, ic, title: t(`system.group.${key}`), items: sys.checks.filter((c) => match(c.name)) }));
+    const rest = sys.checks.filter((c) => !GROUPS.some((g) => g[2](c.name)));
+    if (rest.length) groups.push({ key: 'other', ic: 'list-checks', title: t('system.group.other'), items: rest });
+    return h(
+      'section',
+      { class: 'card card-flush sys-checks', 'aria-label': t('system.checks') },
+      h('header', { class: 'card-hd' }, h('h2', { class: 'card-title' }, icon('stethoscope', { size: 16 }), h('span', null, t('system.checks')), h('span', { class: 'card-count' }, String(sys.checks.length)))),
+      groups
+        .filter((g) => g.items.length)
+        .map((g) => {
+          const bad = g.items.filter((c) => checkState(c) === 'error').length;
+          const warn = g.items.filter((c) => checkState(c) === 'warn').length;
+          return h(
+            'div',
+            { class: 'sys-group' },
+            h(
+              'h3',
+              { class: 'sys-group-title' },
+              icon(g.ic, { size: 14 }),
+              h('span', null, g.title),
+              bad ? h('span', { class: 'sys-group-flag is-error' }, t('system.group.flag_error', { n: bad })) : warn ? h('span', { class: 'sys-group-flag is-warn' }, t('system.group.flag_warn', { n: warn })) : null,
+            ),
+            h('ul', { class: 'sys-check-list' }, g.items.map(checkRow)),
+          );
+        }),
+    );
+  }
+
+  // desktop mode: a missing Python, package or back end is installed from Settings → Components
+  function componentHint(c, st) {
+    return h(
+      'div',
+      { class: `sys-hint is-${st}` },
+      icon('info', { size: 13 }),
+      h('span', null, t('system.hint.components')),
+      h('a', { class: 'sys-hint-link', href: '#/settings/components', dataset: { fkey: `sys:gocomp:${c.name}` } }, t('system.open_components'), icon('chevron-right', { size: 13 })),
+    );
+  }
+
+  function checkRow(c) {
+    const st = checkState(c);
+    const provider = c.name.startsWith('api_key:') || c.name.startsWith('api:') || c.name.startsWith('role_model:');
+    const toComponents = desktopMode && st !== 'ok' && st !== 'pending' && !!c.hint_info && COMPONENT_HINTS.has(c.hint_info.code);
+    return h(
+      'li',
+      { class: `sys-check is-${st}` },
+      h('span', { class: 'sys-check-icon', title: statusText(st) }, icon(STATUS_ICON[st], { size: 16, class: st === 'pending' ? 'spin' : '', label: statusText(st) })),
+      h(
+        'div',
+        { class: 'sys-check-main' },
+        h('div', { class: 'sys-check-name' }, U.checkName(c.name), st !== 'ok' && st !== 'pending' ? h('span', { class: `sys-check-state is-${st}` }, statusText(st)) : null),
+        c.detail || c.detail_info ? h('div', { class: 'sys-check-detail' }, checkText(c.detail_info, c.detail)) : null,
+        toComponents
+          ? componentHint(c, st)
+          : c.hint || c.hint_info
+          ? h(
+              'div',
+              { class: `sys-hint is-${st}` },
+              icon('info', { size: 13 }),
+              h('span', null, checkText(c.hint_info, c.hint)),
+              provider && st !== 'ok' ? h('a', { class: 'sys-hint-link', href: '#/settings', dataset: { fkey: `sys:goset:${c.name}` } }, t('system.open_settings'), icon('chevron-right', { size: 13 })) : null,
+            )
+          : null,
+      ),
+    );
+  }
+
+  // ---- resources ----
+
+  function panel(ic, title, body, extra) {
+    return h('section', { class: 'card sys-panel' }, h('header', { class: 'card-hd' }, h('h2', { class: 'card-title' }, icon(ic, { size: 16 }), h('span', null, title)), extra), h('div', { class: 'card-bd' }, body));
+  }
+
+  function meter(fraction, tone) {
+    const f = Math.max(0, Math.min(1, fraction || 0));
+    return h('div', { class: `meter meter-${tone}`, role: 'img', 'aria-label': U.fmtPercent(f, 0) }, h('div', { class: 'meter-fill', style: { width: `${(f * 100).toFixed(1)}%` } }));
+  }
+
+  function kvList(pairs) {
+    return h(
+      'dl',
+      { class: 'sys-kv' },
+      pairs.filter(Boolean).map(([k, v, cls]) => [h('dt', null, k), h('dd', { class: cls || '' }, v)]),
+    );
+  }
+
+  function gpuSig() {
+    const r = ctx.resources();
+    return r && r.gpu ? `${r.gpu.name}|${r.gpu.backend}|${r.gpu.available}` : '';
+  }
+
+  function gpuCard(sys) {
+    const g = sys.gpu;
+    const res = ctx.resources();
+    const live = res && res.gpu && res.gpu.available ? res.gpu : null;
+    const used = g.total_mb ? g.total_mb - g.free_mb : 0;
+    const frac = g.total_mb ? used / g.total_mb : 0;
+    return panel(
+      'cpu',
+      // with the device list (I10) this card is the NVIDIA card's
+      sys.devices ? t('devices.kind.cuda') : t('system.group.gpu'),
+      [
+        live ? h('div', { class: 'sys-gpu-name' }, h('span', { class: 'sys-gpu-model' }, live.name), live.backend ? h('span', { class: 'chip chip-quiet mono' }, live.backend) : null) : null,
+        g.total_mb
+          ? h(
+              'div',
+              { class: 'sys-metric' },
+              h('div', { class: 'sys-metric-top' }, h('span', { class: 'sys-metric-k' }, t('system.gpu.vram')), h('span', { class: 'sys-metric-v' }, `${U.fmtMB(used)} `, h('small', null, `/ ${U.fmtMB(g.total_mb)}`))),
+              meter(frac, frac > 0.9 ? 'warn' : 'accent'),
+            )
+          : h('p', { class: 'sys-empty' }, t('system.gpu.no_vram')),
+        kvList([
+          [t('system.gpu.asr_jobs'), h('span', { class: 'sys-slots' }, Array.from({ length: Math.max(g.slots_max, 1) }, (_, i) => h('span', { class: 'slot' + (i < g.slots_used ? ' is-on' : '') })), ` ${g.slots_used} / ${g.slots_max}`), 'is-num'],
+          [t('system.gpu.per_job'), U.fmtMB(g.estimated_job_mb), 'is-num'],
+          [t('system.gpu.gpu_jobs'), g.paused ? h('span', { class: 'tone-warn' }, t('system.gpu.paused')) : t('system.gpu.running')],
+        ]),
+      ],
+    );
+  }
+
+  // ---- transcription devices, power, OpenVINO (SPEC-v2 I10) ----
+
+  function powerText(p) {
+    if (!p || !p.known) return t('system.power.unknown');
+    if (!p.on_battery) return p.has_battery && p.charging ? [t('system.power.ac'), t('resources.power.charging')].join(' · ') : t('system.power.ac');
+    return p.battery_pct != null ? t('system.power.battery_pct', { pct: U.fmtPercent(p.battery_pct / 100, 0) }) : t('system.power.battery');
+  }
+
+  function deviceState(d) {
+    const chips = [];
+    if (!d.present) chips.push(h('span', { class: 'chip chip-warn', title: t('devices.not_present_tip') }, t('devices.not_present')));
+    if (!d.enabled) chips.push(h('span', { class: 'chip chip-quiet' }, t('devices.disabled')));
+    if (d.paused) chips.push(h('span', { class: 'chip chip-warn' }, t('devices.paused')));
+    if (!chips.length) chips.push(h('span', { class: 'chip chip-ok' }, t('system.devices.ready')));
+    return chips;
+  }
+
+  function devicesCard(sys) {
+    const devs = (sys.devices || []).slice().sort((a, b) => b.priority - a.priority);
+    const ov = sys.openvino;
+    const ovByID = new Map(((ov && ov.devices) || []).filter((x) => x.device_id).map((x) => [x.device_id, x]));
+    const rows = devs.map((d) => {
+      const o = ovByID.get(d.id);
+      const sub = [U.deviceKindName(d.kind), d.backend === 'openvino' ? 'OpenVINO' : d.backend];
+      if (o) sub.push(o.name, o.driver_version ? t('system.openvino.driver', { version: o.driver_version }) : '');
+      return h(
+        'tr',
+        { class: d.enabled && d.present ? '' : 'is-muted' },
+        h('th', { scope: 'row' }, h('span', { class: 'sys-dev-name', title: d.label }, d.label), h('span', { class: 'sys-dev-sub' }, sub.filter(Boolean).join(' · '))),
+        h('td', { class: 'mono' }, U.comboText(d.model, d.precision)),
+        h('td', { title: d.detected_at ? t('system.devices.detected_at', { when: U.relTime(d.detected_at) }) : undefined }, h('span', { class: 'sys-dev-state' }, deviceState(d))),
+      );
+    });
+    const ovBlock = ov
+      ? h(
+          'div',
+          { class: 'sys-ov' },
+          h('h3', { class: 'sys-group-title' }, icon('cpu', { size: 14 }), h('span', null, 'OpenVINO'), ov.detected_at ? h('span', { class: 'sys-ov-at' }, t('system.devices.detected_at', { when: U.relTime(ov.detected_at) })) : null),
+          ov.available
+            ? kvList([
+                [t('system.openvino.python'), h('span', { class: 'mono sys-ov-path', title: ov.python }, ov.python)],
+                ov.version ? ['OpenVINO', h('span', { class: 'mono' }, ov.version)] : null,
+                ov.genai_version ? ['GenAI', h('span', { class: 'mono' }, ov.genai_version)] : null,
+                [t('system.openvino.convert'), ov.can_convert ? t('system.openvino.convert_ok') : h('span', { class: 'tone-warn' }, t('system.openvino.convert_no'))],
+              ])
+            : h('p', { class: 'sys-empty tone-warn' }, icon('triangle-alert', { size: 13 }), ov.error_info ? U.errorInfoText(ov.error_info) : t('system.openvino.unavailable')),
+          (ov.ignored || []).length
+            ? h(
+                'div',
+                { class: 'sys-ov-ignored' },
+                h('div', { class: 'sys-disk-cap' }, t('system.openvino.ignored')),
+                h(
+                  'ul',
+                  { class: 'sys-ov-list' },
+                  ov.ignored.map((x) => {
+                    const why = ['not_intel', 'second_intel_gpu', 'error'].includes(x.reason) ? t(`system.openvino.reason.${x.reason}`) : x.reason || '';
+                    return h('li', null, h('span', { class: 'sys-dev-name', title: x.full_name || x.name }, x.full_name || x.name), h('span', { class: 'sys-dev-sub' }, [x.name, why].filter(Boolean).join(' · ')));
+                  }),
+                ),
+              )
+            : null,
+        )
+      : null;
+    return h(
+      'section',
+      { class: 'card sys-devices' },
+      h(
+        'header',
+        { class: 'card-hd' },
+        h('h2', { class: 'card-title' }, icon('mic', { size: 16 }), h('span', null, t('system.group.gpu')), devs.length ? h('span', { class: 'card-count' }, String(devs.length)) : null),
+        h('a', { class: 'card-link', href: '#/settings/asr', dataset: { fkey: 'sys:dev:settings' } }, t('system.open_settings'), icon('chevron-right', { size: 13 })),
+      ),
+      h(
+        'div',
+        { class: 'card-bd sys-devices-bd' },
+        h(
+          'div',
+          { class: 'sys-devices-main' },
+          devs.length
+            ? h(
+                'div',
+                { class: 'sys-dev-wrap' },
+                h(
+                  'table',
+                  { class: 'sys-dev-table' },
+                  h('thead', null, h('tr', null, h('th', { scope: 'col' }, t('settings.asr.device')), h('th', { scope: 'col' }, t('selftest.col.combo')), h('th', { scope: 'col' }, t('system.devices.col.state')))),
+                  h('tbody', null, rows),
+                ),
+              )
+            : h('p', { class: 'sys-empty' }, t('devices.empty_title')),
+          kvList([[t('system.power.label'), h('span', { class: sys.power && sys.power.on_battery ? 'tone-warn' : '' }, powerText(sys.power))]]),
+        ),
+        ovBlock,
+      ),
+    );
+  }
+
+  function apiCard(sys) {
+    const rows = Object.entries(sys.api || {}).sort((a, b) => a[0].localeCompare(b[0]));
+    return panel(
+      'activity',
+      t('system.api.title'),
+      rows.length
+        ? h(
+            'div',
+            { class: 'sys-api' },
+            rows.map(([name, a]) =>
+              h(
+                'div',
+                { class: 'sys-metric' },
+                h('div', { class: 'sys-metric-top' }, h('span', { class: 'sys-metric-k strong' }, name), h('span', { class: 'sys-metric-v' }, `${a.inflight} `, h('small', null, `/ ${t('system.api.limits', { max: a.max, rpm: a.rpm_limit })}`))),
+                meter(a.max ? a.inflight / a.max : 0, a.inflight >= a.max && a.max ? 'warn' : 'accent'),
+              ),
+            ),
+          )
+        : h('p', { class: 'sys-empty' }, t('system.api.none'), h('a', { href: '#/settings' }, t('system.api.add'))),
+      h('a', { class: 'card-link', href: '#/settings', dataset: { fkey: 'sys:api:settings' } }, t('system.api.settings'), icon('chevron-right', { size: 13 })),
+    );
+  }
+
+  function usageCard(sys) {
+    const u = sys.usage_today;
+    const rate = U.cacheHitRate(u);
+    const budget = Number(sys.config && sys.config.general && sys.config.general.daily_budget) || 0;
+    return panel('coins', t('system.usage.title'), [
+      h('div', { class: 'sys-usage-big' }, u.estimated_cost != null ? h('span', { class: 'sys-usage-money' }, U.fmtCost(u.estimated_cost)) : h('span', { class: 'sys-usage-money is-quiet' }, t('system.usage.no_price')), h('span', { class: 'sys-usage-k' }, t('system.usage.cost'))),
+      budget > 0 && u.estimated_cost != null
+        ? h(
+            'div',
+            { class: 'sys-metric' },
+            h('div', { class: 'sys-metric-top' }, h('span', { class: 'sys-metric-k' }, t('system.usage.budget', { budget: U.fmtDecimal(budget, 2) })), h('span', { class: 'sys-metric-v' }, t('system.usage.used', { pct: U.fmtPercent(u.estimated_cost / budget, 0) }))),
+            meter(u.estimated_cost / budget, u.estimated_cost >= budget ? 'warn' : 'ok'),
+          )
+        : null,
+      kvList([
+        [t('system.usage.input'), U.fmtTokens(u.prompt_tokens), 'is-num'],
+        [t('system.usage.cache_hit'), rate != null ? t('system.usage.cache_hit_value', { tokens: U.fmtTokens(u.cache_hit_tokens), pct: U.fmtPercent(rate) }) : U.fmtTokens(u.cache_hit_tokens), 'is-num'],
+        [t('system.usage.output'), U.fmtTokens(u.completion_tokens), 'is-num'],
+        [t('system.usage.budget_today'), sys.budget_hit ? h('span', { class: 'tone-warn' }, t('system.usage.budget_hit')) : budget > 0 ? t('system.usage.budget_ok') : t('system.usage.unlimited')],
+      ]),
+    ]);
+  }
+
+  function diskCard(sys) {
+    const d = sys.disk;
+    const entries = Object.entries(d.courses_mb || {}).sort((a, b) => b[1] - a[1]);
+    const maxMB = entries.length ? Math.max(...entries.map((e) => e[1]), 1) : 1;
+    const courses = new Map(ctx.courses().map((c) => [c.id, c]));
+    const low = d.free_mb > 0 && d.free_mb < 5 * 1024;
+    return panel('hard-drive', t('system.disk.title'), [
+      kvList([
+        [t('system.disk.free'), h('span', { class: low ? 'tone-warn' : '' }, U.fmtMB(d.free_mb)), 'is-num'],
+        [t('system.disk.data'), U.fmtMB(d.data_mb), 'is-num'],
+        // v2 P8.1: the playback files, part of the data folder size
+        d.stream_mb != null ? [h('span', { title: t('system.disk.stream_tip') }, t('system.disk.stream')), U.fmtMB(d.stream_mb), 'is-num'] : null,
+      ]),
+      entries.length
+        ? h(
+            'div',
+            { class: 'sys-disk' },
+            h('div', { class: 'sys-disk-cap' }, t('system.disk.per_course')),
+            h(
+              'ul',
+              { class: 'sys-disk-list' },
+              entries.map(([id, size]) => {
+                const c = courses.get(id);
+                return h(
+                  'li',
+                  { class: 'sys-disk-row' },
+                  h(
+                    'span',
+                    { class: 'sys-disk-name', title: c ? c.name : id },
+                    c ? [c.code ? h('span', { class: 'sys-disk-code' }, c.code) : null, h('span', null, c.name)] : h('span', { class: 'mono dim' }, id),
+                  ),
+                  h('span', { class: 'sys-disk-bar' }, h('span', { style: { width: `${((size / maxMB) * 100).toFixed(1)}%` } })),
+                  h('span', { class: 'sys-disk-v' }, U.fmtMB(size)),
+                );
+              }),
+            ),
+          )
+        : null,
+    ]);
+  }
+
+  // ---- configuration ----
+
+  function configCard(cfg) {
+    const scalars = Object.entries(cfg).filter(([, v]) => v === null || typeof v !== 'object');
+    const objects = Object.entries(cfg).filter(([, v]) => v && typeof v === 'object');
+    const row = (key, label, v) =>
+      h('tr', null, h('th', { scope: 'row' }, h('span', { class: 'mono' }, key.split('.').pop()), label ? h('span', { class: 'sys-cfg-label' }, label) : null), h('td', { class: 'mono' }, fmtValue(v)));
+    const flatten = (prefix, obj) =>
+      Object.entries(obj)
+        .flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flatten(`${prefix}.${k}`, v) : [[`${prefix}.${k}`, v]]))
+        .filter(([k]) => !CONFIG_HIDDEN.has(k));
+    return h(
+      'section',
+      { class: 'card sys-config' },
+      h(
+        'header',
+        { class: 'card-hd' },
+        h('h2', { class: 'card-title' }, icon('braces', { size: 16 }), h('span', null, t('system.config.title'))),
+        h(
+          'div',
+          { class: 'card-tools' },
+          btn(t('system.config.copy'), {
+            size: 'sm',
+            icon: 'copy',
+            fkey: 'sys:copycfg',
+            onclick: async () => toast((await copyText(JSON.stringify(cfg, null, 2))) ? t('system.config.copied') : t('system.config.copy_failed'), 'info'),
+          }),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'card-bd' },
+        h('p', { class: 'sys-cfg-note' }, icon('info', { size: 13 }), withLink(t('system.config.note'), h('a', { href: '#/settings' }, t('system.config.note_link')))),
+        Object.keys(cfg).length === 0
+          ? h('p', { class: 'sys-empty' }, t('system.config.empty'))
+          : h(
+              'div',
+              { class: 'sys-cfg-grid' },
+              scalars.length ? h('table', { class: 'sys-cfg' }, h('caption', null, t('system.config.startup')), h('tbody', null, scalars.map(([k, v]) => row(k, configLabel(k), v)))) : null,
+              objects.map(([k, v]) =>
+                h(
+                  'table',
+                  { class: 'sys-cfg' },
+                  h('caption', null, configLabel(k) ? t('system.config.caption', { label: configLabel(k), key: k }) : k),
+                  h('tbody', null, flatten(k, v).map(([kk, vv]) => row(kk, configLabel(kk), vv))),
+                ),
+              ),
+            ),
+      ),
+    );
+  }
+
+  function fmtValue(v) {
+    if (v === null || v === undefined) return h('span', { class: 'dim' }, 'null');
+    if (typeof v === 'boolean') return h('span', { class: v ? 'tone-ok' : 'tone-muted' }, String(v));
+    if (Array.isArray(v)) return v.length ? v.map(String).join(', ') : h('span', { class: 'dim' }, '[]');
+    if (v === '') return h('span', { class: 'dim' }, '""');
+    return String(v);
+  }
+
+  render();
+  refresh();
+
+  return {
+    refresh,
+    onSystemChanged: () => preserveFocus(render),
+    onCoursesChanged: () => preserveFocus(render),
+    onResources() {
+      if (ctx.system() && gpuSig() !== gpuKey) preserveFocus(render);
+    },
+    destroy() {
+      alive = false;
+    },
+  };
+}

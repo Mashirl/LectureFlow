@@ -1,0 +1,9 @@
+node_modules/
+dist/
+out/
+test-results/
+playwright-report/
+.e2e-tmp/
+build/
+.cache/
+dist-next/

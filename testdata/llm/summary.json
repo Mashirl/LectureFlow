@@ -1,0 +1,3 @@
+{
+  "summary": "This lecture introduces the cache hierarchy of modern processors. It first explains the write-back policy, in which a cache writes a cache line back to memory only on eviction, and notes that a cache line is 64 bytes on most x86 machines. The lecturer then shows how an address is split into a tag, an index and an offset: the index selects a set and the tag decides whether the access is a hit. A direct mapped cache has one line per set, which causes conflict misses; a two-way set associative cache halves the number of sets and lowers the miss rate from 5 percent to about 3 percent. The lecture ends with LRU replacement, which evicts the least recently used line, and announces a related lab next week."
+}

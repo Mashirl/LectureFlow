@@ -1,0 +1,4 @@
+[
+  {"id": "01JPAT0000000000000000000B", "lecture_id": "01JLEC0000000000000000000B", "sentence_idx": 2, "before": "A right back cache only writes on eviction.", "after": "A write-back cache only writes on eviction.", "class": "decide", "reason": "right back -> write-back may change meaning", "review": "pending", "edited_text": null, "low_conf_count": 2, "start_ms": 9100, "end_ms": 15800, "prev_text": "Today we talk about the cache hierarchy.", "next_text": "It has 64-byte lines."},
+  {"id": "01JPAT0000000000000000000C", "lecture_id": "01JLEC0000000000000000000B", "sentence_idx": 7, "before": "The miss rate is about five percent.", "after": "The miss rate is about 5 percent.", "class": "decide", "reason": "number normalisation", "review": "pending", "edited_text": null, "low_conf_count": 0, "start_ms": 30100, "end_ms": 33800, "prev_text": "Let's look at the numbers.", "next_text": null}
+]

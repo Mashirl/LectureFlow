@@ -1,0 +1,35 @@
+[
+ {
+  "provider_id": "deepseek",
+  "name": "DeepSeek",
+  "requests": 412,
+  "prompt_tokens": 1842310,
+  "cache_hit_tokens": 1521904,
+  "completion_tokens": 96318,
+  "cache_hit_rate": 0.8261,
+  "cost": 2.1415,
+  "currency": "CNY"
+ },
+ {
+  "provider_id": "01JPRV0000000000000000000A",
+  "name": "Anthropic",
+  "requests": 23,
+  "prompt_tokens": 312400,
+  "cache_hit_tokens": 241000,
+  "completion_tokens": 18900,
+  "cache_hit_rate": 0.7714,
+  "cost": 0.57,
+  "currency": "USD"
+ },
+ {
+  "provider_id": "01JPRV0000000000000000000B",
+  "name": "OpenRouter",
+  "requests": 0,
+  "prompt_tokens": 0,
+  "cache_hit_tokens": 0,
+  "completion_tokens": 0,
+  "cache_hit_rate": null,
+  "cost": null,
+  "currency": null
+ }
+]

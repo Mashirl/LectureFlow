@@ -1,0 +1,10 @@
+ 1 W02L1  ok=true  w=2 n=1 2026-10-05 --:-- Mon  Wk2 Oct 05.mp4
+ 2 W02L2  ok=true  w=2 n=2 2026-10-07 --:-- Wed  Wk2 Oct 07 part a.mp4 同日顺序按文件名推测
+ 3 W02L3  ok=true  w=2 n=3 2026-10-07 --:-- Wed  Wk2 Oct 07 part b.mp4 同日顺序按文件名推测
+ 4 W02L4  ok=true  w=2 n=4 2026-10-07 --:-- Wed  Wk2 Oct 07 part c.mp4 同日顺序按文件名推测
+ 5 W03L1  ok=true  w=3 n=1 2026-10-14 --:-- Wed  M unknown.mp4 同日顺序按文件名推测
+ 6 W03L2  ok=true  w=3 n=2 2026-10-14 09:00 Wed  Z morning.mp4 同日顺序按文件名推测
+ 7 W03L3  ok=true  w=3 n=3 2026-10-14 14:00 Wed  A afternoon.mp4 同日顺序按文件名推测
+ 8 W04L1  ok=true  w=4 n=1 2026-10-21 09:35 Wed  same a.mp4 同日顺序按文件名推测
+ 9 W04L2  ok=true  w=4 n=2 2026-10-21 09:35 Wed  same b.mp4 同日顺序按文件名推测
+10 W04L3  ok=true  w=4 n=3 2026-10-21 11:00 Wed  later.mp4

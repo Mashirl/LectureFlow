@@ -1,0 +1,11 @@
+== input
+sentence #9  05:00.000 → 05:05.770
+  text:  We use AES for the data, and RSA for the key exchange, because RSA is slow.
+  asr:   we use aes for the data and rsa for the key exchange because rsa is slow
+  words: we[300000-300220] use[300270-300550] aes[300600-300880] for[300930-301210] the[301260-301540] data[301590-301930] and[301980-302260] rsa[302310-302590] for[302640-302920] the[302970-303250] key[303300-303580] exchange[303630-304210] because[304260-304780] rsa[304830-305110] is[305160-305380] slow[305430-305770]
+  zh:    我们用 AES 加密数据，用 RSA 交换密钥，因为 RSA 很慢。
+  times: We[300000-300220] use[300270-300550] AES[300600-300880] for[300930-301210] the[301260-301540] data,[301590-301930] and[301980-302260] RSA[302310-302590] for[302640-302920] the[302970-303250] key[303300-303580] exchange,[303630-304210] because[304260-304780] RSA[304830-305110] is[305160-305380] slow.[305430-305770]
+== cues
+#9  05:00.000 → 05:05.770  (5770 ms, 75 ch)
+  en: We use AES for the data, and RSA for the key exchange, because RSA is slow.
+  zh: 我们用 AES 加密数据，用 RSA 交换密钥，因为 RSA 很慢。

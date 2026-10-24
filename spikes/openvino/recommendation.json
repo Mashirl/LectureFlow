@@ -1,0 +1,157 @@
+{
+ "generated_at": "2026-10-23T20:05:34+0100",
+ "openvino_version": "2026.4.1",
+ "openvino_genai_version": "2026.4.1.0",
+ "rule": "lowest WER with RTF <= 0.5 (else lowest RTF); long-form WhisperPipeline, greedy (num_beams=1), word_timestamps=True, no prompt",
+ "audio": {
+  "seconds": 602.0,
+  "note": "CSC1003 lecture, 20:28-30:30"
+ },
+ "devices": {
+  "GPU": {
+   "openvino_device": "GPU.0",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "hf_id": "openai/whisper-large-v3-turbo",
+   "model_dir": "data/models/openvino/whisper-large-v3-turbo-fp16",
+   "export": "optimum-cli export openvino --model openai/whisper-large-v3-turbo --task automatic-speech-recognition-with-past --weight-format fp16 <model_dir>",
+   "rtf": 0.0338,
+   "wer": 0.0568,
+   "words": true,
+   "low_conf_words": false,
+   "num_beams": 1,
+   "first_load_s": 6.16,
+   "cached_load_s": 1.38,
+   "convert_s": 29.8,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 2683.1,
+   "sys_mem_peak_mb": 3448.8,
+   "variants": {
+    "chunk30": {
+     "rtf": 0.0368,
+     "wer": 0.0637
+    },
+    "nowords": {
+     "rtf": 0.0255,
+     "wer": 0.0576
+    },
+    "prompt-hotwords": {
+     "rtf": 0.0374,
+     "wer": 0.0753
+    },
+    "prompt-initial": {
+     "rtf": 0.0401,
+     "wer": 0.0714
+    }
+   },
+   "note": "",
+   "alternative": {
+    "model": "large-v3-turbo",
+    "precision": "int8",
+    "rtf": 0.0258,
+    "wer": 0.0576,
+    "model_mb": 783.9,
+    "peak_working_set_mb": 2109.3,
+    "why": "fastest cell within 0.5 WER points of the pick"
+   }
+  },
+  "NPU": {
+   "openvino_device": "NPU",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "hf_id": "openai/whisper-large-v3-turbo",
+   "model_dir": "data/models/openvino/whisper-large-v3-turbo-fp16",
+   "export": "optimum-cli export openvino --model openai/whisper-large-v3-turbo --task automatic-speech-recognition-with-past --weight-format fp16 <model_dir>",
+   "rtf": 0.071,
+   "wer": 0.0607,
+   "words": true,
+   "low_conf_words": false,
+   "num_beams": 1,
+   "first_load_s": 255.68,
+   "cached_load_s": 2.21,
+   "convert_s": 29.8,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 5003.8,
+   "sys_mem_peak_mb": 4367.2,
+   "variants": {
+    "nowords": {
+     "rtf": 0.0274,
+     "wer": 0.0614
+    }
+   },
+   "note": "",
+   "alternative": null
+  },
+  "CPU": {
+   "openvino_device": "CPU",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "hf_id": "openai/whisper-large-v3-turbo",
+   "model_dir": "data/models/openvino/whisper-large-v3-turbo-fp16",
+   "export": "optimum-cli export openvino --model openai/whisper-large-v3-turbo --task automatic-speech-recognition-with-past --weight-format fp16 <model_dir>",
+   "rtf": 0.2547,
+   "wer": 0.0561,
+   "words": true,
+   "low_conf_words": false,
+   "num_beams": 1,
+   "first_load_s": 0.84,
+   "cached_load_s": null,
+   "convert_s": 29.8,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 5259.5,
+   "sys_mem_peak_mb": 5869.5,
+   "variants": {},
+   "note": "",
+   "alternative": {
+    "model": "large-v3-turbo",
+    "precision": "int8",
+    "rtf": 0.129,
+    "wer": 0.0568,
+    "model_mb": 783.9,
+    "peak_working_set_mb": 2430.6,
+    "why": "fastest cell within 0.5 WER points of the pick"
+   }
+  }
+ },
+ "cuda_baseline": {
+  "backend": "faster-whisper",
+  "device": "cuda",
+  "model": "large-v3",
+  "precision": "float16",
+  "num_beams": 5,
+  "vad_filter": true,
+  "rtf": 0.2855,
+  "wer": 0.0753,
+  "words": true,
+  "load_s": 4.02,
+  "gpu_mem_peak_mb": 5898,
+  "note": "measured while the NVIDIA GPU was power-capped (P5, SW power cap, ~32 W, memory clock 810 MHz); the same GPU did RTF ~0.06 (large-v2) earlier the same day",
+  "others": {
+   "CUDA-large-v3-turbo-float16": {
+    "rtf": 0.0746,
+    "wer": 0.0691
+   },
+   "CUDA-large-v3-float16-beam1": {
+    "rtf": 0.2617,
+    "wer": 0.0499
+   },
+   "CUDA-large-v3-float16-prompt": {
+    "rtf": 0.2894,
+    "wer": 0.0745
+   },
+   "CUDA-large-v2-float16-prompt": {
+    "rtf": 0.3009,
+    "wer": 0.0622
+   }
+  }
+ },
+ "merge_notes": [
+  "pick the Intel iGPU by vendor 0x8086 (DEVICE_ARCHITECTURE / FULL_DEVICE_NAME), not plain 'GPU': OpenVINO also lists NVIDIA as GPU.1",
+  "always pass CACHE_DIR (data/models/openvino/cache/<device>-<model>-<precision>): NPU first compile 40 s (base) to 270 s (turbo) and 666 s (medium int8), cached 0.7-2.9 s; NPU int4 compile is very slow (turbo int4 > 15 min)",
+  "WhisperPipeline(path, device, word_timestamps=True) and generation config word_timestamps=True; glue word pieces without a leading space to the previous word before split_sentences",
+  "no word probabilities (low_conf_words empty), no no_speech_prob/avg_logprob (only remove_repeats applies), no VAD (cap word durations)",
+  "num_beams > 1 fails on GPU and NPU (greedy only); CPU supports beam search",
+  "streamer is called once per 30 s window (text only); StreamingStatus.CANCEL stops at once; killing the process frees the device immediately",
+  "initial_prompt applies to the first 30 s window only (same as faster-whisper with condition_on_previous_text=False); hotwords applies to every window"
+ ]
+}

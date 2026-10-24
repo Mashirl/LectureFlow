@@ -1,0 +1,1377 @@
+[
+ {
+  "name": "fresh session, 50-minute lecture: fits",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "window: 3.8 h used, 50-minute lecture does not fit",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 13680,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_window",
+   "estimate_sec": 930,
+   "remaining_sec": 720,
+   "cost_cu": 0.52
+  }
+ },
+ {
+  "name": "window: 3.5 h used, 50-minute lecture fits",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 12600,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 930,
+   "remaining_sec": 1800,
+   "cost_cu": 0.52
+  }
+ },
+ {
+  "name": "window: exactly the estimate left",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 13470,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 930,
+   "remaining_sec": 930,
+   "cost_cu": 0.52
+  }
+ },
+ {
+  "name": "window used up completely",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 600,
+   "window_sec": 14400,
+   "used_sec": 18000,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_window",
+   "estimate_sec": 330,
+   "remaining_sec": 0,
+   "cost_cu": 0.18
+  }
+ },
+ {
+  "name": "balance too low",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 0.1,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_balance",
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "balance unknown on the paid tier",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": false,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_balance",
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "free tier ignores the balance",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": false,
+   "balance_known": true,
+   "balance_cu": 0,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "credential ends before the lecture could finish",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": 1500
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_auth",
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "credential outlives the lecture with the margin",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": 3000
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 1350,
+   "remaining_sec": 14400,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "auth checked before window and balance",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 18000,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 0,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": 10
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_auth",
+   "estimate_sec": 1350,
+   "remaining_sec": 0,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "window checked before balance",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 18000,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 0,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_window",
+   "estimate_sec": 1350,
+   "remaining_sec": 0,
+   "cost_cu": 0.75
+  }
+ },
+ {
+  "name": "measured rate makes a lecture fit that the default does not",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 5400,
+   "window_sec": 14400,
+   "used_sec": 13140,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 6,
+    "overhead_sec": 90,
+    "samples": 2,
+    "audio_min": 100
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": true,
+   "estimate_sec": 630,
+   "remaining_sec": 1260,
+   "cost_cu": 0.35
+  }
+ },
+ {
+  "name": "same lecture with the default rate",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 5400,
+   "window_sec": 14400,
+   "used_sec": 13140,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_window",
+   "estimate_sec": 1530,
+   "remaining_sec": 1260,
+   "cost_cu": 0.85
+  }
+ },
+ {
+  "name": "real hourly rate from the running session",
+  "kind": "decide",
+  "input": {
+   "audio_sec": 3000,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 3,
+   "cu_per_hour": 11.77,
+   "auth_remaining_sec": -1
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "dispatch": false,
+   "waiting_for": "remote_balance",
+   "estimate_sec": 930,
+   "remaining_sec": 14400,
+   "cost_cu": 3.04
+  }
+ },
+ {
+  "name": "queue of lectures of different lengths, 2.5 h used",
+  "kind": "plan",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 9000,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "queue": [
+   5400,
+   1200,
+   4500,
+   3000,
+   7200,
+   600
+  ],
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 5,
+   "fits": [
+    true,
+    true,
+    true,
+    true,
+    false,
+    true
+   ],
+   "cost_cu": 2.54,
+   "used_sec": 13575
+  }
+ },
+ {
+  "name": "queue on a fresh session (setup paid once)",
+  "kind": "plan",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "queue": [
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000,
+   3000
+  ],
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 15,
+   "fits": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false
+   ],
+   "cost_cu": 7.98,
+   "used_sec": 14370
+  }
+ },
+ {
+  "name": "queue limited by the balance",
+  "kind": "plan",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 1.2,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "queue": [
+   3000,
+   3000,
+   3000,
+   3000
+  ],
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 2,
+   "fits": [
+    true,
+    true,
+    false,
+    false
+   ],
+   "cost_cu": 1.03,
+   "used_sec": 1860
+  }
+ },
+ {
+  "name": "queue limited by the credential",
+  "kind": "plan",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": 3600
+  },
+  "queue": [
+   3000,
+   3000,
+   3000,
+   3000
+  ],
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 3,
+   "fits": [
+    true,
+    true,
+    true,
+    false
+   ],
+   "cost_cu": 1.55,
+   "used_sec": 2790
+  }
+ },
+ {
+  "name": "queue with a measured rate",
+  "kind": "plan",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 1800,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 6,
+    "overhead_sec": 90,
+    "samples": 2,
+    "audio_min": 100
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "queue": [
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400,
+   5400
+  ],
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 20,
+   "fits": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+    false
+   ],
+   "cost_cu": 7,
+   "used_sec": 14400
+  }
+ },
+ {
+  "name": "about N lectures of 50 minutes, fresh session",
+  "kind": "approx",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "typical": 3000,
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 15
+  }
+ },
+ {
+  "name": "about N lectures, 3 h used",
+  "kind": "approx",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 10800,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "typical": 3000,
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 3
+  }
+ },
+ {
+  "name": "about N lectures, measured rate",
+  "kind": "approx",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 3600,
+   "setup_done": true,
+   "rate": {
+    "sec_per_audio_min": 6,
+    "overhead_sec": 90,
+    "samples": 2,
+    "audio_min": 100
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "typical": 3000,
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 27
+  }
+ },
+ {
+  "name": "about N lectures, nothing fits",
+  "kind": "approx",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 14400,
+   "used_sec": 14400,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 15,
+    "overhead_sec": 180,
+    "setup_sec": 420,
+    "auth_margin_sec": 600,
+    "cu_per_hour": {
+     "A100": 13,
+     "G4": 12,
+     "H100": 20,
+     "L4": 5,
+     "T4": 2
+    }
+   },
+   "paid": true,
+   "balance_known": true,
+   "balance_cu": 100,
+   "cu_per_hour": 2,
+   "auth_remaining_sec": -1
+  },
+  "typical": 3000,
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "output": {
+   "lectures": 0
+  }
+ },
+ {
+  "name": "rate: first measurement replaces the default",
+  "kind": "rate",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 0,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "setup_sec": 0,
+    "auth_margin_sec": 0,
+    "cu_per_hour": null
+   },
+   "paid": false,
+   "balance_known": false,
+   "balance_cu": 0,
+   "cu_per_hour": 0,
+   "auth_remaining_sec": 0
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "samples": [
+   {
+    "audio_sec": 3000,
+    "transcribe_sec": 400,
+    "overhead_sec": 150
+   }
+  ],
+  "output": {
+   "sec_per_audio_min": 8,
+   "overhead_sec": 150,
+   "samples": 1,
+   "audio_min": 50
+  }
+ },
+ {
+  "name": "rate: weighted by audio length",
+  "kind": "rate",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 0,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "setup_sec": 0,
+    "auth_margin_sec": 0,
+    "cu_per_hour": null
+   },
+   "paid": false,
+   "balance_known": false,
+   "balance_cu": 0,
+   "cu_per_hour": 0,
+   "auth_remaining_sec": 0
+  },
+  "rate_before": {
+   "sec_per_audio_min": 0,
+   "overhead_sec": 0,
+   "samples": 0,
+   "audio_min": 0
+  },
+  "samples": [
+   {
+    "audio_sec": 3000,
+    "transcribe_sec": 400,
+    "overhead_sec": 150
+   },
+   {
+    "audio_sec": 600,
+    "transcribe_sec": 120,
+    "overhead_sec": 90
+   },
+   {
+    "audio_sec": 5400,
+    "transcribe_sec": 650,
+    "overhead_sec": 210
+   }
+  ],
+  "output": {
+   "sec_per_audio_min": 7.8,
+   "overhead_sec": 150,
+   "samples": 3,
+   "audio_min": 150
+  }
+ },
+ {
+  "name": "rate: a sample without audio is ignored",
+  "kind": "rate",
+  "input": {
+   "audio_sec": 0,
+   "window_sec": 0,
+   "used_sec": 0,
+   "setup_done": false,
+   "rate": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "samples": 0,
+    "audio_min": 0
+   },
+   "defaults": {
+    "sec_per_audio_min": 0,
+    "overhead_sec": 0,
+    "setup_sec": 0,
+    "auth_margin_sec": 0,
+    "cu_per_hour": null
+   },
+   "paid": false,
+   "balance_known": false,
+   "balance_cu": 0,
+   "cu_per_hour": 0,
+   "auth_remaining_sec": 0
+  },
+  "rate_before": {
+   "sec_per_audio_min": 8,
+   "overhead_sec": 100,
+   "samples": 1,
+   "audio_min": 50
+  },
+  "samples": [
+   {
+    "audio_sec": 0,
+    "transcribe_sec": 30,
+    "overhead_sec": 0
+   }
+  ],
+  "output": {
+   "sec_per_audio_min": 8,
+   "overhead_sec": 100,
+   "samples": 1,
+   "audio_min": 50
+  }
+ }
+]

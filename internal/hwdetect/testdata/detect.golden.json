@@ -1,0 +1,384 @@
+[
+  {
+    "name": "windows_this_machine",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 386H",
+      "ram_mb": 64907,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "Intel(R) NPU",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_no_nvidia_smi",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 386H",
+      "ram_mb": 64907,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "wmi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "Intel(R) NPU",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_nvidia_smi_fails_vram_unknown",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 386H",
+      "ram_mb": 64907,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 0,
+          "driver": "592.00",
+          "source": "wmi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Graphics",
+      "intel_npu_name": "Intel(R) NPU",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_powershell_fails",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 16384,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_powershell_garbage",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 8000,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_intel_only",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 7 155H",
+      "ram_mb": 32768,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": true,
+      "intel_npu": true,
+      "intel_gpu_name": "Intel(R) Iris(R) Xe Graphics",
+      "intel_npu_name": "Intel(R) AI Boost",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_desktop_amd_accelerator",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "AMD Ryzen 7 5800X 8-Core Processor",
+      "ram_mb": 32768,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 3060",
+          "vram_mb": 12288,
+          "driver": "552.22",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_multi_gpu_smi",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "AMD Ryzen 7 5800X 8-Core Processor",
+      "ram_mb": 32768,
+      "disk_free_mb": 51200,
+      "nvidia": [
+        {
+          "name": "NVIDIA RTX A2000 8GB Laptop GPU",
+          "vram_mb": 8192,
+          "driver": "552.22",
+          "source": "nvidia-smi"
+        },
+        {
+          "name": "Tesla T4",
+          "vram_mb": 0,
+          "driver": "",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "windows_everything_fails",
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 0,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader,nounits",
+      "powershell.exe"
+    ]
+  },
+  {
+    "name": "darwin_m2pro_laptop",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M2 Pro",
+      "ram_mb": 32768,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M2 Pro",
+      "unified_mem_mb": 32768,
+      "has_battery": true
+    },
+    "calls": [
+      "pmset -g batt",
+      "sysctl -n hw.memsize",
+      "sysctl -n hw.optional.arm64",
+      "sysctl -n machdep.cpu.brand_string"
+    ]
+  },
+  {
+    "name": "darwin_m2pro_desktop",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Apple M2 Pro",
+      "ram_mb": 32768,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": true,
+      "chip": "Apple M2 Pro",
+      "unified_mem_mb": 32768,
+      "has_battery": false
+    },
+    "calls": [
+      "pmset -g batt",
+      "sysctl -n hw.memsize",
+      "sysctl -n hw.optional.arm64",
+      "sysctl -n machdep.cpu.brand_string"
+    ]
+  },
+  {
+    "name": "darwin_intel_laptop",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+      "ram_mb": 16384,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "calls": [
+      "pmset -g batt",
+      "sysctl -n hw.memsize",
+      "sysctl -n hw.optional.arm64",
+      "sysctl -n machdep.cpu.brand_string"
+    ]
+  },
+  {
+    "name": "darwin_everything_fails",
+    "hw": {
+      "os": "darwin",
+      "arch": "arm64",
+      "cpu": "",
+      "ram_mb": 0,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": [
+      "pmset -g batt",
+      "sysctl -n hw.memsize",
+      "sysctl -n hw.optional.arm64",
+      "sysctl -n machdep.cpu.brand_string"
+    ]
+  },
+  {
+    "name": "linux",
+    "hw": {
+      "os": "linux",
+      "arch": "amd64",
+      "cpu": "",
+      "ram_mb": 0,
+      "disk_free_mb": 51200,
+      "nvidia": [],
+      "intel_gpu": false,
+      "intel_npu": false,
+      "intel_gpu_name": "",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": false
+    },
+    "calls": null
+  }
+]

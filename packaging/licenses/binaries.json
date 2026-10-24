@@ -1,0 +1,101 @@
+{
+  "_doc": "Binaries shipped with the installer next to the server (SPEC-v3 V7, brief 1: resources/bin). Every entry needs name, version, license (SPDX expression) and source. Pinned downloads (url, sha256) and the build steps live in desktop/packaging/third-party.json and desktop/scripts/stage.js; keep both files in step. stage.js fails the build when the ffmpeg configure line contains --enable-gpl or --enable-nonfree.",
+  "binaries": [
+    {
+      "name": "ffmpeg / ffprobe (Windows build)",
+      "version": "9.0.2 (built from ffmpeg-9.0.2.tar.xz with mingw-w64)",
+      "license": "LGPL-2.1-or-later",
+      "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "source_code": [
+        "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+        "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz",
+        "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz",
+        "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz",
+        "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
+        "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1",
+        "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1"
+      ],
+      "component": "core",
+      "platforms": [
+        "windows"
+      ],
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+      "configure": "--arch=x86_64 --target-os=mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-gpl --disable-nonfree --disable-version3 --disable-autodetect --enable-w32threads --enable-zlib --enable-d3d11va --enable-dxva2 --enable-ffnvcodec --enable-nvenc --enable-libvpl --enable-libopenh264 --enable-shared --disable-static --disable-doc --disable-ffplay --disable-debug",
+      "note": "Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264 and libvpl in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer.",
+      "bundled": [
+        {
+          "name": "OpenH264",
+          "version": "2.6.0 (commit 652bdb7719f3)",
+          "license": "BSD-2-Clause",
+          "url": "https://github.com/cisco/openh264/tree/652bdb7719f30b52b08e506645a7322ff1b2cc6f",
+          "note": "H.264 encoder (libopenh264) in avcodec, compiled from source; Cisco's patent coverage applies only to Cisco's own binaries."
+        },
+        {
+          "name": "libvpl (Intel Video Processing Library dispatcher)",
+          "version": "2.16.0 (commit 778a66d6c653)",
+          "license": "MIT",
+          "url": "https://github.com/intel/libvpl/tree/778a66d6c6537f08eabb91955dbbf1bce3812894",
+          "note": "Intel Quick Sync (h264_qsv) in avcodec; loads the Intel runtime from the driver at run time."
+        },
+        {
+          "name": "zlib",
+          "version": "1.3.1 (commit 51b7f2abdade)",
+          "license": "Zlib",
+          "url": "https://github.com/madler/zlib/tree/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+          "note": "Compression (PNG, compressed MP4 headers)."
+        },
+        {
+          "name": "nv-codec-headers",
+          "version": "12.1.14.0 (commit 1889e62e2d35)",
+          "license": "MIT",
+          "url": "https://github.com/FFmpeg/nv-codec-headers/tree/1889e62e2d35ff7aa9baca2bceb14f053785e6f1",
+          "note": "Headers only (NVENC, h264_nvenc); the NVIDIA driver is loaded at run time."
+        },
+        {
+          "name": "GCC runtime libraries (libgcc, libstdc++)",
+          "version": "13.2.0 (Ubuntu 13.2.0-6ubuntu1+26.1)",
+          "license": "GPL-3.0-or-later WITH GCC-exception-3.1",
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1",
+          "note": "Linked statically (-static-libgcc; libstdc++ for OpenH264 and libvpl). The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL: no GPL obligations attach to ffmpeg."
+        },
+        {
+          "name": "MinGW-w64 runtime (static CRT parts)",
+          "version": "11.0.1 (Ubuntu 11.0.1-3build1)",
+          "license": "ZPL-2.1",
+          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1",
+          "note": "Startup code and libmingwex helpers linked statically; some files are public domain. The C runtime itself is msvcrt.dll from Windows."
+        }
+      ]
+    },
+    {
+      "name": "ffmpeg / ffprobe (macOS build)",
+      "version": "9.0.2 (built from ffmpeg-9.0.2.tar.xz in CI)",
+      "license": "LGPL-2.1-or-later",
+      "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+      "source_code": [
+        "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+      ],
+      "component": "core",
+      "platforms": [
+        "darwin"
+      ],
+      "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+      "configure": "--arch=arm64 --cc=clang --enable-pthreads --disable-gpl --disable-nonfree --disable-autodetect --enable-zlib --enable-videotoolbox --enable-audiotoolbox --enable-static --disable-shared --disable-doc --disable-ffplay --disable-debug",
+      "note": "Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables with no third-party library inside (bundled is empty): zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically. Corresponding source: the pinned ffmpeg-9.0.2.tar.xz and that build script.",
+      "bundled": []
+    },
+    {
+      "name": "uv",
+      "version": "0.13.1",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/astral-sh/uv/releases/tag/0.13.1",
+      "component": "core",
+      "platforms": [
+        "windows",
+        "darwin"
+      ],
+      "sha256": "windows uv-x86_64-pc-windows-msvc.zip 3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672; darwin uv-aarch64-apple-darwin.tar.gz cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2",
+      "note": "Creates the component virtual environments (SPEC-v3 V3.1). LICENSE-MIT and LICENSE-APACHE of the 0.13.1 tag ship in resources/licenses/uv."
+    }
+  ]
+}

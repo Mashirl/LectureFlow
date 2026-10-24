@@ -1,0 +1,996 @@
+[
+ {
+  "id": "01JC0000000000000000003631",
+  "name": "Cryptography",
+  "created_at": "2026-09-28T19:30:00Z",
+  "glossary_version": 5,
+  "syllabus": {
+   "filename": "CSC1003 Module Outline 2026-27.pdf",
+   "chars": 14820,
+   "formatted": true
+  },
+  "stages": [
+   {
+    "stage": "glossary_seed",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-09-28T19:33:00Z",
+    "finished_at": "2026-09-28T19:33:41Z",
+    "duration_ms": 41000,
+    "stats": {
+     "prompt_tokens": 7340,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 3900,
+     "estimated_cost": 0.0459
+    },
+    "display_status": "done",
+    "stale_reason": null,
+    "model": null
+   },
+   {
+    "stage": "glossary_review",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-23T08:40:20Z",
+    "finished_at": "2026-10-23T08:41:10Z",
+    "duration_ms": 50000,
+    "stats": {
+     "prompt_tokens": 21400,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 2900,
+     "estimated_cost": 0.1077
+    },
+    "display_status": "done",
+    "stale_reason": null,
+    "model": null
+   }
+  ],
+  "materials": [
+   {
+    "id": "01JM000000000000000036310A",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "Week1-Introduction.pdf",
+    "pages": 38,
+    "created_at": "2026-09-28T19:35:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-28T19:35:05Z",
+      "finished_at": "2026-09-28T19:35:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-28T19:35:17Z",
+      "finished_at": "2026-09-28T19:35:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 31160,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.0831
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "week",
+     "week": 1,
+     "lecture_id": null
+    },
+    "week_suggested": 1
+   },
+   {
+    "id": "01JM000000000000000036310B",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": "01JD3631000000000000000004",
+    "filename": "week2-block-ciphers.pdf",
+    "pages": 52,
+    "created_at": "2026-10-08T19:05:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-08T19:05:05Z",
+      "finished_at": "2026-10-08T19:05:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-08T19:05:17Z",
+      "finished_at": "2026-10-08T19:05:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 42640,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.1061
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "lecture",
+     "week": null,
+     "lecture_id": "01JD3631000000000000000004"
+    },
+    "week_suggested": 2
+   },
+   {
+    "id": "01JM000000000000000036310D",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "StreamCiphers-2.pdf",
+    "pages": 41,
+    "created_at": "2026-10-05T09:10:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-05T09:10:05Z",
+      "finished_at": "2026-10-05T09:10:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-05T09:10:17Z",
+      "finished_at": "2026-10-05T09:10:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 33620,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.088
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "week",
+     "week": 2,
+     "lecture_id": null
+    },
+    "week_suggested": null
+   },
+   {
+    "id": "01JM000000000000000036310E",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "W03-AES.pdf",
+    "pages": 47,
+    "created_at": "2026-10-12T08:40:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-12T08:40:05Z",
+      "finished_at": "2026-10-12T08:40:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-12T08:40:17Z",
+      "finished_at": "2026-10-12T08:40:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 38540,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.0979
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "week",
+     "week": 3,
+     "lecture_id": null
+    },
+    "week_suggested": 3
+   },
+   {
+    "id": "01JM000000000000000036310F",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "W03-Modes-of-Operation.pdf",
+    "pages": 29,
+    "created_at": "2026-10-12T08:41:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-12T08:41:05Z",
+      "finished_at": "2026-10-12T08:41:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-12T08:41:17Z",
+      "finished_at": "2026-10-12T08:41:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 23780,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.0684
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "week",
+     "week": 3,
+     "lecture_id": null
+    },
+    "week_suggested": 3
+   },
+   {
+    "id": "01JM000000000000000036310C",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "week4-hash-functions.pdf",
+    "pages": 44,
+    "created_at": "2026-10-22T19:45:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-22T19:45:05Z",
+      "finished_at": "2026-10-22T19:45:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-22T19:45:17Z",
+      "finished_at": "2026-10-22T19:45:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 36080,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.093
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "week",
+     "week": 4,
+     "lecture_id": null
+    },
+    "week_suggested": 4
+   },
+   {
+    "id": "01JM000000000000000036310G",
+    "course_id": "01JC0000000000000000003631",
+    "lecture_id": null,
+    "filename": "CSC1003 Module Handbook 2026-27.pdf",
+    "pages": 12,
+    "created_at": "2026-09-28T19:33:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-28T19:33:05Z",
+      "finished_at": "2026-09-28T19:33:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-28T19:33:17Z",
+      "finished_at": "2026-09-28T19:33:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 9840,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.0405
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "course",
+     "week": null,
+     "lecture_id": null
+    },
+    "week_suggested": null
+   }
+  ],
+  "term_count": 48,
+  "lecture_count": 11,
+  "code": "CSC1003",
+  "draft_count": 1,
+  "stale_lecture_count": 1,
+  "patches_pending": 14,
+  "running_count": 2,
+  "last_activity_at": "2026-10-23T13:57:29Z",
+  "course_actions": [
+   "launch_drafts",
+   "update_stale",
+   "export_cite"
+  ],
+  "glossary_pending": false,
+  "janitor": {
+   "configured": true,
+   "running": false,
+   "last_at": "2026-10-23T08:41:10Z",
+   "last_model": "Anthropic / claude-opus-5-5",
+   "last_version": 5,
+   "last_changes": 7
+  },
+  "term_start": "2026-09-28",
+  "skip_weeks": [],
+  "filename_rule": {
+   "regex": "^CSC1003-(?P<kind>[A-Z])\\d{2}-\\d{2} [A-Z][a-z]{2} (?P<month>[A-Z][a-z]{2}) (?P<day>\\d{2}) (?P<hour>\\d{2})-(?P<minute>\\d{2})-\\d{2} [A-Z]{3,4} (?P<year>\\d{4})",
+   "year_default": null,
+   "source": "llm",
+   "created_at": "2026-10-01T13:10:00Z",
+   "samples_matched": 9,
+   "samples_total": 11
+  },
+  "filename_proposal": false,
+  "filename_undo": false,
+  "cite_exported": true,
+  "numbering": "auto"
+ },
+ {
+  "id": "01JC0000000000000000002120",
+  "name": "Operating Systems",
+  "created_at": "2026-09-29T17:20:00Z",
+  "glossary_version": 6,
+  "syllabus": {
+   "filename": "COMP2120_syllabus.md",
+   "chars": 9312,
+   "formatted": true
+  },
+  "stages": [
+   {
+    "stage": "glossary_seed",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-09-29T17:23:00Z",
+    "finished_at": "2026-09-29T17:23:41Z",
+    "duration_ms": 41000,
+    "stats": {
+     "prompt_tokens": 5504,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 3900,
+     "estimated_cost": 0.0422
+    },
+    "display_status": "done",
+    "stale_reason": null,
+    "model": null
+   }
+  ],
+  "materials": [
+   {
+    "id": "01JM000000000000000021200A",
+    "course_id": "01JC0000000000000000002120",
+    "lecture_id": "01JD2120000000000000000003",
+    "filename": "week2-scheduling.pdf",
+    "pages": 61,
+    "created_at": "2026-10-21T09:12:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-21T09:12:05Z",
+      "finished_at": "2026-10-21T09:12:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-21T09:12:17Z",
+      "finished_at": "2026-10-21T09:12:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 50020,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.1208
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "lecture",
+     "week": null,
+     "lecture_id": "01JD2120000000000000000003"
+    },
+    "week_suggested": 2
+   },
+   {
+    "id": "01JM000000000000000021200B",
+    "course_id": "01JC0000000000000000002120",
+    "lecture_id": "01JD2120000000000000000008",
+    "filename": "week4-paging.pdf",
+    "pages": 47,
+    "created_at": "2026-10-23T13:50:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-23T13:50:05Z",
+      "finished_at": "2026-10-23T13:50:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "running",
+      "progress": 0.6,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "cancel"
+      ],
+      "started_at": "2026-10-23T13:50:17Z",
+      "finished_at": null,
+      "duration_ms": null,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "running",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": false,
+    "bind": {
+     "scope": "lecture",
+     "week": null,
+     "lecture_id": "01JD2120000000000000000008"
+    },
+    "week_suggested": 4
+   }
+  ],
+  "term_count": 18,
+  "lecture_count": 8,
+  "code": "COMP2120",
+  "draft_count": 0,
+  "stale_lecture_count": 1,
+  "patches_pending": 12,
+  "running_count": 1,
+  "last_activity_at": "2026-10-23T13:58:38Z",
+  "course_actions": [
+   "update_stale",
+   "export_cite"
+  ],
+  "glossary_pending": true,
+  "janitor": {
+   "configured": true,
+   "running": false
+  },
+  "term_start": "2026-09-28",
+  "skip_weeks": [
+   "2026-10-12"
+  ],
+  "filename_rule": {
+   "regex": "_(?P<kind>Lecture|Tutorial|Seminar)_(?P<day>\\d{2})(?P<month>[A-Za-z]{3})(?P<year>\\d{4})_(?P<hour>\\d{2})(?P<minute>\\d{2})",
+   "year_default": null,
+   "source": "llm",
+   "created_at": "2026-10-23T10:31:00Z",
+   "samples_matched": 7,
+   "samples_total": 8
+  },
+  "filename_proposal": false,
+  "filename_undo": true,
+  "cite_exported": false,
+  "numbering": "auto"
+ },
+ {
+  "id": "01JC0000000000000000003121",
+  "name": "Computer Architecture",
+  "created_at": "2026-09-30T17:45:00Z",
+  "glossary_version": 3,
+  "syllabus": {
+   "filename": "CSC1002 syllabus.pdf",
+   "chars": 18234,
+   "formatted": false
+  },
+  "stages": [
+   {
+    "stage": "glossary_seed",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-09-30T17:48:00Z",
+    "finished_at": "2026-09-30T17:48:41Z",
+    "duration_ms": 41000,
+    "stats": {
+     "prompt_tokens": 8478,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 3900,
+     "estimated_cost": 0.0482
+    },
+    "display_status": "done",
+    "stale_reason": null,
+    "model": null
+   }
+  ],
+  "materials": [
+   {
+    "id": "01JM000000000000000031210A",
+    "course_id": "01JC0000000000000000003121",
+    "lecture_id": null,
+    "filename": "H&P-ch2-slides.pdf",
+    "pages": 96,
+    "created_at": "2026-09-30T17:50:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-30T17:50:05Z",
+      "finished_at": "2026-09-30T17:50:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-09-30T17:50:17Z",
+      "finished_at": "2026-09-30T17:50:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 78720,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.1782
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "course",
+     "week": null,
+     "lecture_id": null
+    },
+    "week_suggested": null
+   },
+   {
+    "id": "01JM000000000000000031210B",
+    "course_id": "01JC0000000000000000003121",
+    "lecture_id": null,
+    "filename": "ch3-pipelining-scan.pdf",
+    "pages": 24,
+    "created_at": "2026-10-14T10:05:00Z",
+    "stages": [
+     {
+      "stage": "material_extract",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-14T10:05:05Z",
+      "finished_at": "2026-10-14T10:05:14Z",
+      "duration_ms": 9000,
+      "stats": {
+       "prompt_tokens": 0,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 0,
+       "estimated_cost": null
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     },
+     {
+      "stage": "material_terms",
+      "status": "done",
+      "progress": 1,
+      "attempt": 0,
+      "error": null,
+      "allowed_actions": [
+       "rerun"
+      ],
+      "started_at": "2026-10-14T10:05:17Z",
+      "finished_at": "2026-10-14T10:05:53Z",
+      "duration_ms": 36000,
+      "stats": {
+       "prompt_tokens": 19680,
+       "cache_hit_tokens": 0,
+       "completion_tokens": 2600,
+       "estimated_cost": 0.0602
+      },
+      "display_status": "done",
+      "stale_reason": null,
+      "model": null
+     }
+    ],
+    "can_delete": true,
+    "bind": {
+     "scope": "course",
+     "week": null,
+     "lecture_id": null
+    },
+    "week_suggested": null,
+    "text_warning": "text_incomplete"
+   }
+  ],
+  "term_count": 16,
+  "lecture_count": 7,
+  "code": "CSC1002",
+  "draft_count": 3,
+  "stale_lecture_count": 0,
+  "patches_pending": 0,
+  "running_count": 1,
+  "last_activity_at": "2026-10-23T13:59:18Z",
+  "course_actions": [
+   "launch_drafts",
+   "export_cite"
+  ],
+  "glossary_pending": false,
+  "janitor": {
+   "configured": true,
+   "running": false
+  },
+  "term_start": "2026-09-28",
+  "skip_weeks": [],
+  "filename_rule": {
+   "regex": "^CSC1002-(?P<kind>[A-Z])\\d{2}-\\d{2} [A-Z][a-z]{2} (?P<month>[A-Z][a-z]{2}) (?P<day>\\d{2}) (?P<hour>\\d{2})-(?P<minute>\\d{2})-\\d{2} [A-Z]{3,4} (?P<year>\\d{4})",
+   "year_default": null,
+   "source": "llm",
+   "created_at": "2026-09-30T18:05:00Z",
+   "samples_matched": 6,
+   "samples_total": 7
+  },
+  "filename_proposal": false,
+  "filename_undo": false,
+  "cite_exported": false,
+  "numbering": "auto"
+ },
+ {
+  "id": "01JC0000000000000000003311",
+  "name": "Database Systems",
+  "created_at": "2026-09-29T19:50:00Z",
+  "glossary_version": 2,
+  "syllabus": null,
+  "stages": [],
+  "materials": [],
+  "term_count": 16,
+  "lecture_count": 4,
+  "code": "COMP3311",
+  "draft_count": 0,
+  "stale_lecture_count": 0,
+  "patches_pending": 7,
+  "running_count": 1,
+  "last_activity_at": "2026-10-23T13:59:18Z",
+  "course_actions": [
+   "export_cite"
+  ],
+  "glossary_pending": false,
+  "janitor": {
+   "configured": true,
+   "running": false
+  },
+  "term_start": null,
+  "skip_weeks": [],
+  "filename_rule": null,
+  "filename_proposal": false,
+  "filename_undo": false,
+  "cite_exported": false,
+  "numbering": "auto"
+ },
+ {
+  "id": "01JC000000000000000000RM01",
+  "name": "Research Methods in Computing",
+  "created_at": "2026-10-23T13:45:00Z",
+  "glossary_version": 0,
+  "syllabus": {
+   "filename": "research-methods-module-handbook.pdf",
+   "chars": 22610,
+   "formatted": true
+  },
+  "stages": [
+   {
+    "stage": "glossary_seed",
+    "status": "running",
+    "progress": 0.35,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "cancel"
+    ],
+    "started_at": "2026-10-23T13:48:00Z",
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    },
+    "display_status": "running",
+    "stale_reason": null,
+    "model": null
+   }
+  ],
+  "materials": [],
+  "term_count": 0,
+  "lecture_count": 0,
+  "code": null,
+  "draft_count": 0,
+  "stale_lecture_count": 0,
+  "patches_pending": 0,
+  "running_count": 0,
+  "last_activity_at": "2026-10-23T13:45:00Z",
+  "course_actions": [],
+  "glossary_pending": true,
+  "janitor": {
+   "configured": true,
+   "running": false
+  },
+  "term_start": null,
+  "skip_weeks": [],
+  "filename_rule": null,
+  "filename_proposal": false,
+  "filename_undo": false,
+  "cite_exported": false,
+  "numbering": "auto"
+ }
+]

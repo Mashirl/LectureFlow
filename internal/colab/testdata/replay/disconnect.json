@@ -1,0 +1,28 @@
+{
+ "_source": "依据 Google OAuth 的令牌撤销端点（RFC 7009，https://oauth2.googleapis.com/revoke）构造，非真实录制；上游 google-colab-cli 0.7.5 没有撤销命令，colab_cli/auth.py 只负责获取凭据。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/auth.py#_get_adc_credentials"
+  ]
+ },
+ "recorded": false,
+ "steps": [
+  {
+   "name": "revoke the refresh token",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/revoke",
+    "form": {
+     "token": "1//replay-refresh-token-0123456789"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {}
+   }
+  }
+ ]
+}

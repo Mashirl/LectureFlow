@@ -1,0 +1,16 @@
+== input
+sentence #3  00:40.000 → 00:53.420
+  text:  First we pad the message to a multiple of the block size, then we split it into blocks, and finally we encrypt every block with the same key in counter mode.
+  asr:   (same as text)
+  words: First[40000-40400] we[40450-40670] pad[40720-41000] the[41050-41330] message[41380-41900] to[41950-42170] a[42220-42380] multiple[42430-43010] of[43060-43280] the[43330-43610] block[43660-44060] size,[44110-44510] then[45160-45500] we[45550-45770] split[45820-46220] it[46270-46490] into[46540-46880] blocks,[46930-47450] and[48100-48380] finally[48430-48950] we[49000-49220] encrypt[49270-49790] every[49840-50240] block[50290-50690] with[50740-51080] the[51130-51410] same[51460-51800] key[51850-52130] in[52180-52400] counter[52450-52970] mode.[53020-53420]
+  zh:    首先我们把消息填充到分组长度的整数倍，然后把它分成若干分组，最后用同一个密钥在计数器模式下加密每个分组。
+== cues
+#3  00:40.000 → 00:45.160  (5160 ms, 57 ch)
+  en: First we pad the message to a multiple of the block size,
+  zh: 首先我们把消息填充到分组长度的整数倍，
+#3  00:45.160 → 00:48.100  (2940 ms, 29 ch)
+  en: then we split it into blocks,
+  zh: 然后把它分成若干分组，
+#3  00:48.100 → 00:53.420  (5320 ms, 69 ch)
+  en: and finally we encrypt every block with the same key in counter mode.
+  zh: 最后用同一个密钥在计数器模式下加密每个分组。

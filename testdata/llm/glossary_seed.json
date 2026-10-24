@@ -1,0 +1,12 @@
+{
+  "terms": [
+    {"en": "cache", "zh": "缓存"},
+    {"en": "write-back", "zh": "写回"},
+    {"en": "cache line", "zh": "缓存行"},
+    {"en": "set associative", "zh": "组相联"},
+    {"en": "LRU", "zh": ""},
+    {"en": "x86", "zh": ""},
+    {"en": "64", "zh": ""},
+    {"en": "Week 3 lecture overview of the memory hierarchy", "zh": ""}
+  ]
+}

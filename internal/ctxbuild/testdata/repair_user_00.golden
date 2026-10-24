@@ -1,0 +1,21 @@
+CONTEXT (before):
+(none)
+
+TARGET:
+[0] Okay, let's get started with today's lecture.
+[1] Today we talk about the ⟦cash⟧ hierarchy in modern processors.
+[2] A ⟦right⟧ ⟦back⟧ cache only writes a line to memory on eviction.
+[3] Each cache line is 64 bytes on most x86 machines.
+[4] So the the first question is how we find a line in the cache.
+[5] We split the address into a tag, an index and an offset.
+[6] The index selects a set, and the tag tells us whether we have a hit.
+[7] With a direct mapped cache, every set has exactly one line.
+[8] That gives us conflict misses when two addresses map to the same set.
+[9] A ⟦two-way⟧ set associative cache halves the number of sets.
+[10] The miss rate drops from 5 percent to about 3 percent.
+[11] ⟦Blah⟧ ⟦lab⟧ is something we will see in the lab next week.
+[12] Finally, ⟦LRU⟧ replacement evicts the least recently used line.
+[13] Any questions before we move on?
+
+CONTEXT (after):
+(none)

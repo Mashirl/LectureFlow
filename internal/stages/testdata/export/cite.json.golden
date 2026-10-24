@@ -1,0 +1,87 @@
+{
+  "schema": "lectureflow.cite/v3",
+  "how_to_cite": "Cite statements with the ref field in square brackets, e.g. [CSC1001 W02L1@12:34]. Use the sentence id when an exact reference is needed.",
+  "course": {
+    "id": "{course_id}",
+    "code": "CSC1001",
+    "name": "Computer Architecture"
+  },
+  "kinds": [
+    {
+      "id": "lecture",
+      "code": "L",
+      "name": "Lecture"
+    }
+  ],
+  "lectures": [
+    {
+      "id": "{lecture_id}",
+      "label": "W02L1",
+      "kind": "lecture",
+      "kind_code": "L",
+      "week": 2,
+      "n": 1,
+      "recorded_at": "2026-10-06T09:00",
+      "title": "Lec 3: Caches/Memory?",
+      "title_zh": null,
+      "blurb_en": null,
+      "blurb_zh": null,
+      "duration_ms": 4548000,
+      "summary": "Caches and memory.",
+      "sentences": [
+        {
+          "id": "CSC1001.W02L1.s0001",
+          "ref": "CSC1001 W02L1@00:00",
+          "start_ms": 0,
+          "end_ms": 3800,
+          "en": "A human\nedit.",
+          "zh": "好，我们开始。",
+          "edited": true
+        },
+        {
+          "id": "CSC1001.W02L1.s0002",
+          "ref": "CSC1001 W02L1@00:03",
+          "start_ms": 3800,
+          "end_ms": 8200,
+          "en": "The cache hierarchy.",
+          "zh": "缓存层次结构。",
+          "edited": false
+        },
+        {
+          "id": "CSC1001.W02L1.s0003",
+          "ref": "CSC1001 W02L1@1:15:12",
+          "start_ms": 4512345,
+          "end_ms": 4512345,
+          "en": "A --> B at minute 75.",
+          "zh": "A --> B，在第 75 分钟。",
+          "edited": false
+        },
+        {
+          "id": "CSC1001.W02L1.s0004",
+          "ref": "CSC1001 W02L1@1:15:20",
+          "start_ms": 4520000,
+          "end_ms": 4525500,
+          "en": "Untranslated.",
+          "zh": null,
+          "edited": false
+        },
+        {
+          "id": "CSC1001.W02L1.s0005",
+          "ref": "CSC1001 W02L1@1:15:26",
+          "start_ms": 4526000,
+          "end_ms": 4548000,
+          "en": "So when the processor misses in the first level cache, it asks the second level, and only if that misses too does it go all the way out to main memory, which costs hundreds of cycles.",
+          "zh": "所以当处理器在一级缓存中未命中时，它会访问二级缓存；只有二级缓存也未命中，才会一路访问主存，这要花费数百个周期。",
+          "edited": false
+        }
+      ]
+    }
+  ],
+  "glossary": [
+    {
+      "en": "cache hierarchy",
+      "zh": "缓存层次结构"
+    }
+  ],
+  "generated_at": "2026-10-23T20:00:00Z"
+}

@@ -1,0 +1,146 @@
+{
+ "generator": "internal/devices/testdata/wer_golden.py",
+ "jiwer": "4.0.0",
+ "cases": [
+  {
+   "name": "identical",
+   "ref": "Today we talk about caches.",
+   "hyp": "Today we talk about caches.",
+   "wer": 0.0,
+   "ref_words": 5
+  },
+  {
+   "name": "case_and_punctuation",
+   "ref": "Today, we talk about CACHES!",
+   "hyp": "today we talk about caches",
+   "wer": 0.0,
+   "ref_words": 5
+  },
+  {
+   "name": "one_substitution",
+   "ref": "Today we talk about the cache hierarchy.",
+   "hyp": "today we talk about the cash hierarchy",
+   "wer": 0.14285714285714285,
+   "ref_words": 7
+  },
+  {
+   "name": "apostrophes",
+   "ref": "It's a write-back cache, isn’t it?",
+   "hyp": "its a write back cache isnt it",
+   "wer": 0.0,
+   "ref_words": 7
+  },
+  {
+   "name": "apostrophe_kept_word",
+   "ref": "the student's notes",
+   "hyp": "the students notes",
+   "wer": 0.0,
+   "ref_words": 3
+  },
+  {
+   "name": "deletion",
+   "ref": "a two way set associative cache halves the number of sets",
+   "hyp": "a two way set associative cache halves the sets",
+   "wer": 0.18181818181818182,
+   "ref_words": 11
+  },
+  {
+   "name": "insertion_repeat",
+   "ref": "so the first question is how we find a line",
+   "hyp": "so the the first question is how we find a line",
+   "wer": 0.1,
+   "ref_words": 10
+  },
+  {
+   "name": "empty_hypothesis",
+   "ref": "nothing was recognised here",
+   "hyp": "",
+   "wer": 1.0,
+   "ref_words": 4
+  },
+  {
+   "name": "numbers",
+   "ref": "Each line is 64 bytes on x86 machines.",
+   "hyp": "each line is sixty four bytes on x 86 machines",
+   "wer": 0.5,
+   "ref_words": 8
+  },
+  {
+   "name": "digits_glued",
+   "ref": "Each line is 64 bytes on x86 machines.",
+   "hyp": "each line is 64bytes on x86 machines",
+   "wer": 0.25,
+   "ref_words": 8
+  },
+  {
+   "name": "non_ascii_letters",
+   "ref": "The Vigenère cipher uses a keyword.",
+   "hyp": "the vigenere cipher uses a key word",
+   "wer": 0.5714285714285714,
+   "ref_words": 7
+  },
+  {
+   "name": "non_ascii_same",
+   "ref": "The Vigenère cipher.",
+   "hyp": "the Vigenère cipher",
+   "wer": 0.0,
+   "ref_words": 4
+  },
+  {
+   "name": "dashes_quotes",
+   "ref": "“Write-through” — or write‑back?",
+   "hyp": "write through or write back",
+   "wer": 0.0,
+   "ref_words": 5
+  },
+  {
+   "name": "slash_and_symbols",
+   "ref": "I/O-bound code: 3.5% of time (roughly).",
+   "hyp": "i o bound code 3 5 of time roughly",
+   "wer": 0.0,
+   "ref_words": 9
+  },
+  {
+   "name": "whitespace",
+   "ref": "  tag\tindex \n offset  ",
+   "hyp": "tag index offset",
+   "wer": 0.0,
+   "ref_words": 3
+  },
+  {
+   "name": "hypothesis_longer",
+   "ref": "hit",
+   "hyp": "hit or miss or maybe a hit again",
+   "wer": 7.0,
+   "ref_words": 1
+  },
+  {
+   "name": "all_different",
+   "ref": "the cache line is valid",
+   "hyp": "a page table entry is dirty",
+   "wer": 1.0,
+   "ref_words": 5
+  },
+  {
+   "name": "reordered",
+   "ref": "tag index offset",
+   "hyp": "offset index tag",
+   "wer": 0.6666666666666666,
+   "ref_words": 3
+  },
+  {
+   "name": "paragraph",
+   "ref": "Okay, let's get started. Today we look at how a set-associative cache finds a line: the address is split into a tag, an index and an offset. The index selects one set; the tag tells us whether it's a hit. On a miss we fetch the whole 64-byte line from memory, and with a write-back policy a dirty line is only written out when it is evicted.",
+   "hyp": "okay let's get started today we look at how a set associative cash finds the line the address is split into a tag an index and offset the index selects one set the tag tells us whether its a hit on a miss we fetch the whole sixty four byte line from memory and with a right back policy a dirty line is only written out when it is evicted evicted",
+   "wer": 0.1,
+   "ref_words": 70
+  },
+  {
+   "name": "paragraph_identical",
+   "ref": "Okay, let's get started. Today we look at how a set-associative cache finds a line: the address is split into a tag, an index and an offset. The index selects one set; the tag tells us whether it's a hit. On a miss we fetch the whole 64-byte line from memory, and with a write-back policy a dirty line is only written out when it is evicted.",
+   "hyp": "OKAY, LET'S GET STARTED. TODAY WE LOOK AT HOW A SET-ASSOCIATIVE CACHE FINDS A LINE: THE ADDRESS IS SPLIT INTO A TAG, AN INDEX AND AN OFFSET. THE INDEX SELECTS ONE SET; THE TAG TELLS US WHETHER IT'S A HIT. ON A MISS WE FETCH THE WHOLE 64-BYTE LINE FROM MEMORY, AND WITH A WRITE-BACK POLICY A DIRTY LINE IS ONLY WRITTEN OUT WHEN IT IS EVICTED.",
+   "wer": 0.0,
+   "ref_words": 70
+  }
+ ]
+}

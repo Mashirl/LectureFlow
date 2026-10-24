@@ -1,0 +1,103 @@
+{
+ "gpu": {
+  "available": false,
+  "name": "",
+  "backend": "CUDA · float16",
+  "util_pct": null,
+  "mem_used_mb": null,
+  "mem_total_mb": null,
+  "temp_c": null,
+  "power_w": null,
+  "power_limit_w": null,
+  "util_history": [],
+  "temp_history": [],
+  "temp_warn": false,
+  "asr_slots_used": 0,
+  "asr_slots_max": 1,
+  "paused": true,
+  "error": "exec: \"nvidia-smi\": executable file not found in %PATH%"
+ },
+ "providers": [
+  {
+   "id": "deepseek",
+   "name": "DeepSeek",
+   "balance": null,
+   "balance_currency": null,
+   "balance_error": "余额查询失败：HTTP 401 Authentication Fails",
+   "balance_error_info": {
+    "code": "balance.http",
+    "params": {
+     "status": 401
+    },
+    "detail": "余额查询失败：HTTP 401 Authentication Fails"
+   },
+   "today": {
+    "requests": 412,
+    "prompt_tokens": 1842310,
+    "cache_hit_tokens": 1521904,
+    "completion_tokens": 96318
+   },
+   "total": {
+    "requests": 9871,
+    "prompt_tokens": 41236880,
+    "cache_hit_tokens": 33942117,
+    "completion_tokens": 2214503
+   },
+   "cache_hit_rate_today": 0.8261,
+   "cache_hit_rate_total": 0.8231,
+   "cost_today": 2.1415,
+   "currency": "CNY",
+   "inflight": 0,
+   "max": 8
+  },
+  {
+   "id": "01JPRV0000000000000000000A",
+   "name": "Anthropic",
+   "balance": null,
+   "balance_currency": null,
+   "today": {
+    "requests": 23,
+    "prompt_tokens": 312400,
+    "cache_hit_tokens": 241000,
+    "completion_tokens": 18900
+   },
+   "total": {
+    "requests": 186,
+    "prompt_tokens": 2410350,
+    "cache_hit_tokens": 1903110,
+    "completion_tokens": 148220
+   },
+   "cache_hit_rate_today": 0.7714,
+   "cache_hit_rate_total": 0.7896,
+   "cost_today": 0.57,
+   "currency": "USD",
+   "inflight": 4,
+   "max": 4
+  },
+  {
+   "id": "01JPRV0000000000000000000B",
+   "name": "OpenRouter",
+   "balance": null,
+   "balance_currency": null,
+   "today": {
+    "requests": 0,
+    "prompt_tokens": 0,
+    "cache_hit_tokens": 0,
+    "completion_tokens": 0
+   },
+   "total": {
+    "requests": 57,
+    "prompt_tokens": 601200,
+    "cache_hit_tokens": 0,
+    "completion_tokens": 31800
+   },
+   "cache_hit_rate_today": null,
+   "cache_hit_rate_total": 0,
+   "cost_today": null,
+   "currency": null,
+   "inflight": 0,
+   "max": 4
+  }
+ ],
+ "sampled_at": "2026-10-23T14:00:00Z"
+}

@@ -1,0 +1,35 @@
+{
+ "error": {
+  "code": "needs_model_choice"
+ },
+ "diff": [
+  {
+   "lecture_id": "01JD3631000000000000000003",
+   "lecture_title": "Stream Ciphers and LFSRs",
+   "stage": "translate",
+   "snapshot": {
+    "label": "DeepSeek / deepseek-chat · 温度 0.3 · 窗口 3",
+    "provider_id": "deepseek",
+    "provider_name": "DeepSeek",
+    "model": "deepseek-chat",
+    "params": {
+     "temperature": 0.3,
+     "window": 3
+    },
+    "prompt_version": 1
+   },
+   "current": {
+    "label": "Anthropic / claude-sonnet-4-5 · 温度 0.3 · 窗口 3",
+    "provider_id": "01JPRV0000000000000000000A",
+    "provider_name": "Anthropic",
+    "model": "claude-sonnet-4-5",
+    "params": {
+     "temperature": 0.3,
+     "window": 3
+    },
+    "prompt_version": 2
+   },
+   "snapshot_usable": true
+  }
+ ]
+}

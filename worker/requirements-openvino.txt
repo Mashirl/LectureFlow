@@ -1,0 +1,35 @@
+# OpenVINO Whisper backend (SPEC-v2 I1, I7) -- separate virtual environment .venv-ov
+# (Python 3.13; do not install into .venv). Versions = what the I1-I5 benchmark used and
+# what worker/asr_openvino.py was verified with (phase 3b).
+#   python -m venv .venv-ov
+#   .venv-ov\Scripts\python.exe -m pip install -r worker/requirements-openvino.txt
+# Full freeze of the benchmark venv: spikes/openvino/results/pip-freeze-venv-ov.txt
+#
+# worker/asr_openvino.py imports worker/asr_common.py (standard library only) and needs
+# nothing from .venv. It reads the wav with the standard library and numpy.
+
+# Runtime: transcription with WhisperPipeline on CPU / Intel GPU / NPU, and --probe.
+# These alone run models that are already converted (data/models/openvino/whisper-*).
+openvino==2026.4.1
+openvino-genai==2026.4.1.0
+openvino-tokenizers==2026.4.1.0
+numpy==2.4.6
+
+# Model preparation: the worker converts a missing model in its own process through
+# optimum-intel's Python API (the same settings as `optimum-cli export openvino --task
+# automatic-speech-recognition-with-past --weight-format fp16|int8|int4`, tokenizer and
+# detokenizer included; no subprocess). Without these, --probe reports can_convert=false
+# and a missing model fails with ERROR_CODE model_prepare_failed (exit code 2).
+# nncf is needed for int8 / int4 only; huggingface_hub downloads openai/whisper-* into
+# job.hf_home (HF_HOME).
+optimum-intel==2.2.0
+optimum==2.3.0
+nncf==3.4.0
+transformers==5.5.4
+torch==2.14.1
+huggingface_hub==1.21.0
+
+# Benchmark helpers (spikes/openvino only; the worker does not use them)
+soundfile==0.14.0
+psutil==7.2.2
+jiwer==4.0.0

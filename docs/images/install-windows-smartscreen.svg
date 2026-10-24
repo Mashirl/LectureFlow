@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" width="720" height="300" font-family="Segoe UI, Microsoft YaHei UI, sans-serif">
+  <!-- Schematic, not a screenshot: the two clicks through the Windows SmartScreen prompt for an unsigned installer. -->
+  <rect width="720" height="300" fill="#eef0f4"/>
+  <g transform="translate(20,20)">
+    <rect width="320" height="250" rx="6" fill="#1f5fa8"/>
+    <text x="20" y="40" fill="#fff" font-size="17" font-weight="600">Windows 已保护你的电脑</text>
+    <text x="20" y="64" fill="#fff" font-size="12">Windows protected your PC</text>
+    <text x="20" y="100" fill="#dce8f6" font-size="12">Microsoft Defender SmartScreen 阻止了</text>
+    <text x="20" y="118" fill="#dce8f6" font-size="12">无法识别的应用启动。</text>
+    <rect x="16" y="138" width="78" height="22" rx="3" fill="none" stroke="#ffd166" stroke-width="2.5"/>
+    <text x="20" y="154" fill="#fff" font-size="13" text-decoration="underline">更多信息</text>
+    <rect x="215" y="205" width="90" height="30" fill="#fff"/>
+    <text x="236" y="225" fill="#1b1e23" font-size="13">不运行</text>
+    <circle cx="112" cy="149" r="12" fill="#ffd166"/><text x="108" y="154" font-size="13" font-weight="700">1</text>
+  </g>
+  <path d="M352 145 L382 145" stroke="#4b5261" stroke-width="2" marker-end="url(#a)"/>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#4b5261"/></marker></defs>
+  <g transform="translate(390,20)">
+    <rect width="310" height="250" rx="6" fill="#1f5fa8"/>
+    <text x="20" y="40" fill="#fff" font-size="17" font-weight="600">Windows 已保护你的电脑</text>
+    <text x="20" y="84" fill="#dce8f6" font-size="12">应用：LectureFlow-Setup-3.0.0-x64.exe</text>
+    <text x="20" y="104" fill="#dce8f6" font-size="12">发布者：未知发布者</text>
+    <rect x="20" y="205" width="100" height="30" fill="#fff" stroke="#ffd166" stroke-width="3"/>
+    <text x="38" y="225" fill="#1b1e23" font-size="13">仍要运行</text>
+    <rect x="200" y="205" width="90" height="30" fill="#fff"/>
+    <text x="221" y="225" fill="#1b1e23" font-size="13">不运行</text>
+    <circle cx="138" cy="220" r="12" fill="#ffd166"/><text x="134" y="225" font-size="13" font-weight="700">2</text>
+  </g>
+</svg>

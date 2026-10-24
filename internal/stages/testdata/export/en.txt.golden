@@ -1,0 +1,5 @@
+A human edit.
+The cache hierarchy.
+A --> B at minute 75.
+Untranslated.
+So when the processor misses in the first level cache, it asks the second level, and only if that misses too does it go all the way out to main memory, which costs hundreds of cycles.

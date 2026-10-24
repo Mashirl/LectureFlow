@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>LectureFlow</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script src="boot.js"></script>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="onboarding.css">
+<link rel="stylesheet" href="settings_v3.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<button type="button" class="skip-link" id="skip-link" data-i18n="nav.skip"></button>
+<div class="app" id="app">
+  <nav id="nav" class="nav" data-i18n-aria-label="nav.label"></nav>
+  <div class="workspace">
+    <div id="conn-banner" class="conn-banner" role="status" hidden data-i18n="nav.conn_lost"></div>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <aside id="inspector" class="inspector" data-i18n-aria-label="nav.inspector"></aside>
+</div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<noscript><p class="noscript">LectureFlow 需要启用 JavaScript。 LectureFlow needs JavaScript.</p></noscript>
+</body>
+</html>

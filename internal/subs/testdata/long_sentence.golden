@@ -1,0 +1,28 @@
+== input
+sentence #12  10:00.000 → 10:31.340
+  text:  So what we want to do today is look at how a block cipher like AES actually works inside, because once you understand the round structure, the key schedule and the way the S-boxes give you confusion, you will see why the attacks we discussed last week do not apply to it, and why people still trust it after more than twenty years of public analysis by some of the best cryptographers in the world.
+  asr:   (same as text)
+  words: So[600000-600220] what[600270-600610] we[600660-600880] want[600930-601270] to[601320-601540] do[601590-601810] today[601860-602260] is[602310-602530] look[602580-602920] at[602970-603190] how[603240-603520] a[603570-603730] block[603780-604180] cipher[604230-604690] like[604740-605080] AES[605130-605410] actually[605460-606040] works[606090-606490] inside,[606540-607060] because[607110-607630] once[607680-608020] you[608070-608350] understand[608400-609100] the[609150-609430] round[609480-609880] structure,[609930-610630] the[610680-610960] key[611010-611290] schedule[611340-611920] and[611970-612250] the[612300-612580] way[612630-612910] the[612960-613240] S-boxes[613290-613810] give[613860-614200] you[614250-614530] confusion,[614580-615280] you[616030-616310] will[616360-616700] see[616750-617030] why[617080-617360] the[617410-617690] attacks[617740-618260] we[618310-618530] discussed[618580-619220] last[619270-619610] week[619660-620000] do[620050-620270] not[620320-620600] apply[620650-621050] to[621100-621320] it,[621370-621650] and[621700-621980] why[622030-622310] people[622360-622820] still[622870-623270] trust[623320-623720] it[623770-623990] after[624040-624440] more[624490-624830] than[624880-625220] twenty[625270-625730] years[625780-626180] of[626230-626450] public[626500-626960] analysis[627010-627590] by[627640-627860] some[627910-628250] of[628300-628520] the[628570-628850] best[628900-629240] cryptographers[629290-630230] in[630280-630500] the[630550-630830] world.[630880-631340]
+  zh:    所以今天我们要看看像 AES 这样的分组密码内部究竟如何工作，因为一旦你理解了轮结构、密钥编排以及 S 盒提供混淆的方式，你就会明白为什么我们上周讨论的攻击对它不适用，以及为什么在世界上一些最好的密码学家二十多年的公开分析之后，人们仍然信任它。
+== cues
+#12  10:00.000 → 10:03.570  (3570 ms, 42 ch)
+  en: So what we want to do today is look at how
+  zh: 所以今天我们要看看像 AES 这样的分组密码内部究竟如何工作，
+#12  10:03.570 → 10:07.110  (3540 ms, 46 ch)
+  en: a block cipher like AES actually works inside,
+  zh: 所以今天我们要看看像 AES 这样的分组密码内部究竟如何工作，
+#12  10:07.110 → 10:10.680  (3570 ms, 48 ch)
+  en: because once you understand the round structure,
+  zh: 因为一旦你理解了轮结构、
+#12  10:10.680 → 10:16.030  (5350 ms, 60 ch)
+  en: the key schedule and the way the S-boxes give you confusion,
+  zh: 密钥编排以及 S 盒提供混淆的方式，
+#12  10:16.030 → 10:21.700  (5670 ms, 71 ch)
+  en: you will see why the attacks we discussed last week do not apply to it,
+  zh: 你就会明白为什么我们上周讨论的攻击对它不适用，
+#12  10:21.700 → 10:26.500  (4800 ms, 61 ch)
+  en: and why people still trust it after more than twenty years of
+  zh: 以及为什么在世界上一些最好的密码学家二十多年的公开分析之后，
+#12  10:26.500 → 10:31.340  (4840 ms, 64 ch)
+  en: public analysis by some of the best cryptographers in the world.
+  zh: 人们仍然信任它。

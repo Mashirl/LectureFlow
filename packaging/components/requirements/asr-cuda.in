@@ -1,0 +1,10 @@
+# Component "asr-cuda": faster-whisper on NVIDIA GPUs (worker/asr.py, SPEC-v3 V3.1).
+# Top-level pins = the versions the product .venv runs on this machine (verified with
+# real CUDA transcription); asr-cuda.constraints.txt pins the transitive ones the same way.
+faster-whisper==1.2.1
+ctranslate2==4.8.3
+# PyAV 19 dropped av.open(metadata_errors=...), which faster-whisper 1.2.1 still passes.
+av==15.1.0
+# cuBLAS 12 / cuDNN 9 for ctranslate2 on CUDA; asr.py registers site-packages/nvidia/*/bin.
+nvidia-cublas-cu12==12.9.2.10
+nvidia-cudnn-cu12==9.27.0.42

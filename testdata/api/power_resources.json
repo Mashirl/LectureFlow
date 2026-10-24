@@ -1,0 +1,214 @@
+{
+ "gpu": {
+  "available": true,
+  "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+  "backend": "CUDA · float16",
+  "util_pct": 0,
+  "mem_used_mb": 412,
+  "mem_total_mb": 12227,
+  "temp_c": 46,
+  "power_w": 6.2,
+  "power_limit_w": 140,
+  "util_history": [
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "temp_history": [
+   47,
+   47,
+   46,
+   46,
+   46
+  ],
+  "temp_warn": false,
+  "asr_slots_used": 1,
+  "asr_slots_max": 3,
+  "paused": false
+ },
+ "devices": [
+  {
+   "id": "cuda:0",
+   "label": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+   "backend": "faster-whisper",
+   "kind": "cuda",
+   "model": "large-v3",
+   "precision": "auto",
+   "slots_used": 0,
+   "slots_max": 1,
+   "present": true,
+   "paused": false,
+   "tasks": [],
+   "util_pct": 0,
+   "util_history": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "battery_mode": true,
+   "battery_hold": true,
+   "enabled": true,
+   "active": false,
+   "untested": false,
+   "holds_suspended": true,
+   "mem_used_mb": null,
+   "mem_total_mb": null
+  },
+  {
+   "id": "ov:GPU",
+   "label": "Intel(R) Graphics",
+   "backend": "openvino",
+   "kind": "igpu",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "slots_used": 0,
+   "slots_max": 1,
+   "present": true,
+   "paused": false,
+   "tasks": [],
+   "util_pct": 2,
+   "util_history": [
+    1,
+    2,
+    2,
+    1,
+    2
+   ],
+   "battery_mode": true,
+   "battery_hold": true,
+   "enabled": true,
+   "active": false,
+   "untested": false,
+   "holds_suspended": false,
+   "mem_used_mb": 310,
+   "mem_total_mb": 16228
+  },
+  {
+   "id": "ov:NPU",
+   "label": "Intel(R) AI Boost",
+   "backend": "openvino",
+   "kind": "npu",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "slots_used": 1,
+   "slots_max": 1,
+   "present": true,
+   "paused": false,
+   "tasks": [
+    {
+     "job_id": "j-asr-w03l2",
+     "lecture_id": "l-w03l2",
+     "lecture_title": "W03 L2 Stream ciphers",
+     "course_id": "c-csc3631",
+     "progress": 0.42
+    }
+   ],
+   "util_pct": 47,
+   "util_history": [
+    38,
+    41,
+    44,
+    40,
+    43,
+    45,
+    47,
+    44,
+    42,
+    46
+   ],
+   "battery_mode": true,
+   "battery_hold": false,
+   "enabled": true,
+   "active": true,
+   "untested": true,
+   "holds_suspended": false,
+   "mem_used_mb": 2950,
+   "mem_total_mb": 16228
+  },
+  {
+   "id": "fw:cpu",
+   "label": "CPU (faster-whisper)",
+   "backend": "faster-whisper",
+   "kind": "cpu",
+   "model": "small",
+   "precision": "auto",
+   "slots_used": 0,
+   "slots_max": 1,
+   "present": true,
+   "paused": false,
+   "tasks": [],
+   "util_pct": null,
+   "util_history": [],
+   "battery_mode": true,
+   "battery_hold": false,
+   "enabled": false,
+   "active": false,
+   "untested": true,
+   "holds_suspended": false,
+   "mem_used_mb": null,
+   "mem_total_mb": null
+  }
+ ],
+ "power": {
+  "known": true,
+  "on_battery": true,
+  "saver": false,
+  "battery_pct": 63,
+  "battery_aware": true,
+  "has_battery": true,
+  "charging": false,
+  "source": "battery"
+ },
+ "system": {
+  "cpu_pct": 18,
+  "mem_used_mb": 14210,
+  "mem_total_mb": 32456,
+  "cpu_temp_c": null
+ },
+ "policy": {
+  "battery_machine": true,
+  "mode": "auto",
+  "manual_ignored": false,
+  "reason": "battery",
+  "active": [
+   "ov:NPU"
+  ],
+  "wait_ac": 1,
+  "wait_no_device": 0,
+  "notices": [
+   {
+    "id": "j-asr-w03l1:power.suspended:2026-10-24T07:12:05Z",
+    "at": "2026-10-24T07:12:05Z",
+    "info": {
+     "code": "power.suspended",
+     "params": {
+      "lecture": "W03 L1 Block ciphers"
+     }
+    },
+    "job_id": "j-asr-w03l1",
+    "lecture_id": "l-w03l1",
+    "course_id": "c-csc3631"
+   },
+   {
+    "id": "j-asr-w03l2:power.switched:2026-10-24T07:12:05Z",
+    "at": "2026-10-24T07:12:05Z",
+    "info": {
+     "code": "power.switched",
+     "params": {
+      "lecture": "W03 L2 Stream ciphers",
+      "device": "Intel(R) AI Boost"
+     }
+    },
+    "job_id": "j-asr-w03l2",
+    "lecture_id": "l-w03l2",
+    "course_id": "c-csc3631"
+   }
+  ]
+ },
+ "providers": [],
+ "sampled_at": "2026-10-24T07:15:30Z"
+}

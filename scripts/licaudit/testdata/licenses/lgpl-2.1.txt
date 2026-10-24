@@ -1,0 +1,6 @@
+                  GNU LESSER GENERAL PUBLIC LICENSE
+                       Version 2.1, February 1999
+
+ This version of the GNU Lesser General Public License incorporates
+ terms of the GNU General Public License, Version 2, June 1991.
+ (fixture: the rest of the license text is omitted)

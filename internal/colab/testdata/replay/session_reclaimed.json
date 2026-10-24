@@ -1,0 +1,71 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/utils.py is_terminal_error（404/401 表示会话已丢失）与 colab_cli/common.py State.sync_sessions 构造，非真实录制：上传时运行时返回 404，会话已被 Colab 回收。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/utils.py#is_terminal_error",
+   "colab_cli/common.py#State.sync_sessions"
+  ]
+ },
+ "recorded": false,
+ "extends": "borrow_run_release.json",
+ "until": "upload colab_remote.py",
+ "steps": [
+  {
+   "name": "upload colab_remote.py (404: runtime gone)",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/colab_remote.py",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404,
+    "body": "Not Found"
+   }
+  },
+  {
+   "name": "release: shut the kernel down",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/kernels/kernel-replay-1",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 404
+   }
+  },
+  {
+   "name": "release: GET /tun/m/assignments",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assignments",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "assignments": []
+    }
+   }
+  }
+ ]
+}

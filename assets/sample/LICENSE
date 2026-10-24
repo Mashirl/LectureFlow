@@ -1,0 +1,20 @@
+The files in this directory are in the PUBLIC DOMAIN.
+
+sample-lecture.flac
+  An excerpt of the LibriVox recording of "The Chemical History of a Candle"
+  by Michael Faraday, Lecture I, read by Availle.
+  LibriVox recordings are released into the public domain:
+  https://librivox.org/pages/public-domain/
+  Archive item (Public Domain Mark 1.0):
+  https://archive.org/details/chemical_history_candle_ava_librivox
+
+reference.txt
+  The corresponding text of "The Chemical History of a Candle"
+  (Michael Faraday, 1791-1867; published 1861), a public-domain work.
+
+SOURCE.md
+  Provenance notes for the two files above. To the extent possible under law,
+  the LectureFlow contributors dedicate SOURCE.md and this LICENSE file to the
+  public domain (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/).
+
+The rest of LectureFlow is licensed under AGPL-3.0-or-later; see ../../LICENSE.

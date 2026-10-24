@@ -1,0 +1,52 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:03.800
+A human edit.
+好，我们开始。
+
+2
+00:00:03.800 --> 00:00:08.200
+The cache hierarchy.
+缓存层次结构。
+
+3
+01:15:12.345 --> 01:15:13.345
+A -> B at minute 75.
+A -> B，在第 75 分钟。
+
+4
+01:15:20.000 --> 01:15:26.000
+Untranslated.
+（未翻译）
+
+5
+01:15:26.000 --> 01:15:29.486
+So when the processor misses
+所以当处理器在一级缓存中未命中时，
+
+6
+01:15:29.486 --> 01:15:32.612
+in the first level cache,
+所以当处理器在一级缓存中未命中时，
+
+7
+01:15:32.612 --> 01:15:35.737
+it asks the second level,
+它会访问二级缓存；
+
+8
+01:15:35.737 --> 01:15:40.065
+and only if that misses too does it
+只有二级缓存也未命中，
+
+9
+01:15:40.065 --> 01:15:44.273
+go all the way out to main memory,
+才会一路访问主存，
+
+10
+01:15:44.273 --> 01:15:48.000
+which costs hundreds of cycles.
+这要花费数百个周期。
+

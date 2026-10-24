@@ -1,0 +1,14 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py Client.assign 构造，非真实录制：分到运行时之后凭据按用户设定到期，释放请求无法发出（凭据已删除），会话记录留待重新授权后清理。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Client.assign"
+  ]
+ },
+ "recorded": false,
+ "extends": "queue_then_assigned.json",
+ "until": "release: GET /tun/m/assignments",
+ "steps": []
+}

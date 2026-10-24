@@ -1,0 +1,831 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py（Client.assign、_get_assignment、_post_assignment、list_assignments、unassign、get_consumption_user_info）、colab_cli/contents.py（ContentsClient.upload/download/rm）、colab_cli/runtime.py（ColabRuntime.execute_code）、colab_cli/commands/run.py（run_command、_teardown）与 jupyter-kernel-client 0.9.0（manager.py KernelHttpManager.start_kernel、wsclient.py 默认协议）构造，非真实录制。远端 stdout 事件依据 worker/colab_remote.py 的契约。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Client.assign",
+   "colab_cli/client.py#Client.list_assignments",
+   "colab_cli/client.py#Client.unassign",
+   "colab_cli/client.py#Client.get_consumption_user_info",
+   "colab_cli/consumption.py#CcuInfo",
+   "colab_cli/contents.py#ContentsClient",
+   "colab_cli/runtime.py#ColabRuntime.execute_code",
+   "colab_cli/commands/run.py#_teardown",
+   "colab_cli/common.py#State.get_session",
+   "jupyter-kernel-client 0.9.0 manager.py#KernelHttpManager.start_kernel",
+   "jupyter-kernel-client 0.9.0 wsclient.py#KernelWebSocketClient.start_channels"
+  ]
+ },
+ "recorded": false,
+ "vars": {
+  "result_json": "{\"prompt_terms_used\":1,\"sentences\":[{\"start_ms\":0,\"end_ms\":1180,\"text\":\"Welcome to the lecture.\",\"low_conf_words\":[],\"words\":[{\"w\":\"Welcome\",\"s\":0,\"e\":420},{\"w\":\"to\",\"s\":420,\"e\":560},{\"w\":\"the\",\"s\":560,\"e\":700},{\"w\":\"lecture.\",\"s\":700,\"e\":1180}]}],\"timing\":{\"load_s\":12.5,\"transcribe_s\":96.25,\"audio_s\":600.0,\"first_compile\":false,\"peak_working_set_mb\":2310}}"
+ },
+ "steps": [
+  {
+   "name": "refresh the access token",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/token",
+    "headers": {
+     "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "form": {
+     "grant_type": "refresh_token",
+     "client_id": "replay-client.apps.googleusercontent.com",
+     "client_secret": "replay-client-secret-abcdef",
+     "refresh_token": "1//replay-refresh-token-0123456789",
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "access_token": "ya29.replay-access-token-1",
+     "expires_in": 3599,
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory",
+     "token_type": "Bearer"
+    }
+   }
+  },
+  {
+   "name": "ccu-info",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/ccu-info",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "currentBalance": 95.5,
+     "consumptionRateHourly": 0,
+     "assignmentsCount": 0
+    }
+   }
+  },
+  {
+   "name": "assign: GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "acc": "T4",
+     "nbh": "the_notebook_hash",
+     "token": "xsrf-assign-replay-1",
+     "variant": "GPU"
+    }
+   }
+  },
+  {
+   "name": "assign: POST",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-assign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "accelerator": "T4",
+     "endpoint": "gpu-t4-s-replay1",
+     "runtimeProxyInfo": {
+      "token": "proxy-token-replay-1",
+      "tokenExpiresInSeconds": 3600,
+      "url": "{{runtime_url}}"
+     },
+     "variant": 1
+    }
+   }
+  },
+  {
+   "name": "boot: runtime not ready (503)",
+   "request": {
+    "method": "GET",
+    "host": "runtime",
+    "path": "/api/kernels",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 503,
+    "body": "runtime starting"
+   }
+  },
+  {
+   "name": "boot: runtime ready",
+   "request": {
+    "method": "GET",
+    "host": "runtime",
+    "path": "/api/kernels",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": []
+   }
+  },
+  {
+   "name": "start the kernel",
+   "request": {
+    "method": "POST",
+    "host": "runtime",
+    "path": "/api/kernels",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "json": {
+     "name": "python3"
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "id": "kernel-replay-1",
+     "name": "python3",
+     "last_activity": "2026-10-24T09:00:05.000000Z",
+     "execution_state": "starting",
+     "connections": 0
+    }
+   }
+  },
+  {
+   "name": "mkdir content/lectureflow",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "type": "directory"
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "lectureflow",
+     "path": "content/lectureflow",
+     "type": "directory"
+    }
+   }
+  },
+  {
+   "name": "upload colab_remote.py",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/colab_remote.py",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "colab_remote.py",
+     "path": "content/lectureflow/colab_remote.py",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "colab_remote.py",
+     "path": "content/lectureflow/colab_remote.py",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload asr.py",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/asr.py",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "asr.py",
+     "path": "content/lectureflow/asr.py",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "asr.py",
+     "path": "content/lectureflow/asr.py",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload asr_common.py",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/asr_common.py",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "asr_common.py",
+     "path": "content/lectureflow/asr_common.py",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "asr_common.py",
+     "path": "content/lectureflow/asr_common.py",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "mkdir jobs",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "type": "directory"
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "jobs",
+     "path": "content/lectureflow/jobs",
+     "type": "directory"
+    }
+   }
+  },
+  {
+   "name": "mkdir the job directory",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "type": "directory"
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "lecture-1",
+     "path": "content/lectureflow/jobs/lecture-1",
+     "type": "directory"
+    }
+   }
+  },
+  {
+   "name": "upload audio chunk 1",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload audio last chunk",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": -1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload job.json",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "kernel channels: run colab_remote.py",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "colab_remote.py"
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "execute_input",
+       "content": {
+        "code": "(the cell)",
+        "execution_count": 1
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260800.0,
+        "stage": "check"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260801.0,
+        "stage": "install"
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "parent": "other",
+       "content": {
+        "name": "stdout",
+        "text": "output of another request: Zebrafish\n"
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260840.0,
+        "stage": "download_model"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260870.0,
+        "stage": "load_model"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260883.0,
+        "stage": "transcribe"
+       },
+       {
+        "type": "progress",
+        "ts": 1793260907.0,
+        "fraction": 0.25
+       }
+      ]
+     },
+     {
+      "stdout_raw": "{\"type\":\"progress\",\"ts\":1793260955.0,\"fra"
+     },
+     {
+      "stdout_raw": "ction\":0.75}\n"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "progress",
+        "ts": 1793260979.25,
+        "fraction": 1.0
+       },
+       {
+        "type": "stage",
+        "ts": 1793260979.5,
+        "stage": "write"
+       },
+       {
+        "type": "done",
+        "ts": 1793261000.0,
+        "result": "result.json",
+        "sha256": "{{sha256:result_json}}",
+        "bytes": "{{len:result_json}}",
+        "audio_s": 600.0,
+        "load_s": 12.5,
+        "transcribe_s": 96.25,
+        "sentences": 1
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "content": {
+        "name": "stderr",
+        "text": "UserWarning: something about Zebrafish\n"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 1,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "download result",
+   "request": {
+    "method": "GET",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1",
+     "content": "1",
+     "format": "base64",
+     "type": "file"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "name": "result.json",
+     "path": "content/lectureflow/jobs/lecture-1/result.json",
+     "type": "file",
+     "format": "base64",
+     "mimetype": "application/json",
+     "content": "{{b64:result_json}}"
+    }
+   }
+  },
+  {
+   "name": "cleanup: delete audio.flac",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete audio.wav",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.wav",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   }
+  },
+  {
+   "name": "cleanup: delete job.json",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete result.json",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete result.json.tmp",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json.tmp",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   }
+  },
+  {
+   "name": "cleanup: delete stderr.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/stderr.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete the job directory",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "release: shut the kernel down",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/kernels/kernel-replay-1",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "release: GET /tun/m/assignments",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assignments",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "assignments": [
+      {
+       "accelerator": "T4",
+       "endpoint": "gpu-t4-s-replay1",
+       "variant": 1,
+       "machineShape": 0,
+       "runtimeProxyInfo": {
+        "token": "proxy-token-replay-1",
+        "tokenExpiresInSeconds": 3600,
+        "url": "{{runtime_url}}"
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "release: unassign GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "token": "xsrf-unassign-replay-1"
+    }
+   }
+  },
+  {
+   "name": "release: unassign POST",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-unassign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {}
+   }
+  }
+ ]
+}

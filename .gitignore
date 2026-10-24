@@ -1,0 +1,43 @@
+# Local environments, data and build output
+/.venv/
+/.venv-ov/
+/.venv-shot/
+/.venv-mlx/
+/data/
+/sample/
+/config.toml
+/tools/
+/lectureflow
+/*.exe
+/*.exe~
+/desktop/node_modules/
+/desktop/dist/
+__pycache__/
+.pytest_cache/
+*.tmp
+*.log
+/testdata/sample.wav
+/testdata/sample10.wav
+
+# Agent and process files. They stay in the local development history (the
+# master branch tracks the ones it already has; add new ones with
+# `git add -f`) and never reach the published repository, which is built
+# from the tracked tree minus everything ignored here.
+/CLAUDE.md
+/AGENTS.md
+/.claude/
+/PROGRESS.md
+/NOTES.md
+# The specification. The prompt tests read its prompt sections from
+# internal/ctxbuild/testdata/prompt-spec (.claude/release/promptspec.go).
+/SPEC*.md
+/web/i18n/reviews/
+/web/i18n/_parts/
+/docs/screenshots/
+/scripts/shots/
+# Benchmark spikes are process work, except the recommendation data the
+# device tests read.
+/spikes/*
+!/spikes/openvino/
+/spikes/openvino/*
+!/spikes/openvino/recommendation.json

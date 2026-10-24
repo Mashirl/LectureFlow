@@ -1,0 +1,160 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
+#
+# Continuous integration (SPEC-v3 V10): on every push and pull request, on
+# Windows x64 and macOS arm64, in parallel jobs: Go vet and tests, the
+# Python worker tests, the desktop shell's unit tests. The licence audit is
+# license.yml. Every action is pinned to a commit.
+#
+# Python: the worker tests run against worker/requirements.txt (CPU wheels
+# of faster-whisper, pypdf, pytest). A smaller set (pytest, numpy, pypdf)
+# is not enough: the checkpoint tests import faster_whisper's own speech
+# timestamp helper. No model is downloaded; tests that need a GPU, OpenVINO
+# or MLX models are marked and skipped (worker/conftest.py).
+#
+# ffmpeg for Windows is built from pinned sources on Linux
+# (desktop/scripts/build-ffmpeg-windows.sh, cached by the hash of the script
+# and of desktop/packaging/third-party.json); the Windows tests run the Go
+# tests that need a real ffmpeg against that build.
+name: CI
+
+on:
+  push:
+  pull_request:
+  # Run it by hand from the Actions tab when a push did not start it.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg-windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache
+        with:
+          path: desktop/.cache/ffmpeg-windows-*
+          key: ffmpeg-windows-${{ hashFiles('desktop/scripts/build-ffmpeg-windows.sh', 'desktop/packaging/third-party.json') }}
+      - name: Build the LGPL ffmpeg for Windows (mingw-w64)
+        if: steps.cache.outputs.cache-hit != 'true'
+        # The build runs as root: drop its work and download directories,
+        # which the ffmpeg-windows-* patterns below would also match, and
+        # hand the output to the runner user for the cache and the upload.
+        run: |
+          sudo bash desktop/scripts/build-ffmpeg-windows.sh --install-deps
+          sudo rm -rf desktop/.cache/ffmpeg-windows-work desktop/.cache/ffmpeg-windows-downloads
+          sudo chown -R "$(id -u):$(id -g)" desktop/.cache
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ffmpeg-windows
+          path: desktop/.cache/ffmpeg-windows-*/
+          if-no-files-found: error
+          # The build is under desktop/.cache, which upload-artifact skips
+          # as a hidden directory unless told otherwise.
+          include-hidden-files: true
+
+  go:
+    needs: ffmpeg-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Windows: real-time scanning slows every file the tests write (temp
+      # directories, SQLite, atomic replaces), and the default temp
+      # directory is on the slower system drive.
+      - name: Speed up the Windows runner
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          Set-MpPreference -DisableRealtimeMonitoring $true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: runner.os == 'Windows'
+        with:
+          name: ffmpeg-windows
+          path: desktop/.cache/
+      - name: Use the LGPL ffmpeg build
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          bin=$(ls -d "$PWD"/desktop/.cache/ffmpeg-windows-*/bin)
+          cygpath -w "$bin" >> "$GITHUB_PATH"
+
+      - name: Go vet
+        run: go vet ./...
+      - name: Go tests
+        run: go test -p 4 ./...
+      - name: Go build for macOS arm64
+        if: runner.os == 'macOS'
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: "0"
+        run: go build -trimpath -o lectureflow ./cmd/lectureflow
+
+  # The Python and desktop tests need no ffmpeg: they start at once and run
+  # beside the Go tests.
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Speed up the Windows runner
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          Set-MpPreference -DisableRealtimeMonitoring $true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: worker/requirements.txt
+      - name: Python dependencies
+        run: python -m pip install -r worker/requirements.txt
+      - name: Python worker tests
+        run: python -m pytest -q worker
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Speed up the Windows runner
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          Set-MpPreference -DisableRealtimeMonitoring $true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Desktop dependencies
+        working-directory: desktop
+        run: npm ci
+      - name: Desktop unit tests
+        working-directory: desktop
+        run: npm test

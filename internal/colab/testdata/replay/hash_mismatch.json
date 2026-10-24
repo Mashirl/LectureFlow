@@ -1,0 +1,245 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/contents.py ContentsClient.download 构造，非真实录制：下载的 result.json 与 done 事件的 sha256 不符（例如传输中被截断或改动）。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/contents.py#ContentsClient.download",
+   "colab_cli/commands/run.py#_teardown"
+  ]
+ },
+ "recorded": false,
+ "extends": "borrow_run_release.json",
+ "until": "download result",
+ "vars": {
+  "result_tampered": "{\"prompt_terms_used\":1,\"sentences\":[{\"start_ms\":0,\"end_ms\":1180,\"text\":\"Welcame to the lecture.\",\"low_conf_words\":[],\"words\":[{\"w\":\"Welcame\",\"s\":0,\"e\":420},{\"w\":\"to\",\"s\":420,\"e\":560},{\"w\":\"the\",\"s\":560,\"e\":700},{\"w\":\"lecture.\",\"s\":700,\"e\":1180}]}],\"timing\":{\"load_s\":12.5,\"transcribe_s\":96.25,\"audio_s\":600.0,\"first_compile\":false,\"peak_working_set_mb\":2310}}"
+ },
+ "steps": [
+  {
+   "name": "download result (tampered)",
+   "request": {
+    "method": "GET",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1",
+     "content": "1",
+     "format": "base64",
+     "type": "file"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "name": "result.json",
+     "path": "content/lectureflow/jobs/lecture-1/result.json",
+     "type": "file",
+     "format": "base64",
+     "content": "{{b64:result_tampered}}"
+    }
+   }
+  },
+  {
+   "name": "cleanup: delete audio.flac",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete audio.wav",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.wav",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   }
+  },
+  {
+   "name": "cleanup: delete job.json",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete result.json",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete result.json.tmp",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json.tmp",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   }
+  },
+  {
+   "name": "cleanup: delete stderr.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/stderr.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "cleanup: delete the job directory",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "release: shut the kernel down",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/kernels/kernel-replay-1",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "release: GET /tun/m/assignments",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assignments",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "assignments": [
+      {
+       "accelerator": "T4",
+       "endpoint": "gpu-t4-s-replay1",
+       "variant": 1,
+       "machineShape": 0,
+       "runtimeProxyInfo": {
+        "token": "proxy-token-replay-1",
+        "tokenExpiresInSeconds": 3600,
+        "url": "{{runtime_url}}"
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "release: unassign GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "token": "xsrf-unassign-replay-1"
+    }
+   }
+  },
+  {
+   "name": "release: unassign POST",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-unassign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {}
+   }
+  }
+ ]
+}

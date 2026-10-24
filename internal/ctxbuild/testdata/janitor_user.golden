@@ -1,0 +1,7 @@
+{"id":"t2","en":"IV","zh":"初始向量","tier":"enforce","common_word":false,"freq":1,"source":"material","contexts":[]}
+{"id":"t6","en":"Kasiski examination","zh":"","tier":"reference","common_word":false,"freq":0,"source":"material","contexts":["The Vigenère cipher repeats a key; the Kasiski examination finds the key length. In the real world the algorithms are…"]}
+{"id":"t7","en":"keyboard <shortcut> & co","zh":"","tier":"enforce","common_word":false,"freq":0,"source":"syllabus","contexts":[]}
+{"id":"t1","en":"public","zh":"公钥","tier":"enforce","common_word":true,"freq":3,"source":"material","contexts":["…finds the key length. In the real world the algorithms are public knowledge and security relies only on the secrecy of the…","Public key cryptography The public key is published; the private…"]}
+{"id":"t5","en":"Vigenère cipher","zh":"维吉尼亚密码","tier":"enforce","common_word":false,"freq":2,"source":"syllabus","contexts":["The Vigenère cipher repeats a key; the Kasiski examination finds the key…","…Topic | |---|---| | 1 | Classical ciphers: Caesar and the Vigenère cipher | | 2 | Public key cryptography |"]}
+
+{"id":"t3","en":"key","zh":"密钥","tier":"enforce","common_word":true,"freq":9,"source":"manual","locked":true}

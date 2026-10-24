@@ -1,0 +1,4 @@
+# Lock files and the manifest are hashed byte for byte (components.json pins their SHA-256):
+# never convert line endings.
+locks/*.txt -text
+components.json -text

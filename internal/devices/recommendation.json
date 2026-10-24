@@ -1,0 +1,62 @@
+{
+ "_note": "Product copy of spikes/openvino/recommendation.json (3a benchmark, SPEC-v2 I5), trimmed to what the product reads: the default model and precision of a newly detected OpenVINO device (I6) and the reference figures. Lead ruling 14: the Intel GPU keeps the rule's pick fp16 (accuracy first); int8 is left to the self-test and the user. Edit only together with internal/devices/recommend.go.",
+ "source": "spikes/openvino/recommendation.json",
+ "generated_at": "2026-10-23T20:05:34+0100",
+ "openvino_version": "2026.4.1",
+ "openvino_genai_version": "2026.4.1.0",
+ "rule": "lowest WER with RTF <= 0.5 (else lowest RTF); long-form WhisperPipeline, greedy (num_beams=1), word_timestamps=True, no prompt",
+ "devices": {
+  "GPU": {
+   "kind": "igpu",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "rtf": 0.0338,
+   "wer": 0.0568,
+   "words": true,
+   "first_load_s": 6.16,
+   "cached_load_s": 1.38,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 2683.1,
+   "alternative": {
+    "model": "large-v3-turbo",
+    "precision": "int8",
+    "rtf": 0.0258,
+    "wer": 0.0576,
+    "model_mb": 783.9,
+    "peak_working_set_mb": 2109.3
+   }
+  },
+  "NPU": {
+   "kind": "npu",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "rtf": 0.071,
+   "wer": 0.0607,
+   "words": true,
+   "first_load_s": 255.68,
+   "cached_load_s": 2.21,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 5003.8
+  },
+  "CPU": {
+   "kind": "cpu",
+   "model": "large-v3-turbo",
+   "precision": "fp16",
+   "rtf": 0.2547,
+   "wer": 0.0561,
+   "words": true,
+   "first_load_s": 0.84,
+   "cached_load_s": null,
+   "model_mb": 1550.7,
+   "peak_working_set_mb": 5259.5,
+   "alternative": {
+    "model": "large-v3-turbo",
+    "precision": "int8",
+    "rtf": 0.129,
+    "wer": 0.0568,
+    "model_mb": 783.9,
+    "peak_working_set_mb": 2430.6
+   }
+  }
+ }
+}

@@ -1,0 +1,11 @@
+{
+  "patches": [
+    {"idx": 1, "after": "Today we talk about the cache hierarchy in modern processors.", "class": "auto", "reason": "cash is a homophone of the glossary term cache"},
+    {"idx": 2, "after": "A write-back cache only writes a line to memory on eviction.", "class": "auto", "reason": "right back is a homophone of write-back"},
+    {"idx": 4, "after": "So, the first question is how we find a line in the cache.", "class": "absorb", "reason": "repeated word"},
+    {"idx": 4, "after": "So the first question is how we find a line in the cache.", "class": "absorb", "reason": "repeated word the"},
+    {"idx": 9, "after": "A four-way set associative cache halves the number of sets.", "class": "decide", "reason": "two-way was unclear, confirm the associativity"},
+    {"idx": 11, "after": "Belady's optimal replacement algorithm is something we will study in next week's lab session.", "class": "auto", "reason": "Blah lab sounds like Belady"},
+    {"idx": 99, "after": "This sentence does not exist.", "class": "auto", "reason": "idx outside the chunk"}
+  ]
+}

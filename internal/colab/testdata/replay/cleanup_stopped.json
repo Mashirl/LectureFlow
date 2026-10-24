@@ -1,0 +1,112 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/contents.py ContentsClient.rm 与 colab_cli/commands/run.py _teardown 构造，非真实录制：转写成功、结果已下载校验并写入后删除远端 result.json 时运行时返回 5xx，第二次尝试之后、第三次之前用户按了“立即关机”：不再重试，客户端立即释放运行时（运行时一释放，远端磁盘即回收）。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/contents.py#ContentsClient.rm",
+   "colab_cli/commands/run.py#_teardown"
+  ]
+ },
+ "recorded": false,
+ "extends": "cleanup_fails.json",
+ "until": "cleanup: delete result.json fails (attempt 3 of 4)",
+ "steps": [
+  {
+   "name": "release: shut the kernel down",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/kernels/kernel-replay-1",
+    "headers": {
+     "Authorization": "Bearer proxy-token-replay-1",
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 204
+   }
+  },
+  {
+   "name": "release: GET /tun/m/assignments",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assignments",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "assignments": [
+      {
+       "accelerator": "T4",
+       "endpoint": "gpu-t4-s-replay1",
+       "variant": 1,
+       "machineShape": 0,
+       "runtimeProxyInfo": {
+        "token": "proxy-token-replay-1",
+        "tokenExpiresInSeconds": 3600,
+        "url": "{{runtime_url}}"
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "release: unassign GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "token": "xsrf-unassign-replay-1"
+    }
+   }
+  },
+  {
+   "name": "release: unassign POST",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-unassign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {}
+   }
+  }
+ ]
+}

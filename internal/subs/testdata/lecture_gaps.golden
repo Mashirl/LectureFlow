@@ -1,0 +1,42 @@
+== input
+sentence #0  00:01.000 → 00:03.200
+  text:  The first sentence ends here.
+  asr:   (same as text)
+  words: The[1000-1280] first[1330-1730] sentence[1780-2360] ends[2410-2750] here.[2800-3200]
+  zh:    第一句在这里结束。
+sentence #1  00:04.000 → 00:06.320
+  text:  The second one follows quickly.
+  asr:   (same as text)
+  words: The[4000-4280] second[4330-4790] one[4840-5120] follows[5170-5690] quickly.[5740-6320]
+  zh:    第二句紧随其后。
+sentence #2  00:07.820 → 00:11.910
+  text:  The third comes after exactly one and a half seconds.
+  asr:   (same as text)
+  words: The[7820-8100] third[8150-8550] comes[8600-9000] after[9050-9450] exactly[9500-10020] one[10070-10350] and[10400-10680] a[10730-10890] half[10940-11280] seconds.[11330-11910]
+  zh:    第三句恰好在一秒半之后。
+sentence #3  00:14.910 → 00:17.770
+  text:  The fourth starts after a long pause.
+  asr:   (same as text)
+  words: The[14910-15190] fourth[15240-15700] starts[15750-16210] after[16260-16660] a[16710-16870] long[16920-17260] pause.[17310-17770]
+  zh:    第四句在长停顿之后开始。
+sentence #4  00:17.570 → 00:20.550
+  text:  The fifth overlaps the fourth a little.
+  asr:   (same as text)
+  words: The[17570-17850] fifth[17900-18300] overlaps[18350-18930] the[18980-19260] fourth[19310-19770] a[19820-19980] little.[20030-20550]
+  zh:    第五句与第四句略有重叠。
+== cues
+#0  00:01.000 → 00:04.000  (3000 ms, 29 ch)
+  en: The first sentence ends here.
+  zh: 第一句在这里结束。
+#1  00:04.000 → 00:06.320  (2320 ms, 31 ch)
+  en: The second one follows quickly.
+  zh: 第二句紧随其后。
+#2  00:07.820 → 00:11.910  (4090 ms, 53 ch)
+  en: The third comes after exactly one and a half seconds.
+  zh: 第三句恰好在一秒半之后。
+#3  00:14.910 → 00:17.570  (2660 ms, 37 ch)
+  en: The fourth starts after a long pause.
+  zh: 第四句在长停顿之后开始。
+#4  00:17.570 → 00:20.550  (2980 ms, 39 ch)
+  en: The fifth overlaps the fourth a little.
+  zh: 第五句与第四句略有重叠。

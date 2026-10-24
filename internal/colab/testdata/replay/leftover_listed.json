@@ -1,0 +1,121 @@
+{
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/common.py State.sync_sessions（以 list_assignments 核对本地记录）与 colab_cli/client.py Client.unassign 构造，非真实录制：上次运行留下的会话仍在账户的分配列表中，启动时释放。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/common.py#State.sync_sessions",
+   "colab_cli/client.py#Client.unassign"
+  ]
+ },
+ "recorded": false,
+ "steps": [
+  {
+   "name": "refresh the access token",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/token",
+    "headers": {
+     "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "form": {
+     "grant_type": "refresh_token",
+     "client_id": "replay-client.apps.googleusercontent.com",
+     "client_secret": "replay-client-secret-abcdef",
+     "refresh_token": "1//replay-refresh-token-0123456789",
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "access_token": "ya29.replay-access-token-1",
+     "expires_in": 3599,
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory",
+     "token_type": "Bearer"
+    }
+   }
+  },
+  {
+   "name": "leftover: GET /tun/m/assignments",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assignments",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "assignments": [
+      {
+       "accelerator": "T4",
+       "endpoint": "gpu-t4-s-replay1",
+       "variant": 1,
+       "machineShape": 0,
+       "runtimeProxyInfo": {
+        "token": "proxy-token-replay-1",
+        "tokenExpiresInSeconds": 3600,
+        "url": "{{runtime_url}}"
+       }
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "leftover: unassign GET (XSRF token)",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "token": "xsrf-unassign-replay-1"
+    }
+   }
+  },
+  {
+   "name": "leftover: unassign POST",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/unassign/gpu-t4-s-replay1",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-unassign-replay-1"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {}
+   }
+  }
+ ]
+}

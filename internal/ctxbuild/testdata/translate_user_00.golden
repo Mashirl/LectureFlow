@@ -1,0 +1,8 @@
+[BEFORE]
+(none)
+[TARGET #0]
+Okay, let's get started with today's lecture.
+[AFTER]
+Today we talk about the cache hierarchy in modern processors.
+A write-back cache only writes a line to memory on eviction.
+Each cache line is 64 bytes on most x86 machines.

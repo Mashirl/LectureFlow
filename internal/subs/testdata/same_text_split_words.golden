@@ -1,0 +1,11 @@
+== input
+sentence #0  00:05.000 → 00:11.000
+  text:  The cipher is IND-CCA secure, so a two-way channel with 3.14 bits leaks nothing.
+  asr:   (same as text)
+  words: The[5000-5150] cipher[5200-5600] is[5650-5800] IND[5850-6200] -CCA[6200-6700] secure,[6750-7300] so[7500-7650] a[7700-7750] two[7800-8000] -way[8000-8300] channel[8350-8800] with[8850-9000] 3[9050-9300] .14[9300-9700] bits[9750-10000] leaks[10050-10400] nothing.[10450-11000]
+  zh:    该密码是 IND-CCA 安全的，所以带 3.14 比特的双向信道不会泄露任何信息。
+  times: The[5000-5150] cipher[5200-5600] is[5650-5800] IND-CCA[5850-6700] secure,[6750-7300] so[7500-7650] a[7700-7750] two-way[7800-8300] channel[8350-8800] with[8850-9000] 3.14[9050-9700] bits[9750-10000] leaks[10050-10400] nothing.[10450-11000]
+== cues
+#0  00:05.000 → 00:11.000  (6000 ms, 80 ch)
+  en: The cipher is IND-CCA secure, so a two-way channel with 3.14 bits leaks nothing.
+  zh: 该密码是 IND-CCA 安全的，所以带 3.14 比特的双向信道不会泄露任何信息。

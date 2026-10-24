@@ -1,0 +1,1025 @@
+{
+  "_doc": "License table of the Python packages of the components (SPEC-v3 V7). Keys are PEP 503 names. Refresh versions/components with: go run ./scripts/licaudit refresh-python -venv .venv=asr-cuda -venv .venv-ov=asr-openvino. Entries with manual=true keep their license/note (set by a person after reading the wheel's bundled files). Until packaging/components has lock files, this table is the approximate dependency set taken from the development venvs.",
+  "packages": {
+    "annotated-doc": {
+      "license": "MIT",
+      "versions": [
+        "0.0.5"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/annotated-doc/",
+      "evidence": "License-Expression"
+    },
+    "anyio": {
+      "license": "MIT",
+      "versions": [
+        "4.15.1"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/anyio/",
+      "evidence": "License-Expression"
+    },
+    "av": {
+      "license": "BSD-3-Clause AND GPL-2.0-or-later AND OpenSSL",
+      "versions": [
+        "15.1.0"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/av/",
+      "evidence": "manual: wheel contents reviewed",
+      "manual": true,
+      "note": "PyAV itself is BSD-3-Clause, but the Windows wheel (av.libs) bundles an FFmpeg built with GPL parts (libx264, libx265: GPL-2.0-or-later) and OpenSSL 1.1 libcrypto (OpenSSL/SSLeay license, GPL-incompatible). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "certifi": {
+      "license": "MPL-2.0",
+      "versions": [
+        "2026.10.23"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/certifi/",
+      "evidence": "License field"
+    },
+    "cffi": {
+      "license": "MIT-0",
+      "versions": [
+        "2.1.1"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/cffi/",
+      "evidence": "License-Expression"
+    },
+    "charset-normalizer": {
+      "license": "MIT",
+      "versions": [
+        "3.5.2"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/charset-normalizer/",
+      "evidence": "License field"
+    },
+    "click": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "8.5.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/click/",
+      "evidence": "License-Expression"
+    },
+    "cloudpickle": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.1.2"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/cloudpickle/",
+      "evidence": "License field"
+    },
+    "colorama": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "0.4.6"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/colorama/",
+      "evidence": "license file"
+    },
+    "cryptography": {
+      "license": "Apache-2.0 OR BSD-3-Clause",
+      "versions": [
+        "50.0.2"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/cryptography/",
+      "evidence": "License-Expression"
+    },
+    "ctranslate2": {
+      "license": "MIT AND LicenseRef-NVIDIA-Proprietary AND LicenseRef-Intel-libiomp5",
+      "versions": [
+        "4.8.3"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/ctranslate2/",
+      "evidence": "manual: wheel contents reviewed",
+      "manual": true,
+      "note": "CTranslate2 is MIT, but the Windows wheel bundles cudnn64_9.dll (NVIDIA cuDNN, proprietary) and libiomp5md.dll (Intel OpenMP runtime, license not stated in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "faster-whisper": {
+      "license": "MIT",
+      "versions": [
+        "1.2.1"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/faster-whisper/",
+      "evidence": "License field"
+    },
+    "filelock": {
+      "license": "MIT",
+      "versions": [
+        "4.2.4"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/filelock/",
+      "evidence": "License-Expression"
+    },
+    "flatbuffers": {
+      "license": "Apache-2.0",
+      "versions": [
+        "25.12.19"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/flatbuffers/",
+      "evidence": "License field"
+    },
+    "fsspec": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "2026.9.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/fsspec/",
+      "evidence": "License-Expression"
+    },
+    "h11": {
+      "license": "MIT",
+      "versions": [
+        "0.16.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/h11/",
+      "evidence": "License field"
+    },
+    "hf-xet": {
+      "license": "Apache-2.0",
+      "versions": [
+        "1.7.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/hf-xet/",
+      "evidence": "License-Expression"
+    },
+    "httpcore": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "1.0.9"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/httpcore/",
+      "evidence": "License-Expression"
+    },
+    "httpcore2": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "2.16.0"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/httpcore2/",
+      "evidence": "License-Expression"
+    },
+    "httpx": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "0.28.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/httpx/",
+      "evidence": "License field"
+    },
+    "httpx2": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "2.16.0"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/httpx2/",
+      "evidence": "License-Expression"
+    },
+    "huggingface-hub": {
+      "license": "Apache-2.0",
+      "versions": [
+        "1.21.0",
+        "2.2.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/huggingface-hub/",
+      "evidence": "License field"
+    },
+    "idna": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.20"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/idna/",
+      "evidence": "License-Expression"
+    },
+    "iniconfig": {
+      "license": "MIT",
+      "versions": [
+        "2.3.1"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/iniconfig/",
+      "evidence": "License-Expression",
+      "note": "Development/packaging tool in the dev venv; ships only if a component lock file lists it."
+    },
+    "jinja2": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.1.6"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/jinja2/",
+      "evidence": "license file"
+    },
+    "jiwer": {
+      "license": "Apache-2.0",
+      "versions": [
+        "4.0.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/jiwer/",
+      "evidence": "License-Expression",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "joblib": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "1.6.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/joblib/",
+      "evidence": "License-Expression"
+    },
+    "llvmlite": {
+      "license": "BSD-2-Clause AND Apache-2.0 WITH LLVM-exception",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/llvmlite/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "License-Expression on PyPI; the wheel bundles LLVM."
+    },
+    "markdown-it-py": {
+      "license": "MIT",
+      "versions": [
+        "4.2.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/markdown-it-py/",
+      "evidence": "license file"
+    },
+    "markupsafe": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.0.4"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/markupsafe/",
+      "evidence": "License-Expression"
+    },
+    "mdurl": {
+      "license": "MIT",
+      "versions": [
+        "0.1.2"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/mdurl/",
+      "evidence": "license file"
+    },
+    "mlx": {
+      "license": "MIT",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/mlx/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "PyPI License: MIT (ml-explore/mlx LICENSE)."
+    },
+    "mlx-metal": {
+      "license": "MIT",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/mlx-metal/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "PyPI License: MIT; Metal backend binaries of MLX (ml-explore/mlx)."
+    },
+    "mlx-whisper": {
+      "license": "MIT",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/mlx-whisper/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "PyPI License: MIT (ml-explore/mlx-examples LICENSE). The wheel has no license file; the MIT text is reproduced in Appendix A.",
+      "license_text": "packaging/licenses/texts/mlx-examples-796f5b53cab6.LICENSE",
+      "license_text_sha256": "ccfab7ccb2ea306f71531c8ca77bb55507606cd90768b1e32b8b52ab5b48cf01",
+      "license_text_source": "https://github.com/ml-explore/mlx-examples/blob/796f5b53cab69a3d48a44233ce21aae889e94a08/LICENSE (fetched 2026-10-24; unchanged since commit a932012c1291b675e74f899d671883b7c41eb0db)"
+    },
+    "more-itertools": {
+      "license": "MIT",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/more-itertools/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "License-Expression on PyPI."
+    },
+    "mpmath": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "1.3.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/mpmath/",
+      "evidence": "license file (License: BSD)"
+    },
+    "narwhals": {
+      "license": "MIT",
+      "versions": [
+        "2.27.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/narwhals/",
+      "evidence": "License-Expression"
+    },
+    "networkx": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.6.1",
+        "3.7"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/networkx/",
+      "evidence": "License-Expression"
+    },
+    "ninja": {
+      "license": "Apache-2.0",
+      "versions": [
+        "1.13.2"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/ninja/",
+      "evidence": "License-Expression"
+    },
+    "nncf": {
+      "license": "Apache-2.0",
+      "versions": [
+        "3.4.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/nncf/",
+      "evidence": "License-Expression",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "numba": {
+      "license": "BSD-2-Clause",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/numba/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "PyPI License: BSD; numba/numba LICENSE is the 2-clause text (checked on GitHub)."
+    },
+    "numpy": {
+      "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 AND BSD-3-Clause-Open-MPI AND GPL-3.0-or-later WITH GCC-exception-3.1",
+      "versions": [
+        "2.4.6",
+        "2.5.4"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/numpy/",
+      "evidence": "manual: License-Expression + dist-info LICENSE.txt",
+      "manual": true,
+      "note": "License-Expression plus the bundled OpenBLAS/LAPACK/GCC runtime listed in licenses/LICENSE.txt (numpy.libs)."
+    },
+    "nvidia-cublas-cu12": {
+      "license": "LicenseRef-NVIDIA-Proprietary",
+      "versions": [
+        "12.9.2.10"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/nvidia-cublas-cu12/",
+      "evidence": "License-Expression / License field",
+      "manual": true,
+      "note": "NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "nvidia-cuda-nvrtc-cu12": {
+      "license": "LicenseRef-NVIDIA-Proprietary",
+      "versions": [
+        "12.9.86"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/nvidia-cuda-nvrtc-cu12/",
+      "evidence": "License-Expression / License field",
+      "manual": true,
+      "note": "NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "nvidia-cudnn-cu12": {
+      "license": "LicenseRef-NVIDIA-Proprietary",
+      "versions": [
+        "9.27.0.42"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/nvidia-cudnn-cu12/",
+      "evidence": "License-Expression / License field",
+      "manual": true,
+      "note": "NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "onnxruntime": {
+      "license": "MIT",
+      "versions": [
+        "1.31.0"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/onnxruntime/",
+      "evidence": "License field",
+      "note": "Bundled third-party notices: onnxruntime/ThirdPartyNotices.txt in the installed package."
+    },
+    "openvino": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2026.4.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/openvino/",
+      "evidence": "License-Expression",
+      "note": "Bundled third-party notices: dist-info/licenses/licensing/*.txt (oneDNN, oneTBB, runtime)."
+    },
+    "openvino-genai": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2026.4.1.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/openvino-genai/",
+      "evidence": "License field"
+    },
+    "openvino-telemetry": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2025.2.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/openvino-telemetry/",
+      "evidence": "License field"
+    },
+    "openvino-tokenizers": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2026.4.1.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/openvino-tokenizers/",
+      "evidence": "License field"
+    },
+    "optimum": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2.3.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/optimum/",
+      "evidence": "License field",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "optimum-intel": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2.2.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/optimum-intel/",
+      "evidence": "License field",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "packaging": {
+      "license": "Apache-2.0 OR BSD-2-Clause",
+      "versions": [
+        "26.3"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/packaging/",
+      "evidence": "License-Expression"
+    },
+    "pillow": {
+      "license": "MIT-CMU",
+      "versions": [
+        "13.0.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pillow/",
+      "evidence": "License-Expression"
+    },
+    "pip": {
+      "license": "MIT",
+      "versions": [
+        "26.2.2"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pip/",
+      "evidence": "License-Expression",
+      "note": "Development/packaging tool in the dev venv; ships only if a component lock file lists it."
+    },
+    "pluggy": {
+      "license": "MIT",
+      "versions": [
+        "1.7.0"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/pluggy/",
+      "evidence": "License field",
+      "note": "Development/packaging tool in the dev venv; ships only if a component lock file lists it."
+    },
+    "protobuf": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "7.36.2"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/protobuf/",
+      "evidence": "License field"
+    },
+    "psutil": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "7.2.2"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/psutil/",
+      "evidence": "License field"
+    },
+    "pycparser": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.12"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pycparser/",
+      "evidence": "License-Expression"
+    },
+    "pydot": {
+      "license": "MIT",
+      "versions": [
+        "4.0.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pydot/",
+      "evidence": "License-Expression"
+    },
+    "pygments": {
+      "license": "BSD-2-Clause",
+      "versions": [
+        "2.21.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pygments/",
+      "evidence": "License-Expression"
+    },
+    "pyparsing": {
+      "license": "MIT",
+      "versions": [
+        "3.3.3"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pyparsing/",
+      "evidence": "License-Expression"
+    },
+    "pypdf": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "6.21.2"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/pypdf/",
+      "evidence": "License-Expression"
+    },
+    "pytest": {
+      "license": "MIT",
+      "versions": [
+        "9.1.1"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/pytest/",
+      "evidence": "License-Expression",
+      "note": "Development/packaging tool in the dev venv; ships only if a component lock file lists it."
+    },
+    "pyyaml": {
+      "license": "MIT",
+      "versions": [
+        "6.0.3"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/pyyaml/",
+      "evidence": "License field"
+    },
+    "rapidfuzz": {
+      "license": "MIT",
+      "versions": [
+        "3.14.6"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/rapidfuzz/",
+      "evidence": "License-Expression"
+    },
+    "regex": {
+      "license": "Apache-2.0 AND CNRI-Python",
+      "versions": [
+        "2026.9.29"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/regex/",
+      "evidence": "License-Expression",
+      "manual": true,
+      "note": "Locked in asr-mlx (via tiktoken / mlx-whisper); also in the OpenVINO dev venv via transformers. CNRI-Python alone is not GPL-compatible per FSF. User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24)."
+    },
+    "requests": {
+      "license": "Apache-2.0",
+      "versions": [
+        "2.34.2"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/requests/",
+      "evidence": "License field"
+    },
+    "rich": {
+      "license": "MIT",
+      "versions": [
+        "15.0.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/rich/",
+      "evidence": "License field"
+    },
+    "safetensors": {
+      "license": "Apache-2.0",
+      "versions": [
+        "0.8.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/safetensors/",
+      "evidence": "license file"
+    },
+    "scikit-learn": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "1.9.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/scikit-learn/",
+      "evidence": "License-Expression"
+    },
+    "scipy": {
+      "license": "BSD-3-Clause AND BSD-3-Clause-Open-MPI AND GPL-3.0-or-later WITH GCC-exception-3.1",
+      "versions": [
+        "1.18.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/scipy/",
+      "evidence": "manual: dist-info LICENSE.txt",
+      "manual": true,
+      "note": "LICENSE.txt lists the bundled OpenBLAS (BSD-3-Clause), LAPACK (BSD-3-Clause-Open-MPI) and GCC runtime (GPL-3.0-or-later WITH GCC-exception-3.1); scipy.libs also carries msvcp140.dll (Microsoft VC++ runtime, system library)."
+    },
+    "setuptools": {
+      "license": "MIT",
+      "versions": [
+        "84.2.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/setuptools/",
+      "evidence": "License-Expression",
+      "note": "Development/packaging tool in the dev venv; ships only if a component lock file lists it."
+    },
+    "shellingham": {
+      "license": "ISC",
+      "versions": [
+        "1.5.4"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/shellingham/",
+      "evidence": "License field"
+    },
+    "soundfile": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "0.14.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/soundfile/",
+      "evidence": "License field"
+    },
+    "sympy": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "1.14.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/sympy/",
+      "evidence": "license file (License: BSD)"
+    },
+    "tabulate": {
+      "license": "MIT",
+      "versions": [
+        "0.10.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/tabulate/",
+      "evidence": "License-Expression"
+    },
+    "threadpoolctl": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "3.7.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/threadpoolctl/",
+      "evidence": "License-Expression"
+    },
+    "tiktoken": {
+      "license": "MIT",
+      "components": [
+        "asr-mlx"
+      ],
+      "source": "https://pypi.org/project/tiktoken/",
+      "evidence": "manual: PyPI JSON metadata, 2026-10-24 (macOS-only, not installed here)",
+      "manual": true,
+      "note": "PyPI License field holds the MIT text (OpenAI, Shantanu Jain)."
+    },
+    "tokenizers": {
+      "license": "Apache-2.0",
+      "versions": [
+        "0.22.2",
+        "0.23.3"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/tokenizers/",
+      "evidence": "classifier"
+    },
+    "torch": {
+      "license": "Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT",
+      "versions": [
+        "2.14.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/torch/",
+      "evidence": "License-Expression",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "torchvision": {
+      "license": "BSD-3-Clause",
+      "versions": [
+        "0.29.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/torchvision/",
+      "evidence": "license file (License: BSD)",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "tqdm": {
+      "license": "MPL-2.0 AND MIT",
+      "versions": [
+        "4.70.1"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/tqdm/",
+      "evidence": "License field"
+    },
+    "transformers": {
+      "license": "Apache-2.0",
+      "versions": [
+        "5.5.4"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/transformers/",
+      "evidence": "License field",
+      "note": "Model conversion / benchmark tool in the OpenVINO dev venv; ships only if a component lock file lists it."
+    },
+    "truststore": {
+      "license": "MIT",
+      "versions": [
+        "0.10.5"
+      ],
+      "components": [
+        "asr-cuda"
+      ],
+      "source": "https://pypi.org/project/truststore/",
+      "evidence": "License-Expression"
+    },
+    "typer": {
+      "license": "MIT",
+      "versions": [
+        "0.25.1"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/typer/",
+      "evidence": "License-Expression"
+    },
+    "typing-extensions": {
+      "license": "PSF-2.0",
+      "versions": [
+        "4.16.0"
+      ],
+      "components": [
+        "asr-cuda",
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/typing-extensions/",
+      "evidence": "License-Expression"
+    },
+    "urllib3": {
+      "license": "MIT",
+      "versions": [
+        "2.8.0"
+      ],
+      "components": [
+        "asr-openvino"
+      ],
+      "source": "https://pypi.org/project/urllib3/",
+      "evidence": "License-Expression"
+    }
+  }
+}

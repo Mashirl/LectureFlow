@@ -1,0 +1,555 @@
+{
+  "_doc": "Source of components.json (go run ./packaging/components/gen). Everything except _doc, gen and models is copied as it is; gen blocks and models are expanded with SHA-256 and sizes fetched from python-build-standalone, PyPI and the Hugging Face API at the pinned revisions. See packaging/components/README.md.",
+  "schema": 1,
+  "serial": 1,
+  "published": "2026-10-24",
+  "app_version": "3.0.0",
+  "compat": ">=3.0.0 <4.0.0",
+  "update_url": "",
+  "installed_factor": {
+    "venv": { "windows-x64": 1.7, "darwin-arm64": 3.0 },
+    "runtime": 4.0
+  },
+  "sources": {
+    "pypi": {
+      "primary": "pypi",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.pypi",
+        "url": "https://pypi.org/",
+        "values": {
+          "pypi": "https://pypi.org/simple",
+          "python": "https://github.com/astral-sh/python-build-standalone/releases/download"
+        }
+      },
+      "mirrors": [
+        {
+          "id": "tuna",
+          "name_key": "compui.source.name.tuna",
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/help/pypi/",
+          "region": "cn",
+          "values": {
+            "pypi": "https://pypi.tuna.tsinghua.edu.cn/simple",
+            "python": "https://registry.npmmirror.com/-/binary/python-build-standalone"
+          }
+        },
+        {
+          "id": "aliyun",
+          "name_key": "compui.source.name.aliyun",
+          "url": "https://developer.aliyun.com/mirror/pypi",
+          "region": "cn",
+          "values": {
+            "pypi": "https://mirrors.aliyun.com/pypi/simple",
+            "python": "https://registry.npmmirror.com/-/binary/python-build-standalone"
+          }
+        }
+      ]
+    },
+    "models": {
+      "primary": "models",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.huggingface",
+        "url": "https://huggingface.co/",
+        "values": {
+          "models": "https://huggingface.co"
+        }
+      },
+      "mirrors": [
+        {
+          "id": "hf-mirror",
+          "name_key": "compui.source.name.hf_mirror",
+          "url": "https://hf-mirror.com/",
+          "region": "cn",
+          "values": {
+            "models": "https://hf-mirror.com"
+          }
+        }
+      ]
+    },
+    "files": {
+      "primary": "files",
+      "default": {
+        "id": "default",
+        "name_key": "compui.source.name.releases",
+        "values": {
+          "files": ""
+        }
+      }
+    }
+  },
+  "components": [
+    {
+      "id": "core",
+      "version": "3.0.0",
+      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1",
+      "kind": "binary",
+      "bundled": true,
+      "name_key": "compui.name.core",
+      "desc_key": "compui.hint.core",
+      "license": "AGPL-3.0-or-later",
+      "license_note": "Third-party parts: THIRD_PARTY_NOTICES.md",
+      "platforms": {}
+    },
+    {
+      "id": "python",
+      "version": "1.0.0",
+      "upstream": "CPython 3.12.15 (python-build-standalone 20261013); pypdf 6.21.2, cryptography 50.0.2",
+      "kind": "python-runtime",
+      "name_key": "compui.name.python",
+      "desc_key": "compui.hint.python",
+      "license": "PSF-2.0",
+      "license_note": "python-build-standalone build scripts: BSD-3-Clause; the libraries bundled in the runtime keep their own licenses (LICENSE files inside the runtime). Base packages: pypdf BSD-3-Clause, cryptography Apache-2.0 OR BSD-3-Clause, cffi MIT-0, pycparser BSD-3-Clause.",
+      "source": "https://github.com/astral-sh/python-build-standalone/releases/tag/20261013",
+      "check_imports": ["pypdf", "cryptography"],
+      "gen": {
+        "python_build_standalone": {
+          "release": "20261013",
+          "cpython": "3.12.15",
+          "flavor": "install_only_stripped",
+          "platforms": {
+            "windows-x64": { "triple": "x86_64-pc-windows-msvc", "exe": "python/python.exe" },
+            "darwin-arm64": { "triple": "aarch64-apple-darwin", "exe": "python/bin/python3", "min_os": "13.0" }
+          }
+        },
+        "locks": ["windows-x64", "darwin-arm64"],
+        "runtime_factor": { "windows-x64": 3.3 },
+        "max_path": { "windows-x64": 113 }
+      }
+    },
+    {
+      "id": "asr-cuda",
+      "version": "1.0.0",
+      "upstream": "faster-whisper 1.2.1, CTranslate2 4.8.3, PyAV 15.1.0, NVIDIA cuBLAS 12.9 and cuDNN 9.27 runtime libraries",
+      "kind": "venv",
+      "name_key": "compui.name.asr_cuda",
+      "desc_key": "compui.hint.asr_cuda",
+      "depends": ["python"],
+      "backend": "faster-whisper",
+      "license": "MIT",
+      "license_note": "faster-whisper and CTranslate2: MIT; onnxruntime: MIT; PyAV: BSD-3-Clause. nvidia-cublas-cu12, nvidia-cudnn-cu12 and nvidia-cuda-nvrtc-cu12 are NVIDIA proprietary runtime libraries (LicenseRef-NVIDIA-Proprietary) that uv downloads from PyPI on the user's computer; they are not part of the installer.",
+      "source": "https://github.com/SYSTRAN/faster-whisper",
+      "check_imports": ["faster_whisper", "ctranslate2", "av"],
+      "gen": { "locks": ["windows-x64"], "installed_factor": { "windows-x64": 1.65 }, "max_path": { "windows-x64": 123 } }
+    },
+    {
+      "id": "asr-openvino",
+      "version": "1.0.0",
+      "upstream": "OpenVINO 2026.4.1, OpenVINO GenAI 2026.4.1.0, OpenVINO Tokenizers 2026.4.1.0",
+      "kind": "venv",
+      "name_key": "compui.name.asr_openvino",
+      "desc_key": "compui.hint.asr_openvino",
+      "depends": ["python"],
+      "backend": "openvino",
+      "license": "Apache-2.0",
+      "license_note": "Runtime only: models come converted as model:openvino:* components, so the conversion packages (optimum-intel, torch, nncf) are not installed.",
+      "source": "https://github.com/openvinotoolkit/openvino.genai",
+      "check_imports": ["openvino", "openvino_genai", "openvino_tokenizers"],
+      "gen": { "locks": ["windows-x64"], "installed_factor": { "windows-x64": 3.1 }, "max_path": { "windows-x64": 105 } }
+    },
+    {
+      "id": "asr-mlx",
+      "version": "1.0.0",
+      "upstream": "mlx-whisper 0.4.3, MLX 0.29.3",
+      "kind": "venv",
+      "name_key": "compui.name.asr_mlx",
+      "desc_key": "compui.hint.asr_mlx",
+      "depends": ["python"],
+      "backend": "mlx",
+      "license": "MIT",
+      "license_note": "mlx-whisper: MIT (ml-explore/mlx-examples LICENSE); MLX: MIT (ml-explore/mlx LICENSE). Not verified on a Mac (SPEC-v3 appendix F).",
+      "source": "https://github.com/ml-explore/mlx-examples/tree/main/whisper",
+      "check_imports": ["mlx_whisper", "mlx.core"],
+      "gen": { "locks": ["darwin-arm64"] }
+    }
+  ],
+  "models": [
+    {
+      "backend": "faster-whisper",
+      "name": "large-v3",
+      "precisions": ["float16", "int8_float16"],
+      "repo": "Systran/faster-whisper-large-v3",
+      "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+      "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
+      "platforms": ["windows-x64"],
+      "depends": ["asr-cuda"],
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3 (MIT). The same files serve every compute type.",
+      "upstream": "openai/whisper-large-v3"
+    },
+    {
+      "backend": "faster-whisper",
+      "name": "large-v3-turbo",
+      "precisions": ["float16", "int8_float16"],
+      "repo": "dropbox-dash/faster-whisper-large-v3-turbo",
+      "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
+      "platforms": ["windows-x64"],
+      "depends": ["asr-cuda"],
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v3-turbo (MIT); the repository faster-whisper 1.2.1 maps large-v3-turbo to (formerly mobiuslabsgmbh/faster-whisper-large-v3-turbo).",
+      "upstream": "openai/whisper-large-v3-turbo"
+    },
+    {
+      "backend": "faster-whisper",
+      "name": "large-v2",
+      "precisions": ["float16", "int8_float16"],
+      "repo": "Systran/faster-whisper-large-v2",
+      "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
+      "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
+      "platforms": ["windows-x64"],
+      "depends": ["asr-cuda"],
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-large-v2 (MIT).",
+      "upstream": "openai/whisper-large-v2"
+    },
+    {
+      "backend": "faster-whisper",
+      "name": "medium",
+      "precisions": ["float16", "int8_float16"],
+      "repo": "Systran/faster-whisper-medium",
+      "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
+      "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
+      "platforms": ["windows-x64"],
+      "depends": ["asr-cuda"],
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-medium (MIT).",
+      "upstream": "openai/whisper-medium"
+    },
+    {
+      "backend": "faster-whisper",
+      "name": "small",
+      "precisions": ["float16", "int8_float16"],
+      "repo": "Systran/faster-whisper-small",
+      "revision": "536b0662742c02347bc0e980a01041f333bce120",
+      "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
+      "platforms": ["windows-x64"],
+      "depends": ["asr-cuda"],
+      "license": "MIT",
+      "license_note": "CTranslate2 conversion of openai/whisper-small (MIT).",
+      "upstream": "openai/whisper-small"
+    },
+    {
+      "backend": "openvino",
+      "name": "large-v3-turbo",
+      "precisions": ["fp16"],
+      "repo": "OpenVINO/whisper-large-v3-turbo-fp16-ov",
+      "revision": "0250c28d68c7c10d6b5cb39707e876c0c66ab6f8",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "MIT",
+      "license_note": "OpenVINO conversion of openai/whisper-large-v3-turbo (MIT) published by the OpenVINO organisation.",
+      "upstream": "openai/whisper-large-v3-turbo"
+    },
+    {
+      "backend": "openvino",
+      "name": "large-v3-turbo",
+      "precisions": ["int8"],
+      "repo": "OpenVINO/whisper-large-v3-turbo-int8-ov",
+      "revision": "b568445dd5dc8c695bde596f8acbb4694fd6ba64",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "MIT",
+      "license_note": "OpenVINO INT8 weight-compressed conversion of openai/whisper-large-v3-turbo (MIT) published by the OpenVINO organisation.",
+      "upstream": "openai/whisper-large-v3-turbo"
+    },
+    {
+      "backend": "openvino",
+      "name": "large-v3",
+      "precisions": ["fp16"],
+      "repo": "OpenVINO/whisper-large-v3-fp16-ov",
+      "revision": "220761e60602a5ca694c409d5f424563b75d6820",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-large-v3 (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-large-v3"
+    },
+    {
+      "backend": "openvino",
+      "name": "large-v3",
+      "precisions": ["int8"],
+      "repo": "OpenVINO/whisper-large-v3-int8-ov",
+      "revision": "e197310d1fe6d5b40d0ce84c2614a547de21cb62",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-large-v3 (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-large-v3"
+    },
+    {
+      "backend": "openvino",
+      "name": "medium",
+      "precisions": ["fp16"],
+      "repo": "OpenVINO/whisper-medium-fp16-ov",
+      "revision": "eddc8397f55af66a5c4e411893e1b21caf187f0b",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-medium (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-medium"
+    },
+    {
+      "backend": "openvino",
+      "name": "medium",
+      "precisions": ["int8"],
+      "repo": "OpenVINO/whisper-medium-int8-ov",
+      "revision": "8d43cce846729381f56bd45a1c70925cee2222ff",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-medium (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-medium"
+    },
+    {
+      "backend": "openvino",
+      "name": "small",
+      "precisions": ["fp16"],
+      "repo": "OpenVINO/whisper-small-fp16-ov",
+      "revision": "2410d022171ca8a97343182f88eec8807a324db9",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO conversion of openai/whisper-small (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-small"
+    },
+    {
+      "backend": "openvino",
+      "name": "small",
+      "precisions": ["int8"],
+      "repo": "OpenVINO/whisper-small-int8-ov",
+      "revision": "5b831719e093f86e1970be663e524fe001489f9b",
+      "files": ["*"],
+      "exclude": [".gitattributes", "README.md"],
+      "require_openvino_files": true,
+      "platforms": ["windows-x64"],
+      "depends": ["asr-openvino"],
+      "license": "Apache-2.0",
+      "license_note": "OpenVINO INT8 conversion of openai/whisper-small (MIT) published by the OpenVINO organisation under Apache-2.0.",
+      "upstream": "openai/whisper-small"
+    },
+    {
+      "backend": "mlx",
+      "name": "large-v3-turbo",
+      "precisions": ["fp16"],
+      "repo": "mlx-community/whisper-large-v3-turbo-fp16",
+      "revision": "258e98b1f53da60a0a51c1e45e480ffa3ec71e23",
+      "files": ["config.json", "model.safetensors=weights.safetensors"],
+      "platforms": ["darwin-arm64"],
+      "depends": ["asr-mlx"],
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-large-v3-turbo (MIT) by mlx-community, published under Apache-2.0. model.safetensors is byte-identical to weights.safetensors of mlx-community/whisper-large-v3-turbo (the mlx-whisper format; that repository has no license field) and is installed under that name. Not verified on a Mac.",
+      "upstream": "openai/whisper-large-v3-turbo"
+    },
+    {
+      "backend": "mlx",
+      "name": "large-v3",
+      "precisions": ["fp16"],
+      "repo": "mlx-community/whisper-large-v3-mlx",
+      "revision": "49e6aa286ad60c14352c404340ded53710378a11",
+      "files": ["config.json", "weights.npz"],
+      "platforms": ["darwin-arm64"],
+      "depends": ["asr-mlx"],
+      "license": "MIT",
+      "license_note": "MLX conversion of openai/whisper-large-v3 (MIT) by mlx-community, published under MIT. Not verified on a Mac.",
+      "upstream": "openai/whisper-large-v3"
+    },
+    {
+      "backend": "mlx",
+      "name": "medium",
+      "precisions": ["fp16"],
+      "repo": "mlx-community/whisper-medium-fp16",
+      "revision": "d2152aba82a7ba7eee265796582a1359c56cd51a",
+      "files": ["config.json", "model.safetensors=weights.safetensors"],
+      "platforms": ["darwin-arm64"],
+      "depends": ["asr-mlx"],
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-medium (MIT) by mlx-community (mlx-audio-plus), published under Apache-2.0; installed as weights.safetensors, the name mlx-whisper loads. Not verified on a Mac.",
+      "upstream": "openai/whisper-medium"
+    },
+    {
+      "backend": "mlx",
+      "name": "small",
+      "precisions": ["fp16"],
+      "repo": "mlx-community/whisper-small-fp16",
+      "revision": "fa19eb05939653a9334d81bec7e053db81970170",
+      "files": ["config.json", "model.safetensors=weights.safetensors"],
+      "platforms": ["darwin-arm64"],
+      "depends": ["asr-mlx"],
+      "license": "Apache-2.0",
+      "license_note": "MLX conversion of openai/whisper-small (MIT) by mlx-community (mlx-audio-plus), published under Apache-2.0; installed as weights.safetensors, the name mlx-whisper loads. Not verified on a Mac.",
+      "upstream": "openai/whisper-small"
+    }
+  ],
+  "presets": {
+    "default": "standard",
+    "tiers": [
+      {
+        "id": "standard",
+        "name_key": "onboarding.tier.standard.name",
+        "desc_key": "onboarding.tier.standard.desc",
+        "cost_key": "onboarding.tier.standard.cost",
+        "night_processing": false,
+        "transcribe_only": false,
+        "roles": {
+          "syllabus_format": { "provider": "deepseek" },
+          "glossary": { "provider": "deepseek" },
+          "glossary_janitor": { "provider": "deepseek" },
+          "summary": { "provider": "deepseek" },
+          "repair": { "provider": "deepseek" },
+          "translate": { "provider": "deepseek" },
+          "chapters": { "provider": "deepseek" },
+          "organizer": { "provider": "deepseek" }
+        }
+      },
+      {
+        "id": "saver",
+        "name_key": "onboarding.tier.saver.name",
+        "desc_key": "onboarding.tier.saver.desc",
+        "cost_key": "onboarding.tier.saver.cost",
+        "night_processing": false,
+        "transcribe_only": false,
+        "roles": {
+          "syllabus_format": { "provider": "$free" },
+          "glossary": { "provider": "deepseek" },
+          "glossary_janitor": { "provider": "$free" },
+          "summary": { "provider": "deepseek" },
+          "repair": { "provider": "deepseek" },
+          "translate": { "provider": "deepseek" },
+          "chapters": { "provider": "$free" },
+          "organizer": { "provider": "$free" }
+        }
+      },
+      {
+        "id": "free",
+        "name_key": "onboarding.tier.free.name",
+        "desc_key": "onboarding.tier.free.desc",
+        "cost_key": "onboarding.tier.free.cost",
+        "night_processing": true,
+        "transcribe_only": false,
+        "roles": {
+          "syllabus_format": { "provider": "$free" },
+          "glossary": { "provider": "$free" },
+          "glossary_janitor": { "provider": "$free" },
+          "summary": { "provider": "$free" },
+          "repair": { "provider": "$free" },
+          "translate": { "provider": "$free" },
+          "chapters": { "provider": "$free" },
+          "organizer": { "provider": "$free" }
+        }
+      },
+      {
+        "id": "transcribe_only",
+        "name_key": "onboarding.tier.transcribe_only.name",
+        "desc_key": "onboarding.tier.transcribe_only.desc",
+        "cost_key": "onboarding.tier.transcribe_only.cost",
+        "night_processing": false,
+        "transcribe_only": true
+      }
+    ],
+    "providers": [
+      {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "type": "openai",
+        "base_url": "https://api.deepseek.com",
+        "default_model": "deepseek-flash",
+        "free": false,
+        "terms_notice": false,
+        "signup_url": "https://platform.deepseek.com/sign_up",
+        "keys_url": "https://platform.deepseek.com/api_keys",
+        "pricing_url": "https://api-docs.deepseek.com/quick_start/pricing",
+        "steps_keys": [
+          "onboarding.preset.deepseek.step1",
+          "onboarding.preset.deepseek.step2",
+          "onboarding.preset.deepseek.step3"
+        ],
+        "cost_key": "onboarding.preset.deepseek.cost",
+        "max_concurrency": 8,
+        "rpm": 300,
+        "balance_api": "deepseek",
+        "refs": [
+          "https://api-docs.deepseek.com/quick_start/rate_limit"
+        ]
+      },
+      {
+        "id": "gemini",
+        "name": "Google Gemini",
+        "type": "openai",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "default_model": "gemini-3.8-flash",
+        "free": true,
+        "terms_notice": true,
+        "terms_url": "https://ai.google.dev/gemini-api/terms",
+        "signup_url": "https://aistudio.google.com/",
+        "keys_url": "https://aistudio.google.com/apikey",
+        "pricing_url": "https://ai.google.dev/gemini-api/docs/pricing",
+        "steps_keys": [
+          "onboarding.preset.gemini.step1",
+          "onboarding.preset.gemini.step2",
+          "onboarding.preset.gemini.step3"
+        ],
+        "cost_key": "onboarding.preset.gemini.cost",
+        "max_concurrency": 1,
+        "rpm": 5,
+        "refs": [
+          "https://ai.google.dev/gemini-api/docs/openai",
+          "https://ai.google.dev/gemini-api/docs/pricing",
+          "https://ai.google.dev/gemini-api/docs/rate-limits"
+        ]
+      },
+      {
+        "id": "zhipu",
+        "name": "智谱 BigModel (GLM)",
+        "type": "openai",
+        "base_url": "https://open.bigmodel.cn/api/paas/v4/",
+        "default_model": "glm-4.7-flash",
+        "free": true,
+        "terms_notice": true,
+        "terms_url": "https://bigmodel.cn/",
+        "regions": ["cn"],
+        "signup_url": "https://open.bigmodel.cn/",
+        "keys_url": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+        "pricing_url": "https://bigmodel.cn/pricing",
+        "steps_keys": [
+          "onboarding.preset.zhipu.step1",
+          "onboarding.preset.zhipu.step2",
+          "onboarding.preset.zhipu.step3"
+        ],
+        "cost_key": "onboarding.preset.zhipu.cost",
+        "max_concurrency": 1,
+        "rpm": 30,
+        "refs": [
+          "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction",
+          "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+          "https://docs.bigmodel.cn/cn/guide/start/quick-start"
+        ]
+      }
+    ],
+    "free": {
+      "default": "gemini",
+      "by_region": { "cn": "zhipu" }
+    }
+  }
+}

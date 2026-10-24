@@ -1,0 +1,436 @@
+{
+  "GET /api/components": {
+    "platform": "windows-x64",
+    "manifest": {
+      "app_version": "3.0.0",
+      "published_at": "2026-10-20T08:00:00Z",
+      "update_available": true,
+      "serial": 3,
+      "builtin": true
+    },
+    "components": [
+      {
+        "id": "core",
+        "kind": "binary",
+        "version": "3.0.0",
+        "download_bytes": 0,
+        "install_bytes": 0,
+        "disk_bytes": 0,
+        "requires": [],
+        "license": "AGPL-3.0-or-later",
+        "state": "installed",
+        "installed_version": "3.0.0",
+        "bundled": true,
+        "rebuild_needed": false,
+        "orphaned": false
+      },
+      {
+        "id": "python",
+        "kind": "python-runtime",
+        "version": "1.0.0",
+        "name_key": "compui.name.python",
+        "upstream": "CPython 3.12.15",
+        "download_bytes": 22020096,
+        "install_bytes": 167772160,
+        "disk_bytes": 165675008,
+        "requires": [],
+        "license": "PSF-2.0",
+        "state": "installed",
+        "installed_version": "1.0.0",
+        "bundled": false,
+        "rebuild_needed": false,
+        "orphaned": false
+      },
+      {
+        "id": "asr-cuda",
+        "kind": "venv",
+        "version": "1.0.1",
+        "backend": "faster-whisper",
+        "download_bytes": 1352663040,
+        "install_bytes": 3040870400,
+        "disk_bytes": 3009413120,
+        "requires": [
+          "python"
+        ],
+        "license": "MIT",
+        "state": "installed",
+        "installed_version": "1.0.0",
+        "update_version": "1.0.1",
+        "bundled": false,
+        "rebuild_needed": false,
+        "orphaned": false
+      },
+      {
+        "id": "model:faster-whisper:large-v3:float16",
+        "kind": "model",
+        "version": "1.0.0",
+        "backend": "faster-whisper",
+        "model": "large-v3",
+        "precision": "float16",
+        "download_bytes": 3236954112,
+        "install_bytes": 3236954112,
+        "disk_bytes": 0,
+        "requires": [
+          "asr-cuda"
+        ],
+        "license": "MIT",
+        "state": "installing",
+        "bundled": false,
+        "rebuild_needed": false,
+        "orphaned": false,
+        "task": "t1761292800000-1"
+      },
+      {
+        "id": "asr-mlx",
+        "kind": "venv",
+        "version": "1.0.0",
+        "backend": "mlx",
+        "download_bytes": 0,
+        "install_bytes": 0,
+        "disk_bytes": 0,
+        "requires": [
+          "python"
+        ],
+        "license": "MIT",
+        "state": "unavailable",
+        "unavailable_reason": "platform",
+        "bundled": false,
+        "rebuild_needed": false,
+        "orphaned": false
+      }
+    ],
+    "tasks": [
+      {
+        "id": "t1761292700000-0",
+        "kind": "import",
+        "state": "failed",
+        "ids": [],
+        "done_bytes": 2048,
+        "total_bytes": 2048,
+        "speed_bps": 0,
+        "eta_s": -1,
+        "items": [
+          {
+            "id": "tool",
+            "state": "failed",
+            "phase": "failed",
+            "version": "1.0.0",
+            "update": false,
+            "dependency": false,
+            "done_bytes": 2048,
+            "total_bytes": 2048,
+            "source": "offline"
+          }
+        ],
+        "error": {
+          "code": "components.import_checksum",
+          "params": {
+            "id": "tool"
+          }
+        },
+        "notes": [],
+        "created_at": "2026-10-24T07:58:20Z",
+        "updated_at": "2026-10-24T07:58:21Z"
+      },
+      {
+        "id": "t1761292800000-1",
+        "kind": "install",
+        "state": "running",
+        "ids": [
+          "model:faster-whisper:large-v3:float16"
+        ],
+        "done_bytes": 1258291200,
+        "total_bytes": 3236954112,
+        "speed_bps": 12582912,
+        "eta_s": 158,
+        "items": [
+          {
+            "id": "model:faster-whisper:large-v3:float16",
+            "state": "downloading",
+            "phase": "downloading",
+            "version": "1.0.0",
+            "update": false,
+            "dependency": false,
+            "done_bytes": 1258291200,
+            "total_bytes": 3236954112,
+            "source": "mirror"
+          }
+        ],
+        "notes": [
+          {
+            "code": "components.mirror_fallback",
+            "params": {
+              "group": "pypi",
+              "mirror": "tuna",
+              "reason": "components.network"
+            }
+          }
+        ],
+        "created_at": "2026-10-24T08:00:00Z",
+        "updated_at": "2026-10-24T08:01:40Z"
+      }
+    ]
+  },
+  "GET /api/components/sources": {
+    "pypi": {
+      "mode": "mirror",
+      "mirror_id": "tuna",
+      "custom_url": ""
+    },
+    "models": {
+      "mode": "default",
+      "mirror_id": "",
+      "custom_url": ""
+    },
+    "options": {
+      "models": [
+        {
+          "id": "hf-mirror",
+          "label": "hf-mirror.com",
+          "name_key": "compui.source.name.hf_mirror",
+          "url": "https://hf-mirror.com/",
+          "region": "cn"
+        }
+      ],
+      "pypi": [
+        {
+          "id": "tuna",
+          "label": "pypi.tuna.tsinghua.edu.cn",
+          "name_key": "compui.source.name.tuna",
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/help/pypi/",
+          "region": "cn"
+        }
+      ]
+    },
+    "suggest_mirror": true,
+    "suggested": {
+      "pypi": {
+        "mode": "mirror",
+        "mirror_id": "tuna",
+        "custom_url": ""
+      },
+      "models": {
+        "mode": "mirror",
+        "mirror_id": "hf-mirror",
+        "custom_url": ""
+      }
+    }
+  },
+  "GET /api/hardware": {
+    "hw": {
+      "os": "windows",
+      "arch": "amd64",
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "ram_mb": 32446,
+      "disk_free_mb": 214500,
+      "nvidia": [
+        {
+          "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+          "vram_mb": 12227,
+          "driver": "592.00",
+          "source": "nvidia-smi"
+        }
+      ],
+      "intel_gpu": true,
+      "intel_npu": false,
+      "intel_gpu_name": "Intel(R) Arc(TM) 140T GPU",
+      "intel_npu_name": "",
+      "apple_silicon": false,
+      "chip": "",
+      "unified_mem_mb": 0,
+      "has_battery": true
+    },
+    "recommendation": {
+      "components": [
+        "python",
+        "asr-cuda",
+        "model:faster-whisper:large-v3:float16"
+      ],
+      "reasons": [
+        {
+          "code": "hw.reason.nvidia",
+          "params": {
+            "name": "NVIDIA GeForce RTX 5070 Ti Laptop GPU",
+            "vram_gb": 12
+          }
+        }
+      ],
+      "notes": [],
+      "download_bytes": 4611637248
+    }
+  },
+  "GET /api/onboarding/env-keys": [
+    {
+      "provider_type": "deepseek",
+      "env": "DEEPSEEK_API_KEY",
+      "present": true,
+      "masked": "sk-…abcd"
+    },
+    {
+      "provider_type": "gemini",
+      "env": "GEMINI_API_KEY",
+      "present": false
+    },
+    {
+      "provider_type": "zhipu",
+      "env": "ZHIPUAI_API_KEY",
+      "present": false
+    }
+  ],
+  "POST /api/components/install": {
+    "task": {
+      "id": "t1761292800000-1",
+      "kind": "install",
+      "state": "running",
+      "ids": [
+        "model:faster-whisper:large-v3:float16"
+      ],
+      "done_bytes": 1258291200,
+      "total_bytes": 3236954112,
+      "speed_bps": 12582912,
+      "eta_s": 158,
+      "items": [
+        {
+          "id": "model:faster-whisper:large-v3:float16",
+          "state": "downloading",
+          "phase": "downloading",
+          "version": "1.0.0",
+          "update": false,
+          "dependency": false,
+          "done_bytes": 1258291200,
+          "total_bytes": 3236954112,
+          "source": "mirror"
+        }
+      ],
+      "notes": [
+        {
+          "code": "components.mirror_fallback",
+          "params": {
+            "group": "pypi",
+            "mirror": "tuna",
+            "reason": "components.network"
+          }
+        }
+      ],
+      "created_at": "2026-10-24T08:00:00Z",
+      "updated_at": "2026-10-24T08:01:40Z"
+    }
+  },
+  "POST /api/components/plan": {
+    "ids": [
+      "python",
+      "asr-cuda",
+      "model:faster-whisper:large-v3:float16"
+    ],
+    "download_bytes": 3236954112,
+    "install_bytes": 3236954112,
+    "free_bytes": 224919552000,
+    "enough_space": true,
+    "need_bytes": 3505389568,
+    "items": [
+      {
+        "id": "python",
+        "version": "1.0.0",
+        "kind": "python-runtime",
+        "dependency": true,
+        "installed": true,
+        "update": false,
+        "download_bytes": 0,
+        "installed_bytes": 0
+      },
+      {
+        "id": "asr-cuda",
+        "version": "1.0.1",
+        "kind": "venv",
+        "dependency": true,
+        "installed": true,
+        "update": false,
+        "download_bytes": 0,
+        "installed_bytes": 0
+      },
+      {
+        "id": "model:faster-whisper:large-v3:float16",
+        "version": "1.0.0",
+        "kind": "model",
+        "dependency": false,
+        "installed": false,
+        "update": false,
+        "download_bytes": 3236954112,
+        "installed_bytes": 3236954112
+      }
+    ]
+  },
+  "event: components": {
+    "tasks": [
+      {
+        "id": "t1761292700000-0",
+        "kind": "import",
+        "state": "failed",
+        "ids": [],
+        "done_bytes": 2048,
+        "total_bytes": 2048,
+        "speed_bps": 0,
+        "eta_s": -1,
+        "items": [
+          {
+            "id": "tool",
+            "state": "failed",
+            "phase": "failed",
+            "version": "1.0.0",
+            "update": false,
+            "dependency": false,
+            "done_bytes": 2048,
+            "total_bytes": 2048,
+            "source": "offline"
+          }
+        ],
+        "error": {
+          "code": "components.import_checksum",
+          "params": {
+            "id": "tool"
+          }
+        },
+        "notes": [],
+        "created_at": "2026-10-24T07:58:20Z",
+        "updated_at": "2026-10-24T07:58:21Z"
+      },
+      {
+        "id": "t1761292800000-1",
+        "kind": "install",
+        "state": "running",
+        "ids": [
+          "model:faster-whisper:large-v3:float16"
+        ],
+        "done_bytes": 1258291200,
+        "total_bytes": 3236954112,
+        "speed_bps": 12582912,
+        "eta_s": 158,
+        "items": [
+          {
+            "id": "model:faster-whisper:large-v3:float16",
+            "state": "downloading",
+            "phase": "downloading",
+            "version": "1.0.0",
+            "update": false,
+            "dependency": false,
+            "done_bytes": 1258291200,
+            "total_bytes": 3236954112,
+            "source": "mirror"
+          }
+        ],
+        "notes": [
+          {
+            "code": "components.mirror_fallback",
+            "params": {
+              "group": "pypi",
+              "mirror": "tuna",
+              "reason": "components.network"
+            }
+          }
+        ],
+        "created_at": "2026-10-24T08:00:00Z",
+        "updated_at": "2026-10-24T08:01:40Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,35 @@
+== input
+sentence #0  00:00.000 → 00:11.140
+  text:  Now we show that the construction is secure under the standard assumption, and we analyse its cost and the details of an implementation in practice.
+  asr:   (same as text)
+  words: Now[0-280] we[330-550] show[600-940] that[990-1330] the[1380-1660] construction[1710-2530] is[2580-2800] secure[2850-3310] under[3360-3760] the[3810-4090] standard[4140-4720] assumption,[4770-5530] and[5580-5860] we[5910-6130] analyse[6180-6700] its[6750-7030] cost[7080-7420] and[7470-7750] the[7800-8080] details[8130-8650] of[8700-8920] an[8970-9190] implementation[9240-10180] in[10230-10450] practice.[10500-11140]
+  zh:    我们证明该方案满足IND-CCA的安全性并分析效率。
+sentence #1  00:20.000 → 00:31.140
+  text:  Now we show that the construction is secure under the standard assumption, and we analyse its cost and the details of an implementation in practice.
+  asr:   (same as text)
+  words: Now[20000-20280] we[20330-20550] show[20600-20940] that[20990-21330] the[21380-21660] construction[21710-22530] is[22580-22800] secure[22850-23310] under[23360-23760] the[23810-24090] standard[24140-24720] assumption,[24770-25530] and[25580-25860] we[25910-26130] analyse[26180-26700] its[26750-27030] cost[27080-27420] and[27470-27750] the[27800-28080] details[28130-28650] of[28700-28920] an[28970-29190] implementation[29240-30180] in[30230-30450] practice.[30500-31140]
+  zh:    我们的实现使用AES-256加密所有数据块。
+sentence #2  00:40.000 → 00:51.140
+  text:  Now we show that the construction is secure under the standard assumption, and we analyse its cost and the details of an implementation in practice.
+  asr:   (same as text)
+  words: Now[40000-40280] we[40330-40550] show[40600-40940] that[40990-41330] the[41380-41660] construction[41710-42530] is[42580-42800] secure[42850-43310] under[43360-43760] the[43810-44090] standard[44140-44720] assumption,[44770-45530] and[45580-45860] we[45910-46130] analyse[46180-46700] its[46750-47030] cost[47080-47420] and[47470-47750] the[47800-48080] details[48130-48650] of[48700-48920] an[48970-49190] implementation[49240-50180] in[50230-50450] practice.[50500-51140]
+  zh:    该算法的复杂度为O(n log n)而且常数因子很小。
+== cues
+#0  00:00.000 → 00:05.580  (5580 ms, 74 ch)
+  en: Now we show that the construction is secure under the standard assumption,
+  zh: 我们证明该方案满足IND-CCA
+#0  00:05.580 → 00:11.140  (5560 ms, 73 ch)
+  en: and we analyse its cost and the details of an implementation in practice.
+  zh: 的安全性并分析效率。
+#1  00:20.000 → 00:25.580  (5580 ms, 74 ch)
+  en: Now we show that the construction is secure under the standard assumption,
+  zh: 我们的实现使用AES-256
+#1  00:25.580 → 00:31.140  (5560 ms, 73 ch)
+  en: and we analyse its cost and the details of an implementation in practice.
+  zh: 加密所有数据块。
+#2  00:40.000 → 00:45.580  (5580 ms, 74 ch)
+  en: Now we show that the construction is secure under the standard assumption,
+  zh: 该算法的复杂度为O(n log n)
+#2  00:45.580 → 00:51.140  (5560 ms, 73 ch)
+  en: and we analyse its cost and the details of an implementation in practice.
+  zh: 而且常数因子很小。

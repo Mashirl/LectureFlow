@@ -1,0 +1,15 @@
+# Pinned to major versions (SPEC §1.2). Installed into the project .venv:
+#   .venv\Scripts\python.exe -m pip install -r worker\requirements.txt
+faster-whisper==1.2.*
+# PDF text extraction (SPEC-v3 V6): pypdf, BSD-3-Clause; exact pins. cryptography
+# (Apache-2.0 OR BSD-3-Clause) is pypdf's optional dependency for AES-encrypted PDFs
+# (many slide decks only carry an owner password); it pulls in cffi (MIT-0) and pycparser (BSD-3-Clause).
+pypdf==6.21.2
+cryptography==50.0.2
+pytest==9.*
+# PyAV 19 dropped av.open(metadata_errors=...), which faster-whisper 1.2.1 still passes.
+av==15.*
+# cuBLAS 12 / cuDNN 9 for ctranslate2 on CUDA (faster-whisper GPU instructions).
+# asr.py registers site-packages/nvidia/*/bin (Windows) or nvidia/*/lib (Linux) itself.
+nvidia-cublas-cu12==12.*; sys_platform == "win32" or sys_platform == "linux"
+nvidia-cudnn-cu12==9.*; sys_platform == "win32" or sys_platform == "linux"

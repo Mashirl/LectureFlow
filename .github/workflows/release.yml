@@ -1,0 +1,162 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
+#
+# Release build (SPEC-v3 V8–V10): on a version tag, build the installers on
+# Windows (NSIS + portable) and macOS arm64 (dmg + zip for updates), smoke
+# test them, and create a DRAFT GitHub Release with the installers,
+# blockmaps and the size reports. Nothing is published automatically. Every
+# action is pinned to a commit.
+#
+# Updates (V8): only when the repository variable LECTUREFLOW_UPDATE_REPO
+# ("owner/name") is set does the build contain an update feed
+# (app-update.yml) and produce update metadata (latest*.yml, uploaded with
+# the release). Without it the apps never check for updates.
+# LECTUREFLOW_PUBLISHER_NAME (variable, optional): Windows publisher name that
+# updates must be signed by (signed builds; default: the certificate's CN).
+#
+# ffmpeg for Windows is built from pinned sources on Linux first
+# (desktop/scripts/build-ffmpeg-windows.sh) and handed to the Windows job.
+#
+# Signing (V9) comes from repository secrets; when they are not set, the
+# build is unsigned and still succeeds (see docs/install.md):
+#   Windows: WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
+#   macOS:   MAC_CSC_LINK (base64 .p12), MAC_CSC_KEY_PASSWORD,
+#            APPLE_API_KEY (path written from APPLE_API_KEY_P8), APPLE_API_KEY_ID, APPLE_API_ISSUER
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  ffmpeg-windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The same cache as ci.yml: the key pins every input of the build, and a
+      # tag's run can read the caches of main.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache
+        with:
+          path: desktop/.cache/ffmpeg-windows-*
+          key: ffmpeg-windows-${{ hashFiles('desktop/scripts/build-ffmpeg-windows.sh', 'desktop/packaging/third-party.json') }}
+      - name: Build the LGPL ffmpeg for Windows (mingw-w64)
+        if: steps.cache.outputs.cache-hit != 'true'
+        # The build runs as root: drop its work and download directories,
+        # which the ffmpeg-windows-* patterns below would also match, and
+        # hand the output to the runner user for the cache and the upload.
+        run: |
+          sudo bash desktop/scripts/build-ffmpeg-windows.sh --install-deps
+          sudo rm -rf desktop/.cache/ffmpeg-windows-work desktop/.cache/ffmpeg-windows-downloads
+          sudo chown -R "$(id -u):$(id -g)" desktop/.cache
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ffmpeg-windows
+          path: desktop/.cache/ffmpeg-windows-*/
+          if-no-files-found: error
+          # The build is under desktop/.cache, which upload-artifact skips
+          # as a hidden directory unless told otherwise.
+          include-hidden-files: true
+
+  build:
+    needs: ffmpeg-windows
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Tag matches the app version
+        shell: bash
+        run: |
+          v=$(node -p "require('./desktop/package.json').version")
+          test "${GITHUB_REF_NAME}" = "v${v}" || { echo "tag ${GITHUB_REF_NAME} does not match desktop/package.json ${v}"; exit 1; }
+
+      - name: Desktop dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: runner.os == 'Windows'
+        with:
+          name: ffmpeg-windows
+          path: desktop/.cache/
+
+      - name: Apple API key file
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/apple-api-key.p8"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/apple-api-key.p8" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build installers (ffmpeg for macOS is built from source here)
+        working-directory: desktop
+        env:
+          CSC_LINK: ${{ runner.os == 'Windows' && secrets.WIN_CSC_LINK || secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          LECTUREFLOW_UPDATE_REPO: ${{ vars.LECTUREFLOW_UPDATE_REPO }}
+          LECTUREFLOW_PUBLISHER_NAME: ${{ vars.LECTUREFLOW_PUBLISHER_NAME }}
+        run: node scripts/dist.js --publish never
+
+      - name: Smoke test the packaged app
+        working-directory: desktop
+        env:
+          LECTUREFLOW_UPDATE_REPO: ${{ vars.LECTUREFLOW_UPDATE_REPO }}
+        run: node scripts/smoke.js
+
+      - name: Collect release files
+        shell: bash
+        run: |
+          mkdir -p out
+          cd desktop/dist
+          for f in *.exe *.dmg *.zip *.blockmap latest*.yml; do
+            [ -e "$f" ] && cp "$f" ../../out/
+          done
+          cp size-report.md "../../out/size-report-${RUNNER_OS}.md"
+          cp size-report.json "../../out/size-report-${RUNNER_OS}.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ runner.os }}
+          path: out/
+          if-no-files-found: error
+
+  draft-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          # Only the installers: the run's ffmpeg-windows artifact is a
+          # directory, which the release upload refuses.
+          pattern: installers-*
+          path: out
+          merge-multiple: true
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat out/size-report-*.md > notes.md
+          gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft \
+            --title "LectureFlow ${GITHUB_REF_NAME#v}" --notes-file notes.md out/*

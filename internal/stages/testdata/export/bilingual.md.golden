@@ -1,0 +1,20 @@
+**[00:00]** A human edit.
+
+好，我们开始。
+
+**[00:03]** The cache hierarchy.
+
+缓存层次结构。
+
+**[75:12]** A --> B at minute 75.
+
+A --> B，在第 75 分钟。
+
+**[75:20]** Untranslated.
+
+（未翻译）
+
+**[75:26]** So when the processor misses in the first level cache, it asks the second level, and only if that misses too does it go all the way out to main memory, which costs hundreds of cycles.
+
+所以当处理器在一级缓存中未命中时，它会访问二级缓存；只有二级缓存也未命中，才会一路访问主存，这要花费数百个周期。
+

@@ -1,0 +1,205 @@
+{
+ "checks": [
+  {
+   "name": "data_dir",
+   "status": "ok",
+   "detail": "./data 可写",
+   "hint": "",
+   "detail_info": {
+    "code": "check.dir_writable",
+    "params": {
+     "path": "./data"
+    }
+   }
+  },
+  {
+   "name": "ffmpeg",
+   "status": "ok",
+   "detail": "ffmpeg version 9.0.1",
+   "hint": ""
+  },
+  {
+   "name": "python",
+   "status": "ok",
+   "detail": "Python 3.13.15",
+   "hint": ""
+  },
+  {
+   "name": "faster-whisper",
+   "status": "ok",
+   "detail": "可以导入 faster_whisper",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "faster_whisper"
+    }
+   }
+  },
+  {
+   "name": "pypdf",
+   "status": "ok",
+   "detail": "可以导入 pypdf",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "pypdf"
+    }
+   }
+  },
+  {
+   "name": "gpu",
+   "status": "ok",
+   "detail": "总显存 12227 MB，剩余 6883 MB",
+   "hint": "",
+   "detail_info": {
+    "code": "check.gpu_vram",
+    "params": {
+     "total": 12227,
+     "free": 6883
+    }
+   }
+  },
+  {
+   "name": "cuda",
+   "status": "ok",
+   "detail": "SELFTEST ok device=cuda compute_type=float16 load_s=1.4 transcribe_s=0.71 segments=0",
+   "hint": ""
+  },
+  {
+   "name": "api_key:DeepSeek",
+   "status": "ok",
+   "detail": "已配置（sk-…7f3a）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…7f3a"
+    }
+   }
+  },
+  {
+   "name": "api:DeepSeek",
+   "status": "ok",
+   "detail": "连通（312 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 312
+    }
+   }
+  },
+  {
+   "name": "api_key:Anthropic",
+   "status": "ok",
+   "detail": "已配置（sk-…c2d9）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…c2d9"
+    }
+   }
+  },
+  {
+   "name": "api:Anthropic",
+   "status": "ok",
+   "detail": "连通（684 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 684
+    }
+   }
+  },
+  {
+   "name": "disk",
+   "status": "warn",
+   "detail": "剩余 4.2 GB",
+   "hint": "剩余空间少于 5 GB，建议删除不需要的讲座",
+   "detail_info": {
+    "code": "check.disk_free",
+    "params": {
+     "free_mb": 4300
+    }
+   },
+   "hint_info": {
+    "code": "check.hint_disk_warn"
+   }
+  }
+ ],
+ "gpu": {
+  "total_mb": 12227,
+  "free_mb": 6883,
+  "paused": false,
+  "slots_used": 1,
+  "slots_max": 1,
+  "estimated_job_mb": 5000
+ },
+ "api": {
+  "Anthropic": {
+   "inflight": 4,
+   "max": 4,
+   "rpm_limit": 50
+  },
+  "DeepSeek": {
+   "inflight": 3,
+   "max": 8,
+   "rpm_limit": 120
+  },
+  "OpenRouter": {
+   "inflight": 0,
+   "max": 4,
+   "rpm_limit": 60
+  }
+ },
+ "usage_today": {
+  "prompt_tokens": 2152400,
+  "cache_hit_tokens": 1786600,
+  "completion_tokens": 115200,
+  "estimated_cost": 2.71
+ },
+ "budget_hit": false,
+ "disk": {
+  "free_mb": 4300,
+  "data_mb": 9840,
+  "courses_mb": {
+   "01JC0000000000000000002120": 2210,
+   "01JC0000000000000000003121": 1460,
+   "01JC0000000000000000003311": 980,
+   "01JC0000000000000000003631": 4870,
+   "01JC000000000000000000RM01": 320
+  }
+ },
+ "config": {
+  "listen": "127.0.0.1:8420",
+  "data_dir": "./data",
+  "python": ".venv\\Scripts\\python.exe",
+  "python_openvino": ".venv-ov\\Scripts\\python.exe",
+  "ffmpeg": "ffmpeg",
+  "nvidia_smi": "nvidia-smi",
+  "worker_dir": "worker",
+  "log_level": "info",
+  "asr": {
+   "model": "large-v2",
+   "compute_type": "auto",
+   "device": "cuda",
+   "language": "en",
+   "max_parallel": 1,
+   "vram_reserve_mb": 1024,
+   "vram_per_job_mb": 5000,
+   "device_mode": "auto",
+   "multi_device": true,
+   "battery_aware": true,
+   "mem_reserve_mb": 2048
+  },
+  "general": {
+   "keep_original_media": true,
+   "notifications": true,
+   "daily_budget": 20
+  }
+ }
+}

@@ -1,0 +1,14 @@
+== input
+sentence #8  03:20.000 → 03:26.080
+  text:  So the ciphertext is sent over the channel together with the tag.
+  asr:   so um the the cipher text is sent over the channel together with the tag
+  words: so[200000-200220] um[200270-200490] the[200540-200820] the[200870-201150] cipher[201200-201660] text[201710-202050] is[202100-202320] sent[202370-202710] over[202760-203100] the[203150-203430] channel[203480-204000] together[204450-205030] with[205080-205420] the[205470-205750] tag[205800-206080]
+  zh:    所以密文会和标签一起通过信道发送。
+  times: So[200000-200220] the[200870-201150] ciphertext[201150-202100] is[202100-202320] sent[202370-202710] over[202760-203100] the[203150-203430] channel[203480-204000] together[204450-205030] with[205080-205420] the[205470-205750] tag.[205800-206080]
+== cues
+#8  03:20.000 → 03:23.150  (3150 ms, 30 ch)
+  en: So the ciphertext is sent over
+  zh: 所以密文会和
+#8  03:23.150 → 03:26.080  (2930 ms, 34 ch)
+  en: the channel together with the tag.
+  zh: 标签一起通过信道发送。

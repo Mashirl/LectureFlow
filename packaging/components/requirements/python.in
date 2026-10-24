@@ -1,0 +1,5 @@
+# Component "python": the base virtual environment (worker/extract_pdf.py, SPEC-v3 V6).
+# pypdf (BSD-3-Clause); cryptography (Apache-2.0 OR BSD-3-Clause) decrypts AES PDFs that
+# only carry an owner password. Same pins as worker/requirements.txt. No other PDF library.
+pypdf==6.21.2
+cryptography==50.0.2

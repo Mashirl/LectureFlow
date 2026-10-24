@@ -1,0 +1,96 @@
+{
+ "prompt_terms_used": 3,
+ "sentences": [
+  {
+   "start_ms": 0,
+   "end_ms": 3800,
+   "text": "Okay, let's get started with today's lecture.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 3800,
+   "end_ms": 8200,
+   "text": "Today we talk about the cash hierarchy in modern processors.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 8200,
+   "end_ms": 12600,
+   "text": "A right back cache only writes a line to memory on eviction.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 12600,
+   "end_ms": 16000,
+   "text": "Each cache line is 64 bytes on most x86 machines.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 16000,
+   "end_ms": 20400,
+   "text": "So the the first question is how we find a line in the cache.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 20400,
+   "end_ms": 25100,
+   "text": "We split the address into a tag, an index and an offset.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 25100,
+   "end_ms": 29800,
+   "text": "The index selects a set, and the tag tells us whether we have a hit.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 29800,
+   "end_ms": 34500,
+   "text": "With a direct mapped cache, every set has exactly one line.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 34500,
+   "end_ms": 39000,
+   "text": "That gives us conflict misses when two addresses map to the same set.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 39000,
+   "end_ms": 44200,
+   "text": "A two-way set associative cache halves the number of sets.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 44200,
+   "end_ms": 48300,
+   "text": "The miss rate drops from 5 percent to about 3 percent.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 48300,
+   "end_ms": 52700,
+   "text": "Blah lab is something we will see in the lab next week.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 52700,
+   "end_ms": 56900,
+   "text": "Finally, LRU replacement evicts the least recently used line.",
+   "low_conf_words": []
+  },
+  {
+   "start_ms": 56900,
+   "end_ms": 60000,
+   "text": "Any questions before we move on?",
+   "low_conf_words": []
+  }
+ ],
+ "timing": {
+  "load_s": 1.38,
+  "transcribe_s": 0.6,
+  "audio_s": 60.0,
+  "first_compile": false,
+  "peak_working_set_mb": 2683
+ }
+}

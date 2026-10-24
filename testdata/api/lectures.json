@@ -1,0 +1,280 @@
+[
+ {
+  "id": "01JLEC0000000000000000000B",
+  "course_id": "01JCRS0000000000000000000A",
+  "title": "Week 2 - Pipelining",
+  "created_at": "2026-10-16T20:00:00Z",
+  "stages": [
+   {
+    "stage": "prep",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-16T20:00:01Z",
+    "finished_at": "2026-10-16T20:00:30Z",
+    "duration_ms": 29000,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "asr",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-16T20:00:31Z",
+    "finished_at": "2026-10-16T20:06:10Z",
+    "duration_ms": 339000,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "summary",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-16T20:06:11Z",
+    "finished_at": "2026-10-16T20:06:40Z",
+    "duration_ms": 29000,
+    "stats": {
+     "prompt_tokens": 21000,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 900,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "repair",
+    "status": "stale",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-16T20:06:41Z",
+    "finished_at": "2026-10-16T20:08:00Z",
+    "duration_ms": 79000,
+    "stats": {
+     "prompt_tokens": 380000,
+     "cache_hit_tokens": 350000,
+     "completion_tokens": 12000,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "translate",
+    "status": "failed",
+    "progress": 0.63,
+    "attempt": 2,
+    "error": "网络不可用：dial tcp: lookup api.deepseek.com: no such host",
+    "allowed_actions": [
+     "retry"
+    ],
+    "started_at": "2026-10-16T20:08:01Z",
+    "finished_at": "2026-10-16T20:12:00Z",
+    "duration_ms": 239000,
+    "stats": {
+     "prompt_tokens": 500000,
+     "cache_hit_tokens": 480000,
+     "completion_tokens": 30000,
+     "estimated_cost": 0.12
+    }
+   },
+   {
+    "stage": "export",
+    "status": "pending",
+    "progress": 0,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [],
+    "waiting_for": "upstream:translate",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   }
+  ],
+  "counts": {
+   "sentences": 812,
+   "patches_pending": 14,
+   "zh_ok": 510,
+   "zh_qa_failed": 3,
+   "zh_stale": 0
+  },
+  "can_delete": true,
+  "reviewable": true,
+  "exports": [
+   {
+    "name": "Week 2 - Pipelining.bilingual.md",
+    "url": "/api/lectures/01JLEC0000000000000000000B/export/Week%202%20-%20Pipelining.bilingual.md",
+    "size": 182000
+   }
+  ],
+  "usage": {
+   "prompt_tokens": 901000,
+   "cache_hit_tokens": 830000,
+   "completion_tokens": 42900,
+   "estimated_cost": 0.12
+  }
+ },
+ {
+  "id": "01JLEC0000000000000000000A",
+  "course_id": "01JCRS0000000000000000000A",
+  "title": "Week 3 - Caching",
+  "created_at": "2026-10-23T20:00:00Z",
+  "stages": [
+   {
+    "stage": "prep",
+    "status": "done",
+    "progress": 1,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "rerun"
+    ],
+    "started_at": "2026-10-23T20:00:01Z",
+    "finished_at": "2026-10-23T20:00:40Z",
+    "duration_ms": 39000,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "asr",
+    "status": "running",
+    "progress": 0.42,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [
+     "cancel"
+    ],
+    "note": "首次运行，正在下载模型",
+    "started_at": "2026-10-23T20:00:41Z",
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "summary",
+    "status": "pending",
+    "progress": 0,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [],
+    "waiting_for": "upstream:asr",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "repair",
+    "status": "pending",
+    "progress": 0,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [],
+    "waiting_for": "upstream:summary",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "translate",
+    "status": "pending",
+    "progress": 0,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [],
+    "waiting_for": "upstream:repair",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   },
+   {
+    "stage": "export",
+    "status": "pending",
+    "progress": 0,
+    "attempt": 0,
+    "error": null,
+    "allowed_actions": [],
+    "waiting_for": "upstream:translate",
+    "started_at": null,
+    "finished_at": null,
+    "duration_ms": null,
+    "stats": {
+     "prompt_tokens": 0,
+     "cache_hit_tokens": 0,
+     "completion_tokens": 0,
+     "estimated_cost": null
+    }
+   }
+  ],
+  "counts": {
+   "sentences": 0,
+   "patches_pending": 0,
+   "zh_ok": 0,
+   "zh_qa_failed": 0,
+   "zh_stale": 0
+  },
+  "can_delete": false,
+  "reviewable": true,
+  "exports": [],
+  "usage": {
+   "prompt_tokens": 0,
+   "cache_hit_tokens": 0,
+   "completion_tokens": 0,
+   "estimated_cost": null
+  }
+ }
+]

@@ -1,0 +1,7 @@
+{
+  "chapters": [
+    {"start_idx": 0, "title_en": "Cache Hierarchy and Write-Back", "title_zh": "缓存层次与写回"},
+    {"start_idx": 4, "title_en": "Finding a Line: Tag, Index, Offset", "title_zh": "定位缓存行：标记、索引与偏移"},
+    {"start_idx": 7, "title_en": "Associativity and Conflict Misses", "title_zh": "相联度与冲突缺失"}
+  ]
+}

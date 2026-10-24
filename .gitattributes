@@ -1,0 +1,3 @@
+# Check out every file byte for byte as committed: golden files compare
+# exact bytes, and some test inputs keep their CRLF line endings on purpose.
+* -text

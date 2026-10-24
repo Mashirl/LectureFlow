@@ -1,0 +1,36 @@
+# MLX Whisper backend (SPEC-v3 V3.1, V5) for worker/asr_mlx.py.
+# Platform: macOS (darwin) arm64 only (Apple Silicon; mlx has no Windows wheels).
+# Do not install into .venv: the component "asr-mlx" gets its own virtual environment
+# under {data_dir}/components/asr-mlx/{version}/, created by uv from the hashed lock file
+# packaging/components/locks/asr-mlx-darwin-arm64.txt. The pins below are the same
+# versions as that lock (the packages worker/asr_mlx.py and mlx_whisper import at run time).
+#
+# Licenses (checked 2026-10-24 on PyPI metadata and the wheel):
+#   mlx-whisper 0.4.3 MIT (Apple, ml-explore/mlx-examples); mlx / mlx-metal MIT (Apple);
+#   numba BSD-2-Clause; llvmlite BSD-2-Clause AND Apache-2.0 WITH LLVM-exception;
+#   numpy BSD-3-Clause (+ 0BSD, MIT, Zlib, CC0-1.0); scipy BSD-3-Clause; tiktoken MIT;
+#   regex Apache-2.0 AND CNRI-Python; requests Apache-2.0; tqdm MPL-2.0 AND MIT;
+#   huggingface-hub Apache-2.0; more-itertools MIT; torch BSD-3-Clause family.
+#
+# worker/asr_mlx.py also imports worker/asr_common.py (standard library),
+# worker/asr.py and worker/asr_openvino.py (standard library at import time; numpy for
+# the wav and the chunk cuts).
+
+mlx-whisper==0.4.3
+mlx==0.29.3
+mlx-metal==0.29.3
+numpy==2.5.4
+numba==0.68.0
+llvmlite==0.50.0
+scipy==1.18.1
+tiktoken==0.14.0
+regex==2026.9.29
+requests==2.34.2
+tqdm==4.70.1
+huggingface-hub==2.3.0
+more-itertools==11.2.1
+
+# Declared by mlx-whisper but only used by mlx_whisper/torch_whisper.py (converting
+# PyTorch checkpoints); transcribing a pre-converted model (model:mlx:* components)
+# never imports it. Pinned to the lock's version because pip / uv install it anyway.
+torch==2.11.0

@@ -1,0 +1,40 @@
+{
+  "_doc": "Upstream projects whose protocol LectureFlow reimplemented without copying code (SPEC-v3 V14.6): their copyright and license notices are kept in THIRD_PARTY_NOTICES.md (section 9, texts in Appendix A). Each entry needs name, version, license (judged against the AGPL-3.0 table), copyright, source, what was used, the changes, and license_text: a copy of the upstream license file in packaging/licenses/texts/ with its sha256. When details names a file, that file must mention \"<name> <version>\" (keeps internal/colab/UPSTREAM.md and this table in step).",
+  "references": [
+    {
+      "name": "google-colab-cli",
+      "version": "0.7.5",
+      "license": "Apache-2.0",
+      "copyright": [
+        "Copyright 2026 Google LLC"
+      ],
+      "source": "https://pypi.org/project/google-colab-cli/0.7.5/",
+      "artifact": "google_colab_cli-0.7.5-py3-none-any.whl (sha256 2b303ed21ebd6da829f80d506224a6cd4f0e62d506fb373166d06a0532e516a9), read 2026-10-24, not installed, not run",
+      "used": "The protocol between the Colab CLI and the Colab service (ADC credentials and scopes, /tun/m assign / unassign / assignments / ccu-info, XSRF and proxy tokens, Jupyter Contents API and kernel execution on the runtime).",
+      "used_by": "internal/colab (Go)",
+      "changes": "Reimplemented in Go from the protocol; no upstream source was copied or translated line by line. Differences from upstream (queueing with back-off on 412, narrowed refresh scopes, token revocation, chunked uploads, own client agent string, no console/ssh) are listed in internal/colab/UPSTREAM.md.",
+      "details": "internal/colab/UPSTREAM.md",
+      "license_text": "packaging/licenses/texts/google-colab-cli-0.7.5.LICENSE",
+      "license_text_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "license_text_source": "google_colab_cli-0.7.5.dist-info/licenses/LICENSE in the wheel (the Apache-2.0 text; the copyright line is from the source file headers)"
+    },
+    {
+      "name": "jupyter-kernel-client",
+      "version": "0.9.0",
+      "license": "BSD-3-Clause",
+      "copyright": [
+        "Copyright (c) 2023-2024 Datalayer, Inc. (source file headers)",
+        "Copyright (c) 2025, Datalayer (LICENSE file)"
+      ],
+      "source": "https://pypi.org/project/jupyter-kernel-client/0.9.0/",
+      "artifact": "jupyter_kernel_client-0.9.0-py3-none-any.whl (sha256 77acb8f2f738d97625d6bd01ee8cf21c4d59790b7ba464108712db3870416f20), the version google-colab-cli 0.7.5 pins, read 2026-10-24, not installed, not run",
+      "used": "Only the Jupyter kernel channel protocol: kernel REST calls (start, list, shut down) and the WebSocket message framing of the kernel channels.",
+      "used_by": "internal/colab (Go: runtime.go, ws.go)",
+      "changes": "Reimplemented in Go from the protocol; no upstream source was copied or translated line by line. The WebSocket client is LectureFlow's own minimal RFC 6455 implementation.",
+      "details": "internal/colab/UPSTREAM.md",
+      "license_text": "packaging/licenses/texts/jupyter-kernel-client-0.9.0.LICENSE",
+      "license_text_sha256": "888ead28a5342901d93e31d09f37782edf695d2f14fbbdb08d3fcf6063f76b66",
+      "license_text_source": "jupyter_kernel_client-0.9.0.dist-info/licenses/LICENSE in the wheel"
+    }
+  ]
+}

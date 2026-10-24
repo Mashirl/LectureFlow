@@ -1,0 +1,54 @@
+# Copy to config.toml (not committed). API keys come from env vars.
+listen = "127.0.0.1:8420"
+data_dir = "./data"
+# Interpreter for worker/*.py. The default depends on the system:
+# .venv\Scripts\python.exe on Windows, .venv/bin/python elsewhere.
+# python = ".venv\\Scripts\\python.exe"
+# Interpreter of worker/asr_openvino.py (Intel GPU / NPU through OpenVINO,
+# SPEC-v2 I7): a separate environment, see worker/requirements-openvino.txt.
+# When it does not exist the Intel devices are simply not detected and
+# transcription keeps using the NVIDIA GPU (or the CPU). Default:
+# .venv-ov\Scripts\python.exe on Windows, .venv-ov/bin/python elsewhere.
+# python_openvino = ".venv-ov\\Scripts\\python.exe"
+ffmpeg = "ffmpeg"
+# nvidia_smi = "nvidia-smi"
+# log_level = "info"                   # "debug" also writes data/logs/llm/{job_id}.jsonl
+
+# Read once, on the first start of a new database (SPEC-v1.1 A5.1): since
+# then the transcription settings live on the settings page ("转写"), and
+# since phase 3b model, compute_type and max_parallel are per device
+# (SPEC-v2 I6; the first start of 3b moves them to the NVIDIA GPU's row).
+[asr]
+model = "large-v3"
+compute_type = "auto"         # auto | float16 | int8_float16 (SPEC §17.2)
+device = "cuda"               # cuda | cpu
+language = "en"
+vram_per_job_mb = 5000
+max_parallel = 1
+vram_reserve_mb = 1000
+worker_mem_budget_mb = 8192   # host memory of the transcription workers running at the same time (MB)
+# fake_result = "testdata/fake_asr.json"   # tests only (SPEC §14)
+# fake_result_openvino = "testdata/fake_asr_openvino.json"   # tests only: OpenVINO jobs (no word timestamps); test mode then also reports a fake Intel GPU and NPU
+
+[storage]
+keep_original_media = true
+
+[llm.providers.deepseek]
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+max_concurrency = 8
+requests_per_minute = 300
+
+[llm.roles]
+glossary = { provider = "deepseek", model = "deepseek-flash" }
+summary  = { provider = "deepseek", model = "deepseek-flash" }
+repair   = { provider = "deepseek", model = "deepseek-flash" }
+translate = { provider = "deepseek", model = "deepseek-flash", window = 3 }
+
+# Optional prices per million tokens (SPEC §17.7).
+# [llm.prices.deepseek."deepseek-flash"]
+# input = 0.0
+# cache_hit = 0.0
+# output = 0.0
+# [llm]
+# daily_budget = 0
