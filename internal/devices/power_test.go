@@ -66,14 +66,26 @@ func TestPowerBatteryMachine(t *testing.T) {
 	}
 }
 
-// The real readings: on Windows the calls succeed (the values depend on the
+// The real readings: on Windows and macOS the calls succeed (the values depend on the
 // machine); elsewhere they are unknown.
 func TestReadPowerAndMemory(t *testing.T) {
 	p := ReadPower()
 	mb, err := AvailableMemoryMB()
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
 		if p.Known || err == nil {
-			t.Fatalf("not Windows: %+v %d %v", p, mb, err)
+			t.Fatalf("not Windows/Darwin: %+v %d %v", p, mb, err)
+		}
+		return
+	}
+	if runtime.GOOS == "darwin" {
+		if !p.Known {
+			t.Fatalf("darwin: expected known power reading, got %+v", p)
+		}
+		if p.BatteryPct != nil && (*p.BatteryPct < 0 || *p.BatteryPct > 100) {
+			t.Fatalf("darwin power %+v", p)
+		}
+		if err == nil {
+			t.Fatalf("darwin: available memory expected error, got %d", mb)
 		}
 		return
 	}
@@ -82,5 +94,78 @@ func TestReadPowerAndMemory(t *testing.T) {
 	}
 	if p.BatteryPct != nil && (*p.BatteryPct < 0 || *p.BatteryPct > 100) {
 		t.Fatalf("power %+v", p)
+	}
+}
+
+func TestPowerFromPmset(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		out  string
+		want Power
+	}{
+		{
+			"MacBook on battery discharging",
+			"Now drawing from 'Battery Power'\n -InternalBattery-0 (id=36044899)\t76%; discharging; 6:52 remaining present: true",
+			Power{Known: true, OnBattery: true, HasBattery: true, BatteryPct: pct(76)},
+		},
+		{
+			"MacBook on AC charging",
+			"Now drawing from 'AC Power'\n -InternalBattery-0 (id=36044899)\t45%; charging; 1:30 remaining present: true",
+			Power{Known: true, HasBattery: true, BatteryPct: pct(45), Charging: true},
+		},
+		{
+			"MacBook on AC charged",
+			"Now drawing from 'AC Power'\n -InternalBattery-0 (id=36044899)\t100%; charged; 0:00 remaining present: true",
+			Power{Known: true, HasBattery: true, BatteryPct: pct(100)},
+		},
+		{
+			"MacBook on AC finishing charge",
+			"Now drawing from 'AC Power'\n -InternalBattery-0\t99%; finishing charge; 0:05 remaining present: true",
+			Power{Known: true, HasBattery: true, BatteryPct: pct(99), Charging: true},
+		},
+		{
+			"MacBook on AC not charging",
+			"Now drawing from 'AC Power'\n -InternalBattery-0 (id=36044899)\t80%; AC attached; not charging present: true",
+			Power{Known: true, HasBattery: true, BatteryPct: pct(80)},
+		},
+		{
+			"MacBook on AC discharging under heavy load",
+			"Now drawing from 'AC Power'\n -InternalBattery-0 (id=36044899)\t80%; discharging; 1:20 remaining present: true",
+			Power{Known: true, HasBattery: true, BatteryPct: pct(80)},
+		},
+		{
+			"Desktop Mac without battery",
+			"Now drawing from 'AC Power'\n",
+			Power{Known: true},
+		},
+		{
+			"Desktop Mac with UPS",
+			"Now drawing from 'UPS Power'\n",
+			Power{Known: true},
+		},
+		{
+			"Battery missing or not present",
+			"Now drawing from 'AC Power'\n -InternalBattery-0\t0%; present: false",
+			Power{Known: true},
+		},
+		{
+			"No header but discharging",
+			" -InternalBattery-0 (id=123)\t55%; discharging; 3:10 remaining present: true",
+			Power{Known: true, OnBattery: true, HasBattery: true, BatteryPct: pct(55)},
+		},
+		{
+			"Empty output",
+			"",
+			Power{},
+		},
+		{
+			"Command error output",
+			"Error: pmset failed",
+			Power{},
+		},
+	} {
+		if got := PowerFromPmset(c.out); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: got %+v, want %+v", c.name, got, c.want)
+		}
 	}
 }

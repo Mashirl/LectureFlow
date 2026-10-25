@@ -15,6 +15,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -98,6 +99,73 @@ func PowerFromStatus(acLine, batteryFlag, lifePercent, systemStatus byte) Power 
 	if lifePercent != batteryLifeUnknown && lifePercent <= 100 {
 		v := int(lifePercent)
 		p.BatteryPct = &v
+	}
+	return p
+}
+
+// PowerFromPmset maps the output of macOS `pmset -g batt` to a Power (pure,
+// for testing on any platform).
+//
+// A desktop Mac (Mac mini, Mac Studio, Mac Pro, iMac) prints only the power
+// source ("Now drawing from 'AC Power'"); a laptop includes an " -InternalBattery-..."
+// line with the remaining percentage and charging / discharging status.
+func PowerFromPmset(out string) Power {
+	trimmed := strings.TrimSpace(out)
+	if trimmed == "" {
+		return Power{}
+	}
+	var p Power
+	switch {
+	case strings.Contains(trimmed, "'Battery Power'") || strings.Contains(trimmed, "Now drawing from 'Battery Power'"):
+		p.Known, p.OnBattery = true, true
+	case strings.Contains(trimmed, "'UPS Power'") || strings.Contains(trimmed, "Now drawing from 'UPS Power'"):
+		p.Known, p.OnBattery = true, true
+	case strings.Contains(trimmed, "'AC Power'") || strings.Contains(trimmed, "Now drawing from 'AC Power'"):
+		p.Known = true
+	}
+	hasBattery := strings.Contains(trimmed, "InternalBattery")
+	if !p.Known && hasBattery {
+		lower := strings.ToLower(trimmed)
+		if strings.Contains(lower, "discharging") {
+			p.Known, p.OnBattery = true, true
+		} else if strings.Contains(lower, "charging") || strings.Contains(lower, "charged") || strings.Contains(lower, "ac attached") {
+			p.Known = true
+		}
+	}
+	if !p.Known {
+		return Power{}
+	}
+	if !hasBattery {
+		p.OnBattery = false
+		return p
+	}
+	p.HasBattery = true
+	for _, line := range strings.Split(trimmed, "\n") {
+		if !strings.Contains(line, "InternalBattery") {
+			continue
+		}
+		lineLower := strings.ToLower(line)
+		if strings.Contains(lineLower, "present: false") {
+			p.HasBattery, p.OnBattery = false, false
+			return p
+		}
+		if pctIdx := strings.Index(line, "%"); pctIdx > 0 {
+			start := pctIdx - 1
+			for start >= 0 && line[start] >= '0' && line[start] <= '9' {
+				start--
+			}
+			if start < pctIdx-1 {
+				if val, err := strconv.Atoi(line[start+1 : pctIdx]); err == nil && val >= 0 && val <= 100 {
+					p.BatteryPct = &val
+				}
+			}
+		}
+		if !p.OnBattery {
+			p.Charging = (strings.Contains(lineLower, "charging") || strings.Contains(lineLower, "finishing charge")) &&
+				!strings.Contains(lineLower, "not charging") &&
+				!strings.Contains(lineLower, "discharging")
+		}
+		break
 	}
 	return p
 }
