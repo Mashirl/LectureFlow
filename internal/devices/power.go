@@ -116,11 +116,11 @@ func PowerFromPmset(out string) Power {
 	}
 	var p Power
 	switch {
-	case strings.Contains(trimmed, "'Battery Power'") || strings.Contains(trimmed, "Now drawing from 'Battery Power'"):
+	case strings.Contains(trimmed, "'Battery Power'"):
 		p.Known, p.OnBattery = true, true
-	case strings.Contains(trimmed, "'UPS Power'") || strings.Contains(trimmed, "Now drawing from 'UPS Power'"):
+	case strings.Contains(trimmed, "'UPS Power'"):
 		p.Known, p.OnBattery = true, true
-	case strings.Contains(trimmed, "'AC Power'") || strings.Contains(trimmed, "Now drawing from 'AC Power'"):
+	case strings.Contains(trimmed, "'AC Power'"):
 		p.Known = true
 	}
 	hasBattery := strings.Contains(trimmed, "InternalBattery")
