@@ -162,6 +162,9 @@ type Backend struct {
 	rates         map[string]Rate
 	cooldownUntil time.Time
 	lastErr       *model.ErrorInfo
+
+	loginMu sync.Mutex
+	login   *Login // the in-app Google sign-in (login.go); nil until Login is first called
 }
 
 type ccuSnapshot struct {
@@ -309,11 +312,20 @@ func (b *Backend) SetSettings(ctx context.Context, s Settings) error {
 // DetectADC is "检测授权": is gcloud's credential file there and importable?
 func (b *Backend) DetectADC() ADCInfo { return DetectADC(b.o.ADCPath) }
 
-// ImportADC imports gcloud's application default credentials with the
-// user's lifecycle (V14.2), checking them with one token refresh. A
-// leftover session that waited for a credential is released afterwards.
+// ImportADC imports the user's own gcloud application default credentials
+// with the user's lifecycle (V14.2), checking them with one token refresh;
+// the credential's source is SourceGcloud. A leftover session that waited
+// for a credential is released afterwards.
 func (b *Backend) ImportADC(ctx context.Context, lc Lifecycle) (CredentialInfo, error) {
-	info, err := b.auth.importADC(ctx, b.o.ADCPath, lc)
+	return b.ImportADCFile(ctx, b.o.ADCPath, lc, SourceGcloud)
+}
+
+// ImportADCFile is ImportADC for the ADC file at path, recording source
+// (SourceApp: the in-app sign-in imports the file gcloud wrote into its own
+// configuration directory; anything but SourceApp is stored as
+// SourceGcloud).
+func (b *Backend) ImportADCFile(ctx context.Context, path string, lc Lifecycle, source string) (CredentialInfo, error) {
+	info, err := b.auth.importADC(ctx, path, lc, source)
 	if err != nil {
 		return info, b.secrets.scrubErr(err)
 	}
@@ -339,13 +351,18 @@ type DisconnectResult struct {
 	// Released: a runtime was given back first.
 	Released bool              `json:"released"`
 	Warnings []model.ErrorInfo `json:"warnings,omitempty"`
+	// Source of the credential that was stored (SourceApp, SourceGcloud;
+	// "" when there was none).
+	Source string `json:"source,omitempty"`
 }
 
 // Disconnect ends the running lecture (back to the queue), releases the
 // runtime, revokes the credential at Google and deletes the local copy
 // (V14.2). A failed revocation still deletes the local copy and is
-// reported as a warning. Note: gcloud's own ADC file holds the same refresh
-// token, so revoking also signs gcloud's application-default login out.
+// reported as a warning. Note: a SourceGcloud credential is the user's own
+// gcloud ADC file's refresh token, so revoking it also signs gcloud's
+// application-default login out; a SourceApp one was only ever in the
+// app's sign-in directory (wiped after the import).
 func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 	var res DisconnectResult
 	b.stopJob(errShutdownNow, 30*time.Second)
@@ -359,8 +376,8 @@ func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 			res.Released = true
 		}
 	}
-	revoked, err := b.auth.revokeAndDelete(ctx)
-	res.Revoked = revoked
+	revoked, source, err := b.auth.revokeAndDelete(ctx)
+	res.Revoked, res.Source = revoked, source
 	if err != nil {
 		if Code(err) == "" {
 			return res, err // the database failed: the local copy may still be there
@@ -370,9 +387,11 @@ func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 	return res, nil
 }
 
-// Close is called when the app quits: the runtime is released, and a
-// credential with the "session" lifecycle is deleted (its run ends).
+// Close is called when the app quits: a running in-app sign-in is
+// cancelled, the runtime is released, and a credential with the "session"
+// lifecycle is deleted (its run ends).
 func (b *Backend) Close(ctx context.Context) error {
+	b.closeLogin() // a running gcloud sign-in ends with the app (login.go)
 	b.stopJob(errShutdownNow, 10*time.Second)
 	err := b.release(ctx, ReleaseAppExit)
 	if v, ok, _ := getKV(ctx, b.o.KV, KVCredential); ok {

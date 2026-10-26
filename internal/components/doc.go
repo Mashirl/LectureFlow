@@ -8,8 +8,9 @@
 // HTTP Range resume, pause / resume / cancel, SHA-256 verification with one
 // retry, mirror sources with automatic fallback to the default source,
 // python-build-standalone runtimes, uv virtual environments from hash-pinned
-// lock files, offline component archives, uninstall, and updates that keep
-// the old version until the new one passed its self-test.
+// lock files, vendor tools (the Google Cloud CLI, tool.go), offline
+// component archives, uninstall, and updates that keep the old version
+// until the new one passed its self-test.
 //
 // Layout under {data_dir}/components (state.json stores only paths relative
 // to this directory, so the whole data directory can move, V1.3):
@@ -23,6 +24,7 @@
 //	{dir}/{version}/runtime/           python component: the unpacked python-build-standalone archive
 //	{dir}/{version}/model/             model components
 //	{dir}/{version}/bin/               binary components
+//	{dir}/{version}/tool/              tool components: the vendor's archive (ToolPath, ToolEnv)
 //	{dir}/.s{n}/                       work in progress (n = 1, 2, …, created exclusively); renamed to {version}
 //	                                   when complete (".staging-{version}-{task}" before V12.2; both are removed at start)
 //	.imports/{task}.zip                ImportFile: the private copy of the archive (removed when the task ends and at start)

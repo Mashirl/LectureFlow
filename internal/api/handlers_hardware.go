@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -43,6 +44,14 @@ type HardwareRecommendation struct {
 type HardwareView struct {
 	HW             hwdetect.HW            `json:"hw"`
 	Recommendation HardwareRecommendation `json:"recommendation"`
+	// PlanError (3.1.0, M2) is why the component manager cannot plan the
+	// recommendation as it stands (components.unknown,
+	// components.unsupported_platform, components.unavailable,
+	// components.path_too_long, …); null when it can, or when there is no
+	// component manager. With an error, recommendation.download_bytes is
+	// only what could be planned (or the recommendation's estimate) and the
+	// page shows the error instead of the size.
+	PlanError *model.ErrorInfo `json:"plan_error"`
 }
 
 func (s *Server) getHardware(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +68,11 @@ func (s *Server) respondHardware(w http.ResponseWriter, r *http.Request, fresh b
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s.hardwareView(hw))
+	v := s.hardwareView(hw)
+	if v.PlanError != nil {
+		slog.Info("hardware: the recommendation cannot be planned", "code", v.PlanError.Code, "params", v.PlanError.Params)
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 // hardware returns the cached detection, detecting when there is none or
@@ -96,7 +109,18 @@ func (s *Server) hardwareView(hw hwdetect.HW) HardwareView {
 	if s.comps == nil || len(rec.Components) == 0 {
 		return v
 	}
-	// Plan only what this platform's manifest has (the recommendation may
+	// The whole recommendation first: this is what "按推荐安装" installs.
+	p, err := s.comps.Plan(rec.Components)
+	if err == nil {
+		v.Recommendation.DownloadBytes = p.DownloadBytes
+		return v
+	}
+	_, info := classify(context.Background(), err, "", nil)
+	if info.Code == "" || info.Code == "server.internal" {
+		info = model.ErrorInfo{Code: "server.internal", Detail: err.Error()}
+	}
+	v.PlanError = &info
+	// The size of what this platform's manifest has (the recommendation may
 	// name a component the manifest lists as unavailable or not at all).
 	known := map[string]bool{}
 	for _, c := range s.comps.List() {

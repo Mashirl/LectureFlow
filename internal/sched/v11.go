@@ -48,9 +48,11 @@ var ErrDeleteTimeout = fmt.Errorf("讲座的任务没有在 15 秒内停止，�
 const DefaultDeleteWait = 15 * time.Second
 
 // Launch implements A3 "启动" for one draft: current snapshots from
-// settings.CurrentSnapshots (ErrRoleNotConfigured is returned as is), then
-// state.Launch. Errors: db.ErrNotFound, state.ErrAlreadyLaunched,
-// settings.ErrRoleNotConfigured.
+// LaunchSnapshots (settings.CurrentSnapshots; with no lecture role
+// configured, SPEC-v3 V4.2 "只转写", empty LLM snapshots that are recorded
+// when those stages can start, transcribe_only.go; ErrRoleNotConfigured is
+// returned as is), then state.Launch. Errors: db.ErrNotFound,
+// state.ErrAlreadyLaunched, settings.ErrRoleNotConfigured.
 func (s *Scheduler) Launch(ctx context.Context, lectureID string) error {
 	l, err := s.st.GetLecture(ctx, lectureID)
 	if err != nil {
@@ -59,7 +61,7 @@ func (s *Scheduler) Launch(ctx context.Context, lectureID string) error {
 	if !state.IsDraft(l) {
 		return state.ErrAlreadyLaunched
 	}
-	snaps, err := s.set.CurrentSnapshots()
+	snaps, err := s.LaunchSnapshots()
 	if err != nil {
 		return err
 	}
@@ -203,11 +205,17 @@ func (s *Scheduler) autoASRCompare(j *model.Job, current string) asrCompare {
 // stages, in the format launch writes (settings.CurrentSnapshots). When some
 // role elsewhere in the pipeline is not configured, only the listed stages
 // are resolved; an error (settings.ErrRoleNotConfigured) means the role of
-// one of the listed stages is not configured.
-func (s *Scheduler) currentSnapshots(stages []string) (map[string]string, error) {
+// one of the listed stages is not configured. deferred (a "只转写" lecture
+// whose LLM snapshots are still to be recorded, transcribe_only.go): the
+// LLM stages get the empty snapshot, they are recorded when they start.
+func (s *Scheduler) currentSnapshots(stages []string, deferred bool) (map[string]string, error) {
 	all, err := s.set.CurrentSnapshots()
 	out := make(map[string]string, len(stages))
 	for _, st := range stages {
+		if deferred && isLectureLLMStage(st) {
+			out[st] = model.EmptySnapshot
+			continue
+		}
 		if err == nil {
 			out[st] = all[st]
 			continue
@@ -327,7 +335,14 @@ func rerunnable(jobs []model.Job, stage string) error {
 // lecture: the NewSnapshots of state.RerunOpts (nil = keep every snapshot).
 func (s *Scheduler) rerunSnapshots(lectureID string, jobs []model.Job, stage, choice string) (map[string]string, error) {
 	stages := withDownstream(stage)
-	cur, curErr := s.currentSnapshots(stages)
+	deferred := deferredLLM(jobs)
+	cur, curErr := s.currentSnapshots(stages, deferred)
+	if deferred {
+		// "只转写": no recorded model to keep or to compare for the LLM
+		// stages (their empty snapshots equal cur's); they take the
+		// settings when they start (transcribe_only.go).
+		stages = withoutLLM(stages)
+	}
 	switch choice {
 	case model.ModelChoiceCurrent:
 		if curErr != nil {
@@ -455,7 +470,11 @@ func (s *Scheduler) Retry(ctx context.Context, scope, scopeID, stage, choice str
 				check = append(check, d)
 			}
 		}
-		cur, curErr := s.currentSnapshots(withDownstream(stage))
+		deferred := deferredLLM(jobs)
+		if deferred {
+			check = withoutLLM(check) // "只转写": recorded when they start (transcribe_only.go)
+		}
+		cur, curErr := s.currentSnapshots(withDownstream(stage), deferred)
 		switch choice {
 		case "":
 			if bad := s.unusable(scopeID, jobs, check, cur); len(bad) > 0 {

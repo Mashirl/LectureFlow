@@ -84,9 +84,9 @@ type Detection struct {
 	CUDAErr  string    // why nvidia-smi gave no name ("" when it did)
 	Python   string    // the OpenVINO interpreter of the probe: the asr-openvino component's, else python_openvino
 	OV       *OVProbe  // nil when the probe did not run or failed
-	// OVErr is why there are no OpenVINO devices: CodeOVPythonMissing,
-	// CodeOVImportFailed or CodeProbeFailed (Detail = the raw text); nil
-	// when the probe ran.
+	// OVErr is why there are no OpenVINO devices: CodeOVNotInstalled,
+	// CodeOVPythonMissing, CodeOVImportFailed or CodeProbeFailed (Detail =
+	// the raw text); nil when the probe ran.
 	OVErr *model.ErrorInfo
 	// MLX is the label of the Apple GPU when mlx:gpu was found (SPEC-v3 V5:
 	// Apple Silicon and the python_mlx interpreter exists); "" otherwise.
@@ -124,6 +124,9 @@ type Registry struct {
 	cfg     *config.Config
 	dataDir string
 	o       RegistryOptions
+	// goos is GOOS when the registry was made: the system whose rules
+	// apply (fw:cpu, platform.go).
+	goos string
 
 	mu    sync.RWMutex
 	hooks []func()
@@ -158,7 +161,7 @@ func NewRegistry(st db.Store, cfg *config.Config, dataDir string, o RegistryOpti
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	return &Registry{st: st, cfg: cfg, dataDir: dataDir, o: o, dismissed: map[string]bool{}, present: map[string]bool{}}
+	return &Registry{st: st, cfg: cfg, dataDir: dataDir, o: o, goos: GOOS, dismissed: map[string]bool{}, present: map[string]bool{}}
 }
 
 // Load (re)reads the rows and the dismissed-prompt marks into the cache.
@@ -227,7 +230,8 @@ func (r *Registry) nowRFC3339() string { return r.o.Now().UTC().Format(time.RFC3
 // the NVIDIA name (o.CUDAName), created when an NVIDIA GPU answers or the
 // database has an asr job that ran (an existing CUDA user whose nvidia-smi
 // failed this time; label "NVIDIA GPU", detected_at NULL); device cpu →
-// fw:cpu the same way (always created). The migrated row's workbench
+// fw:cpu the same way (always created, except where faster-whisper cannot
+// run: macOS, mac-opti M5). The migrated row's workbench
 // prompt is marked dismissed (it is not a new device). A fresh install
 // without NVIDIA gets no cuda:0. migrated reports whether rows were
 // written in this call.
@@ -279,7 +283,9 @@ func (r *Registry) MigrateLegacy(ctx context.Context, a model.ASRSettings) (migr
 		}
 		var rows []model.ASRDevice
 		if a.Device == "cpu" {
-			rows = append(rows, legacyRow(model.DeviceFWCPU, LabelFWCPU, true, true))
+			if r.fwCPU() { // mac-opti M5: no fw:cpu where faster-whisper cannot run
+				rows = append(rows, legacyRow(model.DeviceFWCPU, LabelFWCPU, true, true))
+			}
 			if cudaName != "" {
 				rows = append(rows, legacyRow(model.DeviceCUDA0, cudaName, true, false))
 			}
@@ -361,7 +367,9 @@ func asrRan(ctx context.Context, st db.Store) (bool, error) {
 // NPU row in the database, present or not, and none found by this
 // detection; Gate round 2), disabled otherwise (the user can enable it),
 // its workbench prompt dismissed (it is built in, not a new device), and
-// not listed in newIDs.
+// not listed in newIDs. Where faster-whisper cannot run (macOS, mac-opti
+// M5, platform.go) there is no fw:cpu: Detect neither inserts nor touches
+// it.
 func (r *Registry) Detect(ctx context.Context) (d Detection, newIDs []string, err error) {
 	r.detectMu.Lock()
 	defer r.detectMu.Unlock()
@@ -448,7 +456,11 @@ func (r *Registry) Detect(ctx context.Context) (d Detection, newIDs []string, er
 				}
 			}
 		}
-		// fw:cpu is never probed: it is always there, and always has a row.
+		// fw:cpu is never probed: it is always there, and always has a row
+		// (except where faster-whisper cannot run, mac-opti M5).
+		if !r.fwCPU() {
+			return nil
+		}
 		row, err := tx.GetASRDevice(ctx, model.DeviceFWCPU)
 		switch {
 		case errors.Is(err, db.ErrNotFound):
@@ -489,7 +501,9 @@ func (r *Registry) Detect(ctx context.Context) (d Detection, newIDs []string, er
 		for id := range seen {
 			present[id] = true
 		}
-		present[model.DeviceFWCPU] = true
+		if r.fwCPU() {
+			present[model.DeviceFWCPU] = true
+		}
 		r.mu.Lock()
 		r.detected, r.present, r.last = true, present, d
 		r.mu.Unlock()
@@ -584,15 +598,22 @@ func (r *Registry) List() []model.ASRDevice {
 		if isRemoteID(d.ID) && !r.remote {
 			continue // SPEC-v3 V14: in the table only while Colab is enabled and authorised
 		}
+		if r.hiddenLocked(d.ID) {
+			continue // mac-opti M5: fw:cpu where faster-whisper cannot run
+		}
 		out = append(out, cloneDevice(d))
 	}
 	return out
 }
 
-// Get returns one row.
+// Get returns one row (none for fw:cpu where faster-whisper cannot run,
+// mac-opti M5).
 func (r *Registry) Get(id string) (model.ASRDevice, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	if r.hiddenLocked(id) {
+		return model.ASRDevice{}, false
+	}
 	if d, ok := r.rowLocked(id); ok {
 		return cloneDevice(d), true
 	}
@@ -621,7 +642,8 @@ func cloneDevice(d model.ASRDevice) model.ASRDevice {
 }
 
 // Present reports whether the last detection saw the device (before the
-// first detection: whether its detected_at is set). fw:cpu is always present.
+// first detection: whether its detected_at is set). fw:cpu is always
+// present, except where faster-whisper cannot run (never; mac-opti M5).
 func (r *Registry) Present(id string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -630,7 +652,7 @@ func (r *Registry) Present(id string) bool {
 
 func (r *Registry) presentLocked(id string) bool {
 	if id == model.DeviceFWCPU {
-		return true
+		return r.fwCPU()
 	}
 	if isRemoteID(id) {
 		return r.remote // never detected: Colab is enabled and authorised (SetRemote)
@@ -663,6 +685,9 @@ func (r *Registry) Update(ctx context.Context, id string, p model.ASRDevicePatch
 	var out model.ASRDevice
 	r.wmu.Lock()
 	err := r.st.Tx(ctx, func(tx db.Store) error {
+		if r.hiddenLocked(id) {
+			return notFound(id) // mac-opti M5: not a device of this system
+		}
 		d, err := tx.GetASRDevice(ctx, id)
 		if errors.Is(err, db.ErrNotFound) {
 			return notFound(id)
@@ -748,8 +773,11 @@ func (r *Registry) Reorder(ctx context.Context, ids []string) ([]model.ASRDevice
 		for _, d := range rows {
 			byID[d.ID] = d
 		}
-		if hidden := r.hiddenRemote(rows); hidden != "" && len(ids) == len(rows)-1 && !slices.Contains(ids, hidden) {
-			ids = append(slices.Clone(ids), hidden) // a hidden colab:remote row keeps the last place
+		// Rows List hides (a colab:remote not present, fw:cpu where it
+		// cannot run) keep the last places when the order leaves them out.
+		if hidden := r.hiddenIDs(rows); len(hidden) > 0 && len(ids) == len(rows)-len(hidden) &&
+			!slices.ContainsFunc(ids, func(id string) bool { return slices.Contains(hidden, id) }) {
+			ids = append(slices.Clone(ids), hidden...)
 		}
 		if len(ids) != len(rows) {
 			return orderInvalid()
@@ -831,6 +859,9 @@ func (r *Registry) ApplyBenchmark(ctx context.Context, id, mdl, precision string
 	mdl, precision = strings.TrimSpace(mdl), strings.TrimSpace(precision)
 	r.wmu.Lock()
 	err := r.st.Tx(ctx, func(tx db.Store) error {
+		if r.hiddenLocked(id) {
+			return notFound(id) // mac-opti M5: not a device of this system
+		}
 		d, err := tx.GetASRDevice(ctx, id)
 		if errors.Is(err, db.ErrNotFound) {
 			return notFound(id)
@@ -913,6 +944,9 @@ func (r *Registry) Prompts() []model.ASRDevice {
 func (r *Registry) DismissPrompt(ctx context.Context, id string) error {
 	r.wmu.Lock()
 	err := r.st.Tx(ctx, func(tx db.Store) error {
+		if r.hiddenLocked(id) {
+			return notFound(id)
+		}
 		if _, err := tx.GetASRDevice(ctx, id); errors.Is(err, db.ErrNotFound) {
 			return notFound(id)
 		} else if err != nil {
@@ -963,8 +997,8 @@ func (r *Registry) CurrentASRSnapshot(a model.ASRSettings) (model.ASRSnapshot, b
 		if !d.Enabled || (a.DeviceMode == model.ASRDeviceModeManual && !slices.Contains(a.ManualDevices, d.ID)) {
 			continue
 		}
-		if isRemoteID(d.ID) && !r.remote {
-			continue // not in the table (SPEC-v3 V14)
+		if (isRemoteID(d.ID) && !r.remote) || r.hiddenLocked(d.ID) {
+			continue // not in the table (SPEC-v3 V14; mac-opti M5)
 		}
 		if r.presentLocked(d.ID) {
 			return model.ASRDeviceSnapshot(*d, a.Language, true), true

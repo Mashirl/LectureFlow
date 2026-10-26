@@ -22,6 +22,14 @@
 //
 // Progress follows the SSE "components" event (api.js onComponentsEvent);
 // while the stream is not delivering it, the task is polled every second.
+//
+// 3.1.0 (lead, after reproducing M2 on a Mac): the install no longer waits
+// for step 5. startChosenInstall starts it in the background as soon as the
+// data folder is confirmed (or, without that step, the transcription mode
+// is chosen), so leaving the onboarding at the API-key step still installs
+// everything; step 5 follows that task (data.task_id / data.gcloud_task_id)
+// and starts one itself only when none was started (older saved states,
+// skipped steps).
 
 import { h, btn } from './dom.js';
 import { icon } from './icons.js';
@@ -33,6 +41,41 @@ import { taskView, taskActive, chooseSourcesDialog } from './components_ui.js';
 
 const POLL_MS = 1000;
 const BACKENDS = ['asr-cuda', 'asr-openvino', 'asr-mlx'];
+
+// ---- starting the install early (3.1.0) ----
+
+/**
+ * Starts the downloads of the chosen transcription mode in the background:
+ * local (or no mode) → data.components, remote → ["gcloud"]. Nothing when
+ * there is nothing to install, everything is installed, or the task it
+ * started before is still running. The task id is saved (data.task_id,
+ * data.gcloud_task_id). Failures are quiet: step 5 starts the install again
+ * and says what happened.
+ */
+export async function startChosenInstall(env) {
+  const remote = env.data.asr_mode === 'remote';
+  const ids = remote ? ['gcloud'] : Array.isArray(env.data.components) ? env.data.components : [];
+  if (!ids.length) return;
+  const key = remote ? 'gcloud_task_id' : 'task_id';
+  const list = await obApi.components({ quiet: true }).catch(() => null);
+  if (!list) return;
+  const comps = list.components || [];
+  const tasks = list.tasks || [];
+  const known = new Set(comps.map((c) => c.id));
+  const installed = new Set(comps.filter((c) => c.state === 'installed').map((c) => c.id));
+  if (ids.every((id) => installed.has(id) || !known.has(id))) return;
+  if (tasks.some((x) => x.id === env.data[key] && taskActive(x))) return;
+  try {
+    const r = await obApi.install(ids, { quiet: true });
+    if (r && r.task) env.data[key] = r.task.id;
+  } catch (e) {
+    // already being installed by another task: follow that one
+    const tk = e.status === 409 ? ((await obApi.tasks({ quiet: true }).catch(() => [])) || []).filter((x) => taskActive(x) && (x.ids || []).some((id) => ids.includes(id))).pop() : null;
+    if (!tk) return;
+    env.data[key] = tk.id;
+  }
+  await env.save();
+}
 
 // ---- step 5 ----
 

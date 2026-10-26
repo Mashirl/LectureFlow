@@ -113,7 +113,7 @@ LectureFlow 是一个运行在你自己电脑上的讲座工具。把课程录�
 | NVIDIA CUDA | 已支持 | 你甚至可以用 A100！只要你有。~~（维护者需要六块 A100 来测试这个项目）~~ |
 | Intel 核显（Iris Xe / Arc / Xe3） | 已支持 | 意外地强，调好配置后能和独显有来有回。 |
 | Intel NPU | 已支持 | 适合带“Copilot+ PC”标识的轻薄本拔电时用；光有 Copilot 按键不够。 |
-| Apple MLX | 实验性 ? | Only Apple can do. 尚未在真机上验证。 |
+| Apple MLX | 已支持 | Only Apple can do. 已在 Mac mini（Apple M6）上测试；还没在用电池的 MacBook 上试过。 |
 | Google Colab | 已支持 | 借 Google 的卡，自动开机、转写、关机。付费额度推荐，免费层尽力而为。 |
 | AMD 显卡 / APU | 计划中 \* ? | 还没找到设备测试，会有的。 |
 | CPU | 仅台式机兜底 ! | 反正都是计算，前提是跑得动。笔记本上坚决不用。 |
@@ -141,7 +141,7 @@ LectureFlow 是一个运行在你自己电脑上的讲座工具。把课程录�
 
 ## 开始使用
 
-1. 从 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下载对应系统的安装包：Windows 用 `LectureFlow-Setup-3.0.0-x64.exe`（或便携版），Apple Silicon Mac 用 `LectureFlow-3.0.0-arm64.dmg`。
+1. 从 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下载对应系统的安装包：Windows 用 `LectureFlow-Setup-3.1.0-x64.exe`（或便携版），Apple Silicon Mac 用 `LectureFlow-3.1.0-arm64.dmg`。
 2. 安装包目前没有代码签名，系统会弹出安全提示，放行方法见 [docs/install.md](docs/install.md)。
 3. 打开 LectureFlow，跟着引导走几步：选择语言、检测电脑、选择费用档位、下载组件。每一步都可以跳过，之后再回来。
 4. 添加一门课程：填写课程名称和开课日期，可以顺便粘贴课程大纲、上传课件（不是必须的，但能明显提高专业术语的准确度）。
@@ -158,7 +158,8 @@ English · 简体中文 · 繁體中文（台灣） · 粵語（香港） · Р�
 ## 局限
 
 - **目前只在计算机科学专业的学生中测试过**，讲座语言为英语、翻译目标为简体中文。医学、法律、人文等学科的术语和讲课风格不同，效果可能有差别，欢迎告诉我们。
-- macOS 与 Apple Silicon 尚未在真机上验证。
+- macOS 只在 Mac mini（Apple M6，macOS 27）上测试过，还没在用电池的 MacBook 上试过。
+- Whisper 的 large-v3 系列（包括 Mac 上默认的 large-v3-turbo）常常漏掉标点和大小写，large-v2 没有这个问题。会在之后的版本中解决。
 - AMD ROCm 尚未支持；多推理后端的调度还不够智能。
 - 自动转写、修复和翻译都可能出错，重要的内容请回到原声确认。
 - 它为**有参考资料的知识型内容**设计，不是通用的视频字幕工具：电影、动画、直播请找更合适的工具。

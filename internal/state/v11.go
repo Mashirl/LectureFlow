@@ -484,6 +484,28 @@ func TranslateWindow(ctx context.Context, st db.Store, lectureID string) (int, e
 	return model.SnapshotWindow(j.ConfigSnapshot), nil
 }
 
+// deferredLLMSnapshots: a lecture started with no provider for any LLM
+// role (“只转写”, 3.1.0; NOTES “决定（3.1.0 只转写…）”): its asr job has a
+// snapshot, the summary, repair and translate jobs have "{}" until the
+// roles are configured. A lecture started by v1 has no snapshot at all, so
+// BackfillSnapshots leaves the former alone: its LLM snapshots are written
+// with the current prompt versions when they run (the scheduler).
+func deferredLLMSnapshots(jobs []model.Job) bool {
+	asr, llm := false, 0
+	for _, j := range jobs {
+		switch j.Stage {
+		case model.StageASR:
+			asr = !model.IsEmptySnapshot(j.ConfigSnapshot)
+		case model.StageSummary, model.StageRepair, model.StageTranslate:
+			if !model.IsEmptySnapshot(j.ConfigSnapshot) {
+				return false
+			}
+			llm++
+		}
+	}
+	return asr && llm == 3
+}
+
 // BackfillSnapshots is the one-time v1.1 migration of lectures started by
 // v1 (lead, NOTES.md): every CURRENT job of a launched lecture whose
 // config_snapshot is empty gets current[stage] (stages not in current keep
@@ -512,6 +534,9 @@ func BackfillSnapshots(ctx context.Context, st db.Store, current map[string]stri
 				jobs, err := tx.ListCurrentJobs(ctx, model.ScopeLecture, l.ID)
 				if err != nil {
 					return err
+				}
+				if deferredLLMSnapshots(jobs) {
+					continue // started by 3.1.0 without providers, not by v1
 				}
 				for _, j := range jobs {
 					snap := current[j.Stage]

@@ -225,7 +225,7 @@ export function createDeviceList(opts) {
       fkey: `set:dev:${d.id}:pause`,
       onclick: () => togglePause(d),
     });
-    const meta = [U.deviceKindName(d.kind), d.backend === 'openvino' ? 'OpenVINO' : d.kind === 'remote' ? '' : d.backend].filter(Boolean).join(' · ');
+    const meta = [U.deviceKindName(d.kind), d.backend === 'openvino' ? 'OpenVINO' : d.backend === 'mlx' ? 'MLX' : d.kind === 'remote' ? '' : d.backend].filter(Boolean).join(' · ');
     li.append(
       h(
         'div',

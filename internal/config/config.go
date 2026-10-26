@@ -31,6 +31,14 @@ type Config struct {
 	// I7): the separate .venv-ov environment. Default
 	// .venv-ov\Scripts\python.exe (.venv-ov/bin/python elsewhere). When it
 	// does not exist, OpenVINO devices are simply not detected.
+	//
+	// Python, PythonOpenVINO and PythonMLX get their development defaults
+	// (.venv, .venv-ov, .venv-mlx of the working directory) only without
+	// ResourcesDir. In the desktop application (ResourcesDir set) the
+	// interpreters are the components' (WorkerPython); a key config.toml
+	// does not set stays empty there, which means "not installed" (3.1.0:
+	// the desktop shell starts the service in the resources directory, so
+	// the defaults named Resources/.venv, which never exists).
 	PythonOpenVINO string `toml:"python_openvino"`
 	// ResourcesDir is the packaged resources directory of the desktop
 	// application (command-line -resources, SPEC-v3 V1, v3-brief §1):
@@ -75,6 +83,12 @@ type Config struct {
 	// (development .venv / .venv-ov / .venv-mlx, tests). Never read from
 	// config.toml. See components.go.
 	Components ComponentLocator `toml:"-"`
+
+	// devPython records the interpreter keys ("python", "python_openvino",
+	// "python_mlx") applyDefaults filled with the development default, with
+	// the value as resolved (absPaths); see PythonSource. Never read from
+	// config.toml.
+	devPython map[string]string
 
 	ASR     ASR     `toml:"asr"`
 	LLM     LLM     `toml:"llm"`
@@ -292,6 +306,9 @@ func (c *Config) absPaths() error {
 			abs(p)
 		}
 	}
+	for key := range c.devPython {
+		c.devPython[key] = *c.pythonField(key)
+	}
 	return err
 }
 
@@ -333,6 +350,53 @@ func defaultPythonMLX() string {
 	return filepath.Join(".venv-mlx", "bin", "python")
 }
 
+// pythonKeys are the config.toml keys of the worker interpreters.
+var pythonKeys = []string{"python", "python_openvino", "python_mlx"}
+
+// pythonField is the field of an interpreter key (PythonKey).
+func (c *Config) pythonField(key string) *string {
+	switch key {
+	case "python_openvino":
+		return &c.PythonOpenVINO
+	case "python_mlx":
+		return &c.PythonMLX
+	}
+	return &c.Python
+}
+
+// devPythonDefault is the development default of an interpreter key.
+func devPythonDefault(key string) string {
+	switch key {
+	case "python_openvino":
+		return defaultPythonOpenVINO()
+	case "python_mlx":
+		return defaultPythonMLX()
+	}
+	return defaultPython()
+}
+
+// applyPythonDefaults: a configured interpreter gets .exe on Windows; an
+// empty one the development default (.venv, .venv-ov, .venv-mlx), except
+// in the desktop application (ResourcesDir set), where it stays empty: the
+// components provide the interpreters there (WorkerPython).
+func (c *Config) applyPythonDefaults() {
+	for _, key := range pythonKeys {
+		p := c.pythonField(key)
+		if *p != "" {
+			*p = exe(*p)
+			continue
+		}
+		if c.ResourcesDir != "" {
+			continue
+		}
+		*p = devPythonDefault(key)
+		if c.devPython == nil {
+			c.devPython = map[string]string{}
+		}
+		c.devPython[key] = *p
+	}
+}
+
 func (c *Config) applyDefaults() {
 	if c.Listen == "" {
 		c.Listen = "127.0.0.1:8420"
@@ -340,21 +404,7 @@ func (c *Config) applyDefaults() {
 	if c.DataDir == "" {
 		c.DataDir = "./data"
 	}
-	if c.Python == "" {
-		c.Python = defaultPython()
-	} else {
-		c.Python = exe(c.Python)
-	}
-	if c.PythonOpenVINO == "" {
-		c.PythonOpenVINO = defaultPythonOpenVINO()
-	} else {
-		c.PythonOpenVINO = exe(c.PythonOpenVINO)
-	}
-	if c.PythonMLX == "" {
-		c.PythonMLX = defaultPythonMLX()
-	} else {
-		c.PythonMLX = exe(c.PythonMLX)
-	}
+	c.applyPythonDefaults()
 	if c.FFmpeg == "" {
 		c.FFmpeg = "ffmpeg"
 	}

@@ -4,7 +4,8 @@
 //
 // openWizard(ctx) — a modal in five steps (A8.1): basics → syllabus →
 // format preview → slides → done. Closing with unsaved work asks first; Esc
-// closes (with that prompt), focus stays inside the dialog, Ctrl+Enter is the
+// closes (with that prompt), focus stays inside the dialog, Ctrl+Enter (⌘+Enter
+// on a Mac, where the hints say ⌘; 3.1.0 M8) is the
 // primary action.
 // The step rail goes back to any earlier step, and forward to a step seen
 // before as long as every step in between is still complete (saved);
@@ -527,7 +528,7 @@ function syllabusFlow(courseId, opts) {
       ),
     );
     R.split.addEventListener('keydown', (e) => {
-      // Ctrl+E switches between preview and edit (the textarea keeps its caret)
+      // Ctrl+E (⌘E on a Mac) switches between preview and edit (the textarea keeps its caret)
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'e' && S.md && S.fmt.status !== 'running') {
         e.preventDefault();
         setView(S.view === 'edit' ? 'preview' : 'edit');
@@ -655,7 +656,7 @@ function syllabusFlow(courseId, opts) {
     if (f.usage && U.hasUsage(f.usage)) {
       R.usage.append(icon('gauge', { size: 13 }), h('span', null, t('wizard.format.usage', { usage: U.usageText(f.usage) })));
     } else {
-      R.usage.append(h('span', null, edit ? t('wizard.format.edit_hint') : t('wizard.format.preview_hint')));
+      R.usage.append(h('span', null, U.macKeys(edit ? t('wizard.format.edit_hint') : t('wizard.format.preview_hint'))));
     }
   }
 
@@ -950,7 +951,7 @@ export function openWizard(ctx) {
         { class: 'wiz-rail' },
         h('div', { class: 'wiz-rail-head' }, h('span', { class: 'wiz-rail-mark' }, icon('graduation-cap', { size: 16 })), h('div', null, h('h2', { class: 'wiz-rail-title' }, t('wizard.title')), railSub)),
         h('nav', { 'aria-label': t('wizard.rail.aria') }, rail),
-        h('p', { class: 'wiz-rail-foot' }, h('kbd', null, 'Ctrl'), '+', h('kbd', null, 'Enter'), ` ${t('wizard.rail.next')} · `, h('kbd', null, 'Esc'), ` ${t('wizard.rail.close')}`),
+        h('p', { class: 'wiz-rail-foot' }, h('kbd', null, U.modKey()), '+', h('kbd', null, 'Enter'), ` ${t('wizard.rail.next')} · `, h('kbd', null, 'Esc'), ` ${t('wizard.rail.close')}`),
       ),
       h(
         'section',
@@ -1106,7 +1107,7 @@ export function openWizard(ctx) {
       if (W.step > 1) footLeft.append(btn(t('wizard.foot.back'), { icon: 'arrow-left', disabled: W.busy, fkey: 'wiz:back', onclick: () => back(W.step === 4 && W.sylSkipped ? 2 : W.step - 1) }));
       const p = primarySpec();
       if (p.note) footRight.append(h('span', { class: 'wiz-foot-note' }, p.note));
-      footRight.append(spinIfBusy(btn(p.label, { kind: 'primary', icon: p.icon, disabled: p.disabled || W.busy, fkey: 'wiz:primary', onclick: primary, title: 'Ctrl+Enter' }), W.busy));
+      footRight.append(spinIfBusy(btn(p.label, { kind: 'primary', icon: p.icon, disabled: p.disabled || W.busy, fkey: 'wiz:primary', onclick: primary, title: `${U.modKey()}+Enter` }), W.busy));
     });
   }
 
@@ -1808,13 +1809,13 @@ export function openSyllabusEditor(course, opts = {}) {
         const waiting = seedRunning();
         if (waiting) footLeft.append(h('span', { class: 'wiz-foot-note tone-warn', role: 'status' }, icon('loader-circle', { size: 14, class: 'spin' }), t('wizard.editor.seed_running')));
         footRight.append(btn(t('common.cancel'), { fkey: 'syl:cancel', onclick: requestClose }));
-        footRight.append(spinIfBusy(btn(busy ? t('wizard.foot.saving') : t('wizard.editor.save'), { kind: 'primary', icon: busy ? 'loader-circle' : 'check', disabled: busy || flow.busy() || !flow.hasMarkdown() || !flow.unsaved() || (live && waiting), fkey: 'syl:save', onclick: primary, title: 'Ctrl+Enter' }), busy));
+        footRight.append(spinIfBusy(btn(busy ? t('wizard.foot.saving') : t('wizard.editor.save'), { kind: 'primary', icon: busy ? 'loader-circle' : 'check', disabled: busy || flow.busy() || !flow.hasMarkdown() || !flow.unsaved() || (live && waiting), fkey: 'syl:save', onclick: primary, title: `${U.modKey()}+Enter` }), busy));
       } else if (phase === 'source') {
         if (hasDoc) footLeft.append(btn(t('wizard.editor.back_to_edit'), { icon: 'arrow-left', disabled: busy, fkey: 'syl:back', onclick: () => ((phase = 'format'), render(true)) }));
         footRight.append(btn(t('common.cancel'), { fkey: 'syl:cancel', onclick: requestClose }));
         const mode = flow.S.mode;
         const ready = (mode === 'paste' && flow.S.text.trim()) || (mode === 'upload' && flow.S.upload && flow.S.upload.status === 'done');
-        footRight.append(spinIfBusy(btn(busy ? t('wizard.foot.saving_raw') : t('wizard.foot.next_format'), { kind: 'primary', icon: busy ? 'loader-circle' : 'sparkles', disabled: busy || !ready, fkey: 'syl:next', onclick: primary, title: 'Ctrl+Enter' }), busy));
+        footRight.append(spinIfBusy(btn(busy ? t('wizard.foot.saving_raw') : t('wizard.foot.next_format'), { kind: 'primary', icon: busy ? 'loader-circle' : 'sparkles', disabled: busy || !ready, fkey: 'syl:next', onclick: primary, title: `${U.modKey()}+Enter` }), busy));
       } else {
         footRight.append(btn(t('common.close'), { fkey: 'syl:cancel', onclick: requestClose }));
       }

@@ -31,6 +31,13 @@ const (
 	// config python_mlx does not exist).
 	CodeMLXPythonMissing = "devices.mlx_python_missing" // path
 
+	// No interpreter at all (3.1.0): in the desktop application without
+	// the asr-openvino / asr-mlx component and without the key in
+	// config.toml (config.Config.WorkerPython returns ""). Detection.OVErr
+	// and the asr stage's job error, pointing to the Components page.
+	CodeOVNotInstalled  = "devices.ov_not_installed"  //
+	CodeMLXNotInstalled = "devices.mlx_not_installed" //
+
 	// Installed models only (installed.go, V12.2 acceptance issue 3):
 	// CodeModelNotInstalled is the asr stage's job error when the run's
 	// model is not ModelAvailable; CodeSelfTestNoModel the self-test's
@@ -50,6 +57,7 @@ var ErrorCodes = []string{
 	CodeNotFound, CodeModelMissing, CodeModelInvalid, CodePrecisionInvalid, CodeMaxParallelInvalid,
 	CodeOrderInvalid, CodeApplyNotTested, CodeRemoteManaged,
 	CodeOVPythonMissing, CodeOVImportFailed, CodeProbeFailed, CodeMLXPythonMissing,
+	CodeOVNotInstalled, CodeMLXNotInstalled,
 	CodeModelNotInstalled, CodeSelfTestNoModel,
 	CodeSnapshotDeviceUnavailable,
 }

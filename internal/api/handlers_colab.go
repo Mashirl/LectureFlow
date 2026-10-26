@@ -7,6 +7,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
 
 	"lectureflow/internal/colab"
 	"lectureflow/internal/model"
@@ -28,6 +32,13 @@ func init() {
 		h("DELETE /api/colab/auth", s.deleteColabAuth)
 		h("POST /api/colab/shutdown", s.shutdownColab)
 		h("POST /api/lectures/{id}/use-colab", s.useColab)
+		// the in-app Google sign-in (3.1.0, .claude/v31-brief.md §2.2)
+		h("POST /api/colab/auth/login", s.startColabLogin)
+		h("GET /api/colab/auth/login", s.getColabLogin)
+		h("DELETE /api/colab/auth/login", s.cancelColabLogin)
+		if s.colab != nil {
+			s.colabLogin() // set up at startup: wipes what an interrupted sign-in left in the data directory
+		}
 	})
 	diagSections = append(diagSections, DiagSection{Name: "colab.json", Collect: diagColab})
 }
@@ -82,6 +93,21 @@ type ColabImportRequest struct {
 	Days      int    `json:"days"`      // days only: 1..90 (0 = 7)
 }
 
+// ColabLogin is the body of the /api/colab/auth/login endpoints (3.1.0,
+// .claude/v31-brief.md §2.2): {"state": idle | waiting | importing | done |
+// failed | cancelled, "url" (gcloud's sign-in link, "" until it printed
+// one), "started_at" (RFC 3339 or null), "error" (ErrorInfo or null)}.
+type ColabLogin = colab.LoginStatus
+
+// ColabLoginRequest is the optional body of POST /api/colab/auth/login: the
+// lifecycle of the credential the sign-in imports, as for
+// POST /api/colab/auth/import (no body = 7 days).
+type ColabLoginRequest = ColabImportRequest
+
+// colabLoginCancelWait bounds DELETE /api/colab/auth/login's wait for
+// gcloud to end.
+const colabLoginCancelWait = 5 * time.Second
+
 // ColabCheckView is POST /api/colab/auth/check.
 type ColabCheckView struct {
 	ADC  ColabADCView         `json:"adc"`
@@ -91,7 +117,10 @@ type ColabCheckView struct {
 // ColabDisconnectView is DELETE /api/colab/auth: Revoked (Google confirmed),
 // Released (a runtime was given back first), Warnings (colab.revoke_failed,
 // …) and Notes: remote.gcloud_signed_out when the revocation went through
-// (gcloud's application-default login used the same refresh token).
+// and the credential came from the user's own gcloud (source gcloud, also
+// every 3.0.0 import: gcloud's application-default login used the same
+// refresh token). A credential of the in-app sign-in (source app) was only
+// ever in the app's own gcloud directory: no note.
 type ColabDisconnectView struct {
 	Revoked  bool              `json:"revoked"`
 	Released bool              `json:"released"`
@@ -209,8 +238,9 @@ func (s *Server) putColabSettings(w http.ResponseWriter, r *http.Request) {
 	s.getColab(w, r)
 }
 
-// POST /api/colab/auth/import: gcloud's application default credentials
-// with the user's lifecycle (V14.2) → CredentialInfo (no secret).
+// POST /api/colab/auth/import: the user's own gcloud application default
+// credentials with the user's lifecycle (V14.2) → CredentialInfo (no
+// secret; source gcloud).
 func (s *Server) importColabAuth(w http.ResponseWriter, r *http.Request) {
 	if !s.colabReady(w) {
 		return
@@ -221,6 +251,19 @@ func (s *Server) importColabAuth(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	info, err := s.colab.ImportADC(ctx, importLifecycle(req))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.sc.RefreshRemote(ctx)
+	s.hub.Changed("settings", "")
+	writeJSON(w, http.StatusOK, info)
+}
+
+// importLifecycle is the lifecycle a request asks for (days without a
+// count = 7 days; an unknown kind is refused by the backend).
+func importLifecycle(req ColabImportRequest) colab.Lifecycle {
 	lc := colab.Lifecycle{Kind: req.Lifecycle}
 	switch req.Lifecycle {
 	case "", colab.LifecycleDays:
@@ -229,14 +272,99 @@ func (s *Server) importColabAuth(w http.ResponseWriter, r *http.Request) {
 			lc.Days = 7
 		}
 	}
-	info, err := s.colab.ImportADC(ctx, lc)
-	if err != nil {
+	return lc
+}
+
+// gcloudLookup finds the gcloud the sign-in runs: config.Config's
+// GcloudPath (the gcloud component, else gcloud on PATH; v31-brief §2.1)
+// when the configuration has it, else gcloud on PATH. Tests replace it.
+var gcloudLookup = func(s *Server) (string, bool) {
+	if s.cfg != nil {
+		if g, ok := any(s.cfg).(interface{ GcloudPath() (string, bool) }); ok {
+			return g.GcloudPath()
+		}
+	}
+	p, err := exec.LookPath("gcloud")
+	return p, err == nil && p != ""
+}
+
+// gcloudEnv is the environment gcloud runs with: config.Config's
+// GcloudEnv (the process environment plus the gcloud component's
+// variables, e.g. CLOUDSDK_PYTHON on macOS) when the configuration has it,
+// else the process environment.
+var gcloudEnv = func(s *Server) []string {
+	if s.cfg != nil {
+		if g, ok := any(s.cfg).(interface{ GcloudEnv() []string }); ok {
+			return g.GcloudEnv()
+		}
+	}
+	return os.Environ()
+}
+
+// colabLogin is the backend's in-app sign-in, in {data_dir}/colab/gcloud.
+func (s *Server) colabLogin() *colab.Login {
+	return s.colab.Login(colab.LoginOptions{
+		ConfigDir: filepath.Join(s.absDataDir(), "colab", "gcloud"),
+		Gcloud:    func() (string, bool) { return gcloudLookup(s) },
+		Env:       func() []string { return gcloudEnv(s) },
+		OnChange:  s.colabLoginChanged,
+	})
+}
+
+// colabLoginChanged: every change is SSE changed {kind: "colab"}; a
+// finished sign-in also changed the credential (the device table gains
+// colab:remote, the settings page refetches), as POST /api/colab/auth/import.
+func (s *Server) colabLoginChanged(st colab.LoginStatus) {
+	if st.State == colab.LoginDone {
+		if s.sc != nil {
+			s.sc.RefreshRemote(context.Background())
+		}
+		s.hub.Changed("settings", "")
+	}
+	s.hub.Changed("colab", "")
+}
+
+// POST /api/colab/auth/login {"lifecycle", "days"} (optional): run gcloud's
+// sign-in → 202 ColabLogin (waiting; failed colab.gcloud_start_failed when
+// gcloud cannot be started). 409 colab.gcloud_missing (no gcloud component
+// and no gcloud on PATH), 409 colab.login_running, 400 colab.lifecycle_invalid.
+func (s *Server) startColabLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.colabReady(w) {
+		return
+	}
+	var req ColabLoginRequest
+	if err := decodeOptionalJSON(r, &req); err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	s.sc.RefreshRemote(ctx)
-	s.hub.Changed("settings", "")
-	writeJSON(w, http.StatusOK, info)
+	st, err := s.colabLogin().Start(importLifecycle(req))
+	if err != nil {
+		switch code := colab.Code(err); code {
+		case colab.CodeGcloudMissing, colab.CodeLoginRunning:
+			writeErrorInfo(w, http.StatusConflict, model.ErrorInfo{Code: code})
+			return
+		}
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, st)
+}
+
+// GET /api/colab/auth/login → ColabLogin.
+func (s *Server) getColabLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.colabReady(w) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.colabLogin().Status())
+}
+
+// DELETE /api/colab/auth/login: gcloud's process tree is stopped → ColabLogin
+// (cancelled; unchanged when no sign-in was running).
+func (s *Server) cancelColabLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.colabReady(w) {
+		return
+	}
+	writeJSON(w, http.StatusOK, s.colabLogin().Cancel(colabLoginCancelWait))
 }
 
 // POST /api/colab/auth/check: "检测授权" — the ADC file again, and the
@@ -268,7 +396,7 @@ func (s *Server) deleteColabAuth(w http.ResponseWriter, r *http.Request) {
 	if v.Warnings == nil {
 		v.Warnings = []model.ErrorInfo{}
 	}
-	if res.Revoked {
+	if res.Revoked && res.Source != colab.SourceApp {
 		v.Notes = append(v.Notes, model.ErrorInfo{Code: sched.CodeRemoteADCSignedOut})
 	}
 	s.sc.RefreshRemote(ctx)

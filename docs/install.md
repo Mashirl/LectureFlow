@@ -36,14 +36,22 @@ LectureFlow 的安装包可能没有代码签名证书（是否购买证书由�
 
 #### macOS：隐私与安全性
 
-1. 打开 `.dmg`，把 LectureFlow 拖进“应用程序”文件夹。
-2. 在“应用程序”里双击 LectureFlow。系统会提示无法验证开发者，点击 **完成**（或“好”），不要点“移到废纸篓”。
-3. 打开 **系统设置 → 隐私与安全性**，向下滚动到“安全性”一节，可以看到“已阻止使用 LectureFlow”，点击旁边的 **仍要打开**。
-4. 输入登录密码（或使用触控 ID），在随后的对话框里点击 **打开**。
+1. 打开 `.dmg`，把 LectureFlow 拖进“应用程序”文件夹（也可以放在外置盘的任意文件夹里）。
+2. 双击 LectureFlow。系统提示“未打开 LectureFlow”，点击 **完成**，不要点“移到废纸篓”。
 
-![示意图：系统设置 → 隐私与安全性 → 仍要打开](images/install-macos-open-anyway.svg)
+   ![系统提示：未打开“LectureFlow”，按钮“移到废纸篓”与“完成”](images/install-macos-1-not-opened.png)
 
-*示意图，不是截图；文字以系统实际显示为准。macOS 版尚未在真机上验证，截图待补。*
+3. 打开 **系统设置 → 隐私与安全性**，向下滚动到“安全性”一节，可以看到“已阻止 LectureFlow 以保护你的 Mac”，点击旁边的 **仍要打开**。
+
+   ![系统设置 → 隐私与安全性 → 安全性：“仍要打开”](images/install-macos-2-open-anyway.png)
+
+4. 在弹出的对话框里再点击一次 **仍要打开**。
+
+   ![对话框：打开“LectureFlow”？按钮“移到废纸篓”“仍要打开”“完成”](images/install-macos-3-confirm.png)
+
+5. 输入登录密码（或使用触控 ID）确认，LectureFlow 随即打开。
+
+*截图来自 macOS 27（英文界面），其他版本与语言的文字可能略有不同。*
 
 只需要做一次。macOS 15 起，右键点按“打开”已不能跳过这个提示，请使用“系统设置”。
 
@@ -77,9 +85,7 @@ The installers may not be code-signed. Your system then warns that the app is un
 
 **Windows (SmartScreen):** on the blue "Windows protected your PC" window, click **More info**, then **Run anyway**. The warning does not come back afterwards. The portable version may show the same warning.
 
-**macOS:** drag LectureFlow to Applications and open it. When macOS says it cannot verify the developer, click **Done** (not "Move to Bin"). Open **System Settings → Privacy & Security**, scroll to "Security", click **Open Anyway** next to the LectureFlow message, confirm with your password or Touch ID, then click **Open**. This is needed once. Since macOS 15, Control-clicking "Open" no longer skips the warning.
-
-The pictures above are schematic, not screenshots; real screenshots are still to be added. The macOS build has not yet been checked on a real Mac.
+**macOS:** drag LectureFlow to Applications (or any folder, also on an external drive) and open it. When macOS says "LectureFlow" Not Opened, click **Done** (not "Move to Trash"). Open **System Settings → Privacy & Security**, scroll to "Security", click **Open Anyway** next to "LectureFlow was blocked to protect your Mac", click **Open Anyway** again in the dialog that follows, then confirm with your password or Touch ID; LectureFlow opens. This is needed once. Since macOS 15, Control-clicking "Open" no longer skips the warning. The macOS screenshots above are from macOS 27; the Windows pictures are schematic.
 
 ### Updates
 

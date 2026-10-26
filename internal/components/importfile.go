@@ -320,7 +320,7 @@ func (m *Manager) identifyImport(ctx context.Context, t *task, it *item) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var missing []string
-	for _, d := range c.Depends {
+	for _, d := range c.DependsOn(m.platform) {
 		if dc := man.Component(d); dc != nil && dc.Bundled {
 			continue
 		}

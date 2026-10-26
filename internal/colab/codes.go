@@ -56,6 +56,15 @@ const (
 	CodeDownloadFailed  = "colab.download_failed"  // file
 	CodeLocalWrite      = "colab.local_write"      // file: the downloaded result could not be written locally
 	CodeWorkerExited    = "colab.worker_exited"    // the remote worker ended without a done or error event
+
+	// The in-app Google sign-in (3.1.0, login.go): gcloud runs in a
+	// configuration directory of its own and the ADC file it writes is
+	// imported like "导入授权".
+	CodeGcloudMissing     = "colab.gcloud_missing"      // neither the gcloud component nor a gcloud on PATH
+	CodeGcloudStartFailed = "colab.gcloud_start_failed" // gcloud could not be started (detail: the system's error)
+	CodeLoginRunning      = "colab.login_running"       // a sign-in is already waiting for the browser
+	CodeLoginTimeout      = "colab.login_timeout"       // minutes: the sign-in did not finish in time; gcloud was stopped
+	CodeLoginFailed       = "colab.login_failed"        // exit_code: gcloud ended with an error (detail: its last ERROR line)
 )
 
 // ErrorCodes lists the codes this package defines (for cmd's
@@ -69,6 +78,7 @@ var ErrorCodes = []string{
 	CodeWindowExhausted, CodeWindowCooldown, CodeBalanceLow, CodeAuthTooShort, CodeShutdownRequeue, CodeBusy,
 	CodeRemoteFailed, CodeHashMismatch, CodeAudioMissing, CodeSettingsInvalid, CodeWorkerMissing, CodeCancelled,
 	CodeUploadFailed, CodeDownloadFailed, CodeLocalWrite, CodeWorkerExited,
+	CodeGcloudMissing, CodeGcloudStartFailed, CodeLoginRunning, CodeLoginTimeout, CodeLoginFailed,
 }
 
 // ErrorParams lists each code's params (for the lead's
@@ -86,5 +96,7 @@ var ErrorParams = map[string][]string{
 	CodeAuthTooShort: {"need_min"}, CodeShutdownRequeue: {}, CodeBusy: {}, CodeRemoteFailed: {"reason"},
 	CodeHashMismatch: {"file"}, CodeAudioMissing: {"file"}, CodeSettingsInvalid: {"field"}, CodeWorkerMissing: {"file"},
 	CodeCancelled: {}, CodeUploadFailed: {"file"}, CodeDownloadFailed: {"file"}, CodeLocalWrite: {"file"},
-	CodeWorkerExited: {},
+	CodeWorkerExited:  {},
+	CodeGcloudMissing: {}, CodeGcloudStartFailed: {}, CodeLoginRunning: {}, CodeLoginTimeout: {"minutes"},
+	CodeLoginFailed: {"exit_code"},
 }

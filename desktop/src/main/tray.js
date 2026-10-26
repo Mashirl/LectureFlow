@@ -24,12 +24,18 @@ class TrayController {
   show() {
     if (this.tray) return;
     this.tray = new Tray(this.icon);
+    this.tray.on('click', () => this.onOpen());
+    this.refresh();
+  }
+
+  /** refresh: the menu and tooltip again, after a language switch. */
+  refresh() {
+    if (!this.tray) return;
     this.tray.setContextMenu(Menu.buildFromTemplate([
       { label: this.t('tray.open'), click: () => this.onOpen() },
       { type: 'separator' },
       { label: this.t('tray.quit'), click: () => this.onQuit() },
     ]));
-    this.tray.on('click', () => this.onOpen());
     this._tooltip();
   }
 

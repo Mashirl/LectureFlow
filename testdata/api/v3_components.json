@@ -257,7 +257,8 @@
       ],
       "notes": [],
       "download_bytes": 4611637248
-    }
+    },
+    "plan_error": null
   },
   "GET /api/onboarding/env-keys": [
     {

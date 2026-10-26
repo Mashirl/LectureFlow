@@ -26,7 +26,10 @@ const (
 	checkNPUDriver       = "npu_driver"
 )
 
-// openVINOChecks returns the four checks (none without the registry).
+// openVINOChecks returns the four checks (none without the registry, and
+// none on a machine without an Intel GPU or NPU and without an OpenVINO
+// environment, mac-opti M3: openVINOVisible). In desktop mode a missing
+// environment is the asr-openvino component that is not installed.
 func (s *Server) openVINOChecks() []SystemCheck {
 	if s.dev == nil {
 		return nil
@@ -36,6 +39,10 @@ func (s *Server) openVINOChecks() []SystemCheck {
 	if python == "" && s.cfg != nil {
 		python = s.cfg.PythonOpenVINO
 	}
+	if !s.openVINOVisible(det, python) {
+		return nil
+	}
+	venvHint := s.devHint("check.hint_openvino_venv", codeHintInstallOpenVINO)
 	venv := SystemCheck{Name: checkOpenVINOVenv, Status: statusOK}
 	venvOK := false
 	if fi, err := os.Stat(python); python != "" && err == nil && !fi.IsDir() {
@@ -43,8 +50,12 @@ func (s *Server) openVINOChecks() []SystemCheck {
 		venv.setDetail("check.openvino_venv_ok", map[string]any{"path": python})
 	} else {
 		venv.Status = statusWarn
-		venv.setDetail("check.openvino_venv_missing", map[string]any{"path": python})
-		venv.setHint("check.hint_openvino_venv", nil)
+		if s.desktopDiag() || python == "" { // "": no component, nothing configured (3.1.0)
+			venv.setDetail(codeOpenVINONotInstalled, nil)
+		} else {
+			venv.setDetail("check.openvino_venv_missing", map[string]any{"path": python})
+		}
+		venv.setHint(venvHint, nil)
 	}
 	imp := SystemCheck{Name: checkOpenVINO, Status: statusWarn}
 	devs := SystemCheck{Name: checkOpenVINODevices, Status: statusWarn}
@@ -87,10 +98,10 @@ func (s *Server) openVINOChecks() []SystemCheck {
 		switch det.OVErr.Code {
 		case devices.CodeOVImportFailed:
 			imp.setDetail("check.import_failed", map[string]any{"module": "openvino", "error": errText})
-			imp.setHint("check.hint_openvino_venv", nil)
+			imp.setHint(venvHint, nil)
 		case devices.CodeOVPythonMissing:
 			imp.setDetail("check.run_failed", map[string]any{"program": python, "error": errText})
-			imp.setHint("check.hint_openvino_venv", nil)
+			imp.setHint(venvHint, nil)
 		default: // devices.CodeProbeFailed: timeout, unreadable output
 			imp.setDetail("check.run_failed", map[string]any{"program": "asr_openvino.py --probe", "error": errText})
 		}

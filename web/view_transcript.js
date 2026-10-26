@@ -7,6 +7,8 @@
 // diff and the reason, qa_failed / stale states, 200 sentences per page, and
 // the sentence menu (right click, the ⋯ button, Shift+F10): play · copy
 // citation · copy English · copy Chinese · edit · reset · retranslate.
+// "Transcribe only" (3.1.0, lecture_english.js): while the lecture has no
+// Chinese and waits for a model provider, the Chinese column is hidden.
 
 import { api } from './api.js';
 import { h, clear, toast, preserveFocus, copyText, errorBlock } from './dom.js';
@@ -17,6 +19,7 @@ import { diffView } from './widgets.js';
 import * as U from './util.js';
 import { t } from './i18n.js';
 import { zh as zhText, zhLang, zhQuery, markNeedles } from './zh_display.js';
+import { englishOnly } from './lecture_english.js';
 
 const PAGE = 200;
 const enc = encodeURIComponent;
@@ -145,6 +148,8 @@ export function mountTranscript(root, lecture, ctx) {
   const sentinel = h('div', { class: 'tx-sentinel' });
   const footer = h('div', { class: 'tx-footer' }, moreBtn);
   const panel = h('div', { class: 'card tx-card' }, sticky, stateEl, listEl, sentinel, footer);
+  const syncColumns = () => panel.classList.toggle('is-en-only', englishOnly(lec)); // no empty Chinese column
+  syncColumns();
   root.append(panel);
 
   const io = new IntersectionObserver((entries) => {
@@ -729,6 +734,7 @@ export function mountTranscript(root, lecture, ctx) {
       const was = lec.reviewable;
       const hadNone = total === 0;
       lec = l;
+      syncColumns();
       syncBusy();
       if (was !== l.reviewable && editing) rerender(editing.idx);
       if (total === 0) renderState();

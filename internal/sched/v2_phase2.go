@@ -102,8 +102,9 @@ func (s *Scheduler) queueTitle(lectureID string) {
 // RequestFilenameRule is what the API calls after a lecture was uploaded
 // (ruling 2). The trigger of P13.3.2 is evaluated once the course has had
 // no new request for FilenameRuleDebounce (default 5 s), so a batch upload
-// queues at most one run: the organizer role must be configured and
-// state.FilenameRuleWanted true. A request that comes due while the
+// queues at most one run when state.FilenameRuleWanted is true (with or
+// without the organizer role: without a model the task uses the built-in
+// Panopto pattern, 3.1.0 "只转写", NOTES.md). A request that comes due while the
 // course's rule is being generated waits for that run (see fnRequest).
 func (s *Scheduler) RequestFilenameRule(courseID string) {
 	s.mu.Lock()
@@ -160,7 +161,9 @@ func (s *Scheduler) processFilenameRules(ctx context.Context) {
 //   - failed or cancelled after the request waited for it: drop (a failed
 //     auxiliary task is not retried automatically; the user retries);
 //   - otherwise (none, done, an older failure before a fresh upload): queue
-//     a run when the organizer is configured and the trigger holds.
+//     a run when the trigger holds. The organizer role need not be
+//     configured (3.1.0): without a model the stage tries only the
+//     built-in Panopto pattern (internal/stages filename_fallback.go).
 func (s *Scheduler) filenameRuleDue(ctx context.Context, courseID string, waited bool) (keep, queued bool, err error) {
 	err = s.st.Tx(ctx, func(tx db.Store) error {
 		j, err := tx.GetCurrentJob(ctx, model.ScopeCourse, courseID, model.StageFilenameRule)
@@ -178,10 +181,6 @@ func (s *Scheduler) filenameRuleDue(ctx context.Context, courseID string, waited
 				}
 			}
 		case !errors.Is(err, db.ErrNotFound):
-			return err
-		}
-		ok, err := state.RoleConfigured(ctx, tx, model.AuxRole(model.StageFilenameRule))
-		if err != nil || !ok {
 			return err
 		}
 		want, err := state.FilenameRuleWanted(ctx, tx, courseID)

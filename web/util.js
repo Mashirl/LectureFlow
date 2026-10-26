@@ -34,6 +34,26 @@ function nameTable(prefix, keys) {
   );
 }
 
+/**
+ * A Mac (3.1.0 M8): shortcut hints say ⌘ there, Ctrl elsewhere. The key
+ * handlers accept both (ctrlKey || metaKey), so Ctrl keeps working on a Mac.
+ */
+export function isMac() {
+  if (typeof navigator === 'undefined') return false;
+  const p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+  return /^mac|iphone|ipad/i.test(p);
+}
+
+/** The command key of a shortcut hint: ⌘ on a Mac, else Ctrl. */
+export function modKey() {
+  return isMac() ? '⌘' : 'Ctrl';
+}
+
+/** A translated text naming a Ctrl shortcut ("Ctrl+E …"): ⌘ on a Mac. */
+export function macKeys(text) {
+  return isMac() ? String(text).replace(/\bCtrl\b/g, '⌘') : text;
+}
+
 /** List of items with the current language's list separator. */
 export function listJoin(items) {
   return (items || []).join(t('common.list_sep'));
@@ -141,9 +161,10 @@ export const JANITOR_ACTION_NAMES = nameTable('glossary.janitor_action.', ['enfo
 
 // Diagnostics checks: product names stay as they are; the others are named
 // by common.check.{name}.
-const CHECK_PRODUCTS = { ffmpeg: 'ffmpeg', python: 'Python', 'faster-whisper': 'faster-whisper', pypdf: 'pypdf', gpu: 'GPU', openvino: 'OpenVINO' };
-// SPEC-v2 I10 added openvino_venv, openvino_devices and npu_driver
-const CHECK_KEYS = new Set(['data_dir', 'cuda', 'disk', 'openvino_venv', 'openvino_devices', 'npu_driver']);
+const CHECK_PRODUCTS = { ffmpeg: 'ffmpeg', python: 'Python', 'faster-whisper': 'faster-whisper', pypdf: 'pypdf', gpu: 'GPU', openvino: 'OpenVINO', mlx: 'MLX' };
+// SPEC-v2 I10 added openvino_venv, openvino_devices and npu_driver; 3.1.0
+// (mac-opti M3) mlx_python and mlx_model
+const CHECK_KEYS = new Set(['data_dir', 'cuda', 'disk', 'openvino_venv', 'openvino_devices', 'npu_driver', 'mlx_python', 'mlx_model']);
 
 export function checkName(name) {
   if (CHECK_KEYS.has(name)) return t(`common.check.${name}`);
@@ -233,7 +254,7 @@ export function deviceLabel(id, sys, res) {
   return id;
 }
 
-/** The kind of a device in the interface language (devices.kind.{cuda|igpu|npu|cpu}); '' when unknown. */
+/** The kind of a device in the interface language (devices.kind.{cuda|igpu|npu|cpu|apple|remote}); '' when unknown. */
 export function deviceKindName(kind) {
   return kind ? named('devices.kind.', kind) : '';
 }
@@ -251,6 +272,7 @@ export function comboText(m, precision) {
 export function backendName(d) {
   if (!d) return '';
   if (d.backend === 'openvino') return 'OpenVINO';
+  if (d.backend === 'mlx') return 'MLX';
   if (d.kind === 'cuda') return 'CUDA';
   return d.backend || '';
 }
@@ -298,6 +320,7 @@ export function waitingForText(w, sys, res) {
   if (w.startsWith(WAIT_UPSTREAM)) return t('waiting.upstream', { stage: stageName(w.slice(WAIT_UPSTREAM.length)) });
   if (w === 'glossary_seed') return t('waiting.glossary_seed');
   if (w === 'glossary_review') return t('waiting.glossary_review'); // v2 G3.1
+  if (w === 'no_provider') return t('waiting.no_provider'); // 3.1.0 "transcribe only": no model provider set up
   if (w.startsWith(WAIT_MATERIAL_TERMS)) return t('waiting.material_terms', { filename: w.slice(WAIT_MATERIAL_TERMS.length) });
   // SPEC-v2 I8 (phase 3b): with transcription devices, gpu_paused is the
   // main switch over every device and gpu_slot means every device the job

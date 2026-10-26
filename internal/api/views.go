@@ -1119,9 +1119,12 @@ func (s *Server) courseViewJobs(ctx context.Context, c model.Course, ix jobIndex
 	}
 	// Like state.Deps for asr: with a syllabus, glossary_seed must be done
 	// (or stale); every material_terms likewise; and the v2 glossary_review
-	// must not be waiting or running (lead ruling 3).
+	// must not be waiting or running (lead ruling 3). Without a term
+	// extraction role asr does not wait for the term jobs (3.1.0 "只转写",
+	// sched transcribe_only.go), so they do not count.
 	pending := false
-	if v.Syllabus != nil {
+	termsWait := s.set == nil || s.roleConfigured(model.RoleGlossary)
+	if v.Syllabus != nil && termsWait {
 		g, ok := findJob(cjobs, model.StageGlossarySeed)
 		pending = !ok || (g.Status != model.StatusDone && g.Status != model.StatusStale)
 	}
@@ -1139,7 +1142,7 @@ func (s *Server) courseViewJobs(ctx context.Context, c model.Course, ix jobIndex
 	for _, m := range mats {
 		jobs := ix.of(model.ScopeMaterial, m.ID)
 		v.Materials = append(v.Materials, s.materialViewJobs(m, jobs))
-		if mt, ok := findJob(jobs, model.StageMaterialTerms); ok && mt.Status != model.StatusDone && mt.Status != model.StatusStale {
+		if mt, ok := findJob(jobs, model.StageMaterialTerms); termsWait && ok && mt.Status != model.StatusDone && mt.Status != model.StatusStale {
 			pending = true
 		}
 	}

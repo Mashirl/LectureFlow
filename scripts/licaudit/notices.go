@@ -95,6 +95,7 @@ func RenderNotices(r *Report) string {
 
 	renderMedia(w, r)
 	renderReferences(w, r)
+	renderTools(w, r)
 
 	// Appendix A: identical texts are printed once with every user listed.
 	type group struct {
@@ -141,6 +142,7 @@ func RenderNotices(r *Report) string {
 	w("- Python packages whose wheel carries no license file (for example mlx-whisper): the text is reproduced in Appendix A from a copy kept in `packaging/licenses/texts/`, pinned to an upstream commit (see the package note in section 4).\n")
 	w("- Upstreams reimplemented from their protocol (section 9): copies of their license files are kept in `packaging/licenses/texts/` and reproduced in Appendix A.\n")
 	w("- Models: the license file or model card of each source repository listed in section 5.\n")
+	w("- Programs downloaded from their vendor (section 10): the license files inside the installed tool (`components/{id}/{version}/tool/`; for the Google Cloud CLI its `LICENSE` and the license files of the parts it bundles).\n")
 	w("- Bundled binaries: the license files shipped next to each binary (section 6).\n")
 	w("- Electron: `LICENSE` and `LICENSES.chromium.html` in the application directory.\n")
 	return b.String()
@@ -266,4 +268,30 @@ func renderReferences(w func(string, ...any), r *Report) {
 		}
 		w("\n")
 	}
+}
+
+// renderTools writes section 10: programs the component manager downloads
+// from their vendor on the user's computer (tools.go).
+func renderTools(w func(string, ...any), r *Report) {
+	w("## 10. Programs downloaded from their vendor on your computer, not distributed with LectureFlow / 由组件管理器从官方下载到你的电脑、不随本程序分发的程序\n\n")
+	w("When you install one of these components, the component manager downloads the vendor's own archive from the vendor's server, checks its SHA-256 against the component manifest and unpacks it; LectureFlow runs it as a separate program. It is not part of the LectureFlow installer or of any LectureFlow download, and LectureFlow publishes no offline archive of it. Its license, listed here, is between you and its vendor; the parts the vendor bundles in its archive keep their own licenses (see the note and the license files inside the installed tool).\n\n")
+	w("安装这些组件时，组件管理器从官方服务器下载官方压缩包，按组件清单核对 SHA-256 后解压，LectureFlow 把它作为独立程序运行。它们不包含在 LectureFlow 安装包或任何 LectureFlow 下载中，LectureFlow 也不发布它们的离线压缩包。其许可证如下，由你与其发布者之间约定；官方压缩包内附带的部分各自遵循其许可证（见备注与安装目录中的许可证文件）。\n\n")
+	cs := componentsOf(r, KindTool)
+	if len(cs) == 0 {
+		w("_None._\n\n")
+		return
+	}
+	w("| Name | Version | License | Platforms | Source | Note |\n|---|---|---|---|---|---|\n")
+	for _, c := range cs {
+		note := c.Note
+		if c.Allowed != "" {
+			note = strings.TrimSpace(note + " Accepted by allowlist: " + c.Allowed)
+		}
+		lic := c.License
+		if lic == "" {
+			lic = "(unknown)"
+		}
+		w("| %s | %s | %s | %s | %s | %s |\n", mdEscape(c.Name), mdEscape(c.Version), mdEscape(lic), mdEscape(c.Group), mdEscape(c.Source), mdEscape(note))
+	}
+	w("\n")
 }

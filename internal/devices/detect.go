@@ -105,10 +105,15 @@ func fakeProbe(withDevices bool) *OVProbe {
 }
 
 // workerProbe runs `{python_openvino} {worker_dir}/asr_openvino.py --probe`.
-// Errors are coded: CodeOVPythonMissing (no interpreter), CodeOVImportFailed
-// (exit 2: openvino cannot be imported), CodeProbeFailed (anything else).
+// Errors are coded: CodeOVNotInstalled (no interpreter at all: the desktop
+// application without asr-openvino), CodeOVPythonMissing (the configured
+// interpreter does not exist), CodeOVImportFailed (exit 2: openvino cannot
+// be imported), CodeProbeFailed (anything else).
 func (r *Registry) workerProbe(ctx context.Context) (*OVProbe, error) {
 	py, _, _ := r.cfg.WorkerPython(model.BackendOpenVINO)
+	if py == "" { // the desktop application without asr-openvino (3.1.0)
+		return nil, model.Errorf(CodeOVNotInstalled, nil, errors.New("the asr-openvino component is not installed"))
+	}
 	if !executableExists(py) {
 		return nil, model.Errorf(CodeOVPythonMissing, map[string]any{"path": py},
 			fmt.Errorf("python_openvino not found: %s", py))
@@ -275,13 +280,13 @@ func normalizeProbe(p *OVProbe) *OVProbe {
 }
 
 // probeErrorInfo classifies a probe error (Detection.OVErr): a coded error
-// with one of the three probe codes keeps its code and params; anything
+// with one of the four probe codes keeps its code and params; anything
 // else is CodeProbeFailed {error}. Detail is the raw text.
 func probeErrorInfo(err error) *model.ErrorInfo {
 	var ce *model.CodedError
 	if errors.As(err, &ce) {
 		switch ce.Info.Code {
-		case CodeOVPythonMissing, CodeOVImportFailed, CodeProbeFailed:
+		case CodeOVNotInstalled, CodeOVPythonMissing, CodeOVImportFailed, CodeProbeFailed:
 			info := ce.Info
 			if info.Detail == "" && ce.Err != nil {
 				info.Detail = ce.Err.Error()

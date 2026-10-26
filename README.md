@@ -113,7 +113,7 @@ If you have ever felt anxious after missing a class, or kept dragging a progress
 | NVIDIA CUDA | Supported | You can even use an A100! If you have one. ~~(The maintainer needs six A100s to test this project.)~~ |
 | Intel integrated graphics (Iris Xe / Arc / Xe3) | Supported | Surprisingly strong; with the right settings it trades blows with a dedicated GPU. |
 | Intel NPU | Supported | For thin-and-light laptops with the "Copilot+ PC" label, on battery. A Copilot key alone isn't enough. |
-| Apple MLX | Experimental ? | Courage. Not yet verified on a real Mac. |
+| Apple MLX | Supported | Courage. Tested on a Mac mini (Apple M6); not yet on a MacBook running on battery. |
 | Google Colab | Supported | Borrow Google's GPU: started, used, and shut down for you. Paid compute recommended; the free tier is best-effort. |
 | AMD GPUs / APUs | Planned \* ? | We haven't found a device to test on yet. We will. |
 | CPU | Desktop fallback only ! | It's all compute in the end — as long as it can keep up. Never used on laptops. |
@@ -141,7 +141,7 @@ Status notes: \* may also support doing transcription and translation fully on-d
 
 ## Getting started
 
-1. Download the installer for your system from [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases): `LectureFlow-Setup-3.0.0-x64.exe` (or the portable build) for Windows, `LectureFlow-3.0.0-arm64.dmg` for Apple Silicon Macs.
+1. Download the installer for your system from [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases): `LectureFlow-Setup-3.1.0-x64.exe` (or the portable build) for Windows, `LectureFlow-3.1.0-arm64.dmg` for Apple Silicon Macs.
 2. The installers are not code-signed yet, so your system will show a security warning. See [docs/install.md](docs/install.md) for how to continue.
 3. Open LectureFlow and follow the short setup guide: choose a language, check your computer, choose a plan, download components. You can skip any step and come back later.
 4. Add a course: give it a name and a start date, and optionally paste the course outline and upload slides (not required, but they noticeably improve accuracy on technical terms).
@@ -158,7 +158,8 @@ Apart from Simplified Chinese, the interface text was translated by AI and revie
 ## Limitations
 
 - **So far it has only been tested by computer science students**, with lectures in English translated into Simplified Chinese. Medicine, law, the humanities and other subjects use different terminology and teaching styles, so results may differ. Please tell us how it goes.
-- macOS and Apple Silicon have not been verified on a real Mac.
+- On macOS it has been tested on a Mac mini (Apple M6, macOS 27) only; MacBooks running on battery have not been tried yet.
+- Whisper's large-v3 models (including large-v3-turbo, the default on Macs) often leave out punctuation and capital letters; large-v2 does not. This will be addressed in a later version.
 - AMD ROCm is not supported yet; scheduling across multiple inference backends is not smart yet.
 - Automatic transcription, correction, and translation can all make mistakes. For anything important, check the original audio.
 - It is designed for **knowledge content with reference material**, not as a general video subtitle tool. For films, anime, or live streams, please use a better-suited tool.

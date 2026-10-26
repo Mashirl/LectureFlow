@@ -15,6 +15,10 @@
 // SPEC-v3 V14.5: while a Colab session exists a line under the title says
 // how it goes ("Colab · T4 运行中 · 使用时限剩余 2 小时 13 分 · 本次还能处理约
 // 2 节"), updated in place from every resource snapshot.
+//
+// 3.1.0 M2: with nothing to transcribe with (no usable local device, Colab
+// not signed in) a prominent "cannot transcribe yet" notice with its two
+// entries comes first, also on the empty workbench (asr_ready.js).
 
 import { api } from './api.js';
 import { h, clear, btn, skeleton, errorBlock, preserveFocus, confirmDialog, toast } from './dom.js';
@@ -30,6 +34,7 @@ import { zh } from './zh_display.js';
 import { lectureTagText, lectureLabel } from './kinds.js';
 import { createUpdateHint } from './update_hint.js';
 import * as C from './settings_colab.js';
+import { asrNotice } from './asr_ready.js';
 
 const enc = encodeURIComponent;
 
@@ -48,6 +53,8 @@ export function mountDashboard(root, ctx) {
   const updateHint = createUpdateHint({ variant: 'dashboard' });
   // SPEC-v3 V14.5: the Colab line (kept across renders, filled in place)
   const colabSlot = h('div', { class: 'dash-colab-slot', role: 'status' });
+  // 3.1.0 M2: "cannot transcribe yet" (kept across renders, filled in place)
+  const asrSlot = asrNotice({ variant: 'page' });
 
   async function load() {
     try {
@@ -100,12 +107,13 @@ export function mountDashboard(root, ctx) {
         return;
       }
       if (data.courses.length === 0) {
-        el.append(emptyState(), updateHint.el);
+        el.append(asrSlot.el, emptyState(), updateHint.el);
         return;
       }
       fillColab();
       el.append(
         head(data),
+        asrSlot.el,
         colabSlot,
         devicePrompt() || '',
         h(
@@ -685,10 +693,12 @@ export function mountDashboard(root, ctx) {
       if (['lecture', 'course', 'patches', 'devices'].includes(ev.kind)) schedule('load', load); // devices: the I9 notice
       if (ev.kind === 'settings') loadSettings();
       updateHint.onChanged(ev);
+      asrSlot.onChanged(ev);
     },
     destroy() {
       alive = false;
       updateHint.destroy();
+      asrSlot.destroy();
       clearInterval(tick);
       window.removeEventListener('kindschange', onKinds);
       for (const tm of timers.values()) clearTimeout(tm);

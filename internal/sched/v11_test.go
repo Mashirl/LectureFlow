@@ -147,6 +147,9 @@ func TestDraftNeverLeavesPendingUntilLaunch(t *testing.T) {
 	}
 }
 
+// Some but not all lecture roles configured: the launch is refused. (With
+// none configured it is "只转写", SPEC-v3 V4.2 / 3.1.0: see
+// TestTranscribeOnlyLaunch in transcribe_only_test.go.)
 func TestLaunchNeedsConfiguredRoles(t *testing.T) {
 	e := newEnvOpts(t, nil, func(o *Options) {
 		// Settings without the legacy import: no provider, no role.
@@ -156,9 +159,10 @@ func TestLaunchNeedsConfiguredRoles(t *testing.T) {
 		}
 		o.Settings = s
 	}, allInstant()...)
+	e.assign(e.provider("p1", 4).ID, "model-a", model.StageSummary) // repair, translate: none
 	d := e.draft()
 	if err := e.s.Launch(e.ctx, d.ID); !errors.Is(err, settings.ErrRoleNotConfigured) {
-		t.Fatalf("launch without roles: %v", err)
+		t.Fatalf("launch with some roles: %v", err)
 	}
 	if l, _ := e.st.GetLecture(e.ctx, d.ID); l.LaunchedAt != nil {
 		t.Fatal("failed launch must leave a draft")

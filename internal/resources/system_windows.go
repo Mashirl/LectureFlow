@@ -35,6 +35,11 @@ type memoryStatusEx struct {
 	AvailExtendedVirtual uint64
 }
 
+// platformReadings: Windows gives every reading (the temperature may still
+// be null on a machine without thermal zones: "--"); its memory is not
+// unified.
+func platformReadings() ([]string, bool) { return nil, false }
+
 func readMemStatus() (totalPhys, availPhys uint64, err error) {
 	m := memoryStatusEx{Length: uint32(unsafe.Sizeof(memoryStatusEx{}))}
 	if r, _, e := procGlobalMemoryStatusEx.Call(uintptr(unsafe.Pointer(&m))); r == 0 {

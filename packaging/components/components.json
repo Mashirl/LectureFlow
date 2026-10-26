@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "serial": 1,
-  "published": "2026-10-24",
-  "app_version": "3.0.0",
+  "serial": 2,
+  "published": "2026-10-26",
+  "app_version": "3.1.0",
   "compat": ">=3.0.0 <4.0.0",
   "sources": {
     "files": {
@@ -75,7 +75,7 @@
   "components": [
     {
       "id": "core",
-      "version": "3.0.0",
+      "version": "3.1.0",
       "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1",
       "kind": "binary",
       "bundled": true,
@@ -238,6 +238,77 @@
             "sha256": "be859cc02881d46ae0e78280127169a7650134dc9629dbe07ef00e4568d934f9",
             "packages": 36
           }
+        }
+      }
+    },
+    {
+      "id": "gcloud",
+      "version": "1.0.0",
+      "upstream": "Google Cloud CLI 590.0.1 (Windows: with its bundled Python 3.14; macOS: runs on the python component)",
+      "kind": "tool",
+      "name_key": "compui.name.gcloud",
+      "desc_key": "compui.hint.gcloud",
+      "license": "Apache-2.0",
+      "license_note": "Downloaded from Google (dl.google.com) on the user's computer by the component manager and run as a separate program; not part of the LectureFlow installer and never put into an offline archive. The Google Cloud CLI is Apache-2.0 unless an alternate license file says otherwise; the Python bundled in the Windows archive (PSF-2.0, with the Microsoft C runtime DLLs) and the third-party libraries under lib/third_party and platform/ keep their own licenses (license files inside the installed tool). On Windows the component leaves out six directories of API clients and test data that LectureFlow never uses and whose paths are too long for Windows (packaging/components/README.md, Tools).",
+      "source": "https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives",
+      "revision": "590.0.1",
+      "check_args": [
+        "--version"
+      ],
+      "check_env": {
+        "CLOUDSDK_CONFIG": "{tmp}"
+      },
+      "platforms": {
+        "darwin-arm64": {
+          "download_size": 54234180,
+          "installed_size": 330000000,
+          "installed_size_estimated": true,
+          "files": [
+            {
+              "name": "google-cloud-cli-590.0.1-darwin-arm.tar.gz",
+              "url": "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-590.0.1-darwin-arm.tar.gz",
+              "sha256": "02f20618f43b9147e049a73fec37ab71b586b0dc6a242fa6ca835229cb5e542f",
+              "size": 54234180,
+              "unpack": "tar.gz",
+              "strip": "google-cloud-sdk"
+            }
+          ],
+          "exe": "bin/gcloud",
+          "depends": [
+            "python"
+          ],
+          "env": {
+            "CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK": "true",
+            "CLOUDSDK_PYTHON": "{exe:python}"
+          }
+        },
+        "windows-x64": {
+          "download_size": 104431171,
+          "installed_size": 388078184,
+          "files": [
+            {
+              "name": "google-cloud-sdk-590.0.1-windows-x86_64-bundled-python.zip",
+              "url": "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-590.0.1-windows-x86_64-bundled-python.zip",
+              "sha256": "38dad2c60c8507a2042e419ac9293e66b9f96156226c6cda92dcb1c4e8c65cf2",
+              "size": 104431171,
+              "unpack": "zip",
+              "strip": "google-cloud-sdk",
+              "exclude": [
+                "lib/googlecloudsdk/generated_clients/apis/cloudcommerceconsumerprocurement/v1alpha1/",
+                "lib/googlecloudsdk/generated_clients/gapic_clients/aiplatform_v1/services/semantic_governance_policy_engine_service/",
+                "lib/googlecloudsdk/generated_clients/gapic_clients/aiplatform_v1beta1/services/semantic_governance_policy_engine_service/",
+                "lib/googlecloudsdk/generated_clients/gapic_clients/aiplatform_v1beta1/services/semantic_governance_policy_service/",
+                "lib/googlecloudsdk/schemas/privilegedaccessmanager/",
+                "platform/gsutil/third_party/google-auth-library-python/tests/"
+              ]
+            }
+          ],
+          "exe": "bin/gcloud.cmd",
+          "env": {
+            "CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK": "true",
+            "CLOUDSDK_PYTHON": "{dir}/platform/bundledpython/python.exe"
+          },
+          "max_path": 140
         }
       }
     },

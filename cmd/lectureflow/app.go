@@ -252,6 +252,9 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 	// checks and the syllabus PDF extraction (added once the server exists).
 	use := newComponentUse(cfg)
 	use.setWork(s.WorkerUses)
+	if cb != nil {
+		use.setLogin(cb.LoginActive)
+	}
 	use.addPythons(probePythons(reg.RunningPythons))
 	comps := openComponents(ctx, cfg, st, o, use.wrapSelfTest(func(ctx context.Context, req components.SelfTestRequest) error {
 		d := stageDeps.Load()

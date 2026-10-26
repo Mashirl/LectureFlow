@@ -99,6 +99,11 @@ func (s *Server) receiveSyllabusFile(w http.ResponseWriter, r *http.Request, dir
 			if r.Context().Err() != nil {
 				return up, "", r.Context().Err()
 			}
+			var ce *model.CodedError
+			if errors.As(err, &ce) && ce.Info.Code == stages.CodeWorkerPythonNotInstalled {
+				// 3.1.0: the python component is not installed (desktop)
+				return up, "", apiErrDetail(http.StatusUnprocessableEntity, ce.Info.Code, nil, err.Error())
+			}
 			return up, "", apiErrDetail(http.StatusUnprocessableEntity, "syllabus.pdf_failed", nil, err.Error())
 		}
 		text = strings.Join(pages, "\n\n")
@@ -416,6 +421,11 @@ func (s *Server) runExtractPDF(ctx context.Context, dir, pdf string) ([]string, 
 		return nil, err
 	}
 	py := s.cfg.PDFPython() // the python component's base venv when installed (v3)
+	if py == "" {
+		// The desktop application without the python component (3.1.0):
+		// nothing to run, the component to install.
+		return nil, model.Errorf(stages.CodeWorkerPythonNotInstalled, nil, errors.New("没有安装“Python 运行环境”组件，无法从 PDF 中提取文字"))
+	}
 	if strings.ContainsAny(py, `/\`) {
 		if py, err = filepath.Abs(py); err != nil {
 			return nil, err

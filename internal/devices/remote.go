@@ -15,21 +15,7 @@ import (
 // isRemoteID: a device of the remote Colab backend (SPEC-v3 V14).
 func isRemoteID(id string) bool { return model.DeviceBackend(id) == model.BackendColab }
 
-// hiddenRemote is the id of a colab:remote row List hides now ("" = none;
-// caller holds wmu, so r.remote does not change).
-func (r *Registry) hiddenRemote(rows []model.ASRDevice) string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if r.remote {
-		return ""
-	}
-	for _, d := range rows {
-		if isRemoteID(d.ID) {
-			return d.ID
-		}
-	}
-	return ""
-}
+// A colab:remote row List hides now is one of hiddenIDs (platform.go).
 
 // SetRemote puts colab:remote into the device table (present: Colab is
 // enabled and a credential is stored; the scheduler calls it through

@@ -4,11 +4,18 @@
 // .claude/v3-brief.md §8).
 //
 // - The settings page's "Colab 远端转写" section: what is uploaded where
-//   (V14.1: the recordings go to Google's servers), the gcloud guide with
+//   (V14.1: the recordings go to Google's servers); 3.1.0: the in-app
+//   sign-in of colab_login.js (install the Google Cloud CLI component, then
+//   "sign in to Google" — the same as the onboarding's remote step), with
+//   the earlier manual way folded under "advanced: use your own gcloud":
+//   the gcloud guide with
 //   the login command the back end gives (adc.login_command), 检测授权,
 //   importing with a lifecycle (N days / this run only / until I
-//   disconnect), the authorization's state and time left, 断开连接 (which
-//   also signs gcloud's application-default login out), and the settings:
+//   disconnect); the authorization's state, time left and source
+//   (auth.source: "app" = the in-app sign-in, "gcloud" = imported from the
+//   user's own gcloud, also every 3.0.0 import), 断开连接 (which also signs
+//   gcloud's application-default login out — only for the source gcloud,
+//   whose refresh token gcloud shares), and the settings:
 //   enabled, accelerator, model and precision, paid / free tier, the
 //   longest wait for a GPU, "电池模式下优先使用 Colab". Every change is
 //   sent at once; what is shown is the last GET /api/colab or the answer
@@ -23,6 +30,7 @@ import { icon } from './icons.js';
 import { t, has } from './i18n.js';
 import * as U from './util.js';
 import { appRequest } from './settings_app.js';
+import { createColabLogin } from './colab_login.js';
 
 // ---- shared state: the resource snapshot's "remote" ----
 
@@ -214,7 +222,18 @@ export function createColabSection(ui) {
   let waitDraft = null; // the typed 等卡上限 while it is not saved
   let waitError = '';
   let modelDraft = null;
+  let advancedOpen = null; // the "use your own gcloud" fold (null: not toggled yet)
+  let loginStarted = false;
   const redraw = () => alive && ui.rerender();
+  // 3.1.0: the in-app sign-in (the gcloud component, then the Google sign-in)
+  const appLogin = createColabLogin({
+    rerender: redraw,
+    onAuthorized: async () => {
+      await load();
+      if (alive) toast(t('settings.colab.login_done'), 'success');
+    },
+    fkey: 'set:colab:login',
+  });
 
   function setView(v) {
     view = v;
@@ -293,6 +312,11 @@ export function createColabSection(ui) {
     await load();
   }
 
+  // Where the stored credential came from (auth.source): "app" = the in-app
+  // sign-in, whose token the user's own gcloud never held; anything else
+  // ("gcloud", or a back end that does not say) shares it with gcloud.
+  const fromOwnGcloud = () => ((view && view.status && view.status.auth) || {}).source !== 'app';
+
   async function disconnect() {
     if (disconnecting) return;
     const ok = await confirmDialog({
@@ -303,7 +327,11 @@ export function createColabSection(ui) {
         { class: 'colab-points' },
         h('li', null, icon('server', { size: 14 }), h('span', null, t('settings.colab.disconnect_point_release'))),
         h('li', null, icon('key-round', { size: 14 }), h('span', null, t('settings.colab.disconnect_point_revoke'))),
-        h('li', null, icon('triangle-alert', { size: 14 }), h('span', null, t('settings.colab.disconnect_point_gcloud'))),
+        // From the user's own gcloud: its application-default login uses this
+        // very token. In-app sign-in: an isolated copy, but Google revokes the
+        // account's whole grant to gcloud's client, so an own gcloud login
+        // with the same account may need signing in again too.
+        h('li', null, icon('triangle-alert', { size: 14 }), h('span', null, t(fromOwnGcloud() ? 'settings.colab.disconnect_point_gcloud' : 'settings.colab.disconnect_point_gcloud_app'))),
       ),
       okText: t('settings.colab.disconnect_ok'),
       danger: true,
@@ -329,6 +357,61 @@ export function createColabSection(ui) {
   // ---- render ----
 
   const note = (ic, text, cls = '') => h('p', { class: 'set-note' + (cls ? ' ' + cls : '') }, icon(ic, { size: 13 }), h('span', null, text));
+
+  // 3.1.0: the in-app sign-in — install the Google Cloud CLI component when
+  // it is missing, then "sign in to Google" (waiting, the fallback link,
+  // cancel, failures with gcloud's message: as in the onboarding).
+  function appLoginBlock() {
+    if (!loginStarted) {
+      loginStarted = true;
+      appLogin.start();
+    }
+    const parts = [h('p', { class: 'colab-login-hint' }, t('settings.colab.app_login_hint'))];
+    if (appLogin.loading) {
+      parts.push(note('loader-circle', t('onboarding.loading')));
+      return h('div', { class: 'colab-login' }, parts);
+    }
+    const g = appLogin.gcloud();
+    const ready = appLogin.gcloudReady();
+    if (!ready && !appLogin.installBusy) {
+      parts.push(
+        h(
+          'div',
+          { class: 'set-inline colab-login-actions' },
+          btn(t('settings.colab.install_gcloud'), { size: 'sm', kind: 'primary', icon: 'download', fkey: 'set:colab:gcloud', onclick: () => appLogin.install() }),
+          g && g.download_bytes ? h('span', { class: 'dim small' }, t('settings.colab.gcloud_size', { size: U.fmtBytes(g.download_bytes) })) : null,
+        ),
+      );
+    } else {
+      const block = appLogin.gcloudBlock();
+      if (block) parts.push(block);
+    }
+    if (appLogin.startError) parts.push(note('circle-alert', appLogin.startError, 'is-warn'));
+    if (ready) {
+      parts.push(...appLogin.loginBlock({ idleHint: false }));
+      const a = appLogin.loginAction();
+      parts.push(h('div', { class: 'set-inline colab-login-actions' }, btn(a.label, { size: 'sm', kind: 'primary', icon: a.icon, disabled: a.disabled, fkey: 'set:colab:login', onclick: a.onclick }), appLogin.cancelButton({ size: 'sm' })));
+    }
+    return h('div', { class: 'colab-login' }, parts);
+  }
+
+  // The earlier manual way, folded: run gcloud yourself, 检测授权, import.
+  function advancedBlock() {
+    const adc = view.adc || {};
+    const open = advancedOpen != null ? advancedOpen : !!(checked || adc.detected);
+    const d = h(
+      'details',
+      { class: 'colab-advanced', open },
+      h('summary', { dataset: { fkey: 'set:colab:advanced' } }, t('settings.colab.advanced')),
+      h('p', { class: 'dim small colab-advanced-hint' }, t('settings.colab.advanced_hint')),
+      guide(),
+      importRow(),
+    );
+    d.addEventListener('toggle', () => {
+      advancedOpen = d.open;
+    });
+    return d;
+  }
   const savingNote = (field) => (saving === field ? note('loader-circle', t('settings.saving')) : null);
 
   function privacyBlock() {
@@ -436,6 +519,14 @@ export function createColabSection(ui) {
     );
   }
 
+  // "导入于 {date}" with the credential's source when the back end gives it.
+  function importedText(a) {
+    const date = U.fmtDateTime(a.imported_at);
+    if (a.source === 'app') return t('settings.colab.imported_at_app', { date });
+    if (a.source === 'gcloud') return t('settings.colab.imported_at_gcloud', { date });
+    return t('settings.colab.imported_at', { date });
+  }
+
   function authRow() {
     const a = view.status.auth || {};
     if (!a.present) {
@@ -451,7 +542,7 @@ export function createColabSection(ui) {
         { class: 'colab-auth' },
         h('div', { class: 'set-inline colab-auth-line' }, h('span', { class: 'chip chip-ok' }, icon('circle-check', { size: 12 }), t('settings.colab.status_ok')), h('span', { class: 'dim small' }, lcText)),
         left ? h('span', { class: 'colab-auth-left' }, left) : null,
-        a.imported_at ? h('span', { class: 'dim small' }, t('settings.colab.imported_at', { date: U.fmtDateTime(a.imported_at) })) : null,
+        a.imported_at ? h('span', { class: 'dim small' }, importedText(a)) : null,
       ),
       null,
       btn(disconnecting ? t('settings.colab.disconnecting') : t('settings.colab.disconnect'), { size: 'sm', kind: 'danger', icon: 'lock-open', disabled: disconnecting, fkey: 'set:colab:disconnect', onclick: disconnect }),
@@ -596,9 +687,9 @@ export function createColabSection(ui) {
         privacyBlock(),
         saveError ? h('p', { class: 'set-note is-warn', role: 'alert' }, icon('circle-alert', { size: 13 }), h('span', null, saveError)) : null,
         h('h3', { class: 'colab-sub' }, t('settings.colab.auth_title')),
-        authed ? null : guide(),
+        authed ? null : appLoginBlock(),
         authRow(),
-        authed ? null : importRow(),
+        authed ? null : advancedBlock(),
         h('h3', { class: 'colab-sub' }, t('settings.colab.use_title')),
         enabledRow(),
         accelRow(),
@@ -623,8 +714,13 @@ export function createColabSection(ui) {
     onSettingsChanged() {
       if (!saving && !importing && !disconnecting) load();
     },
+    // SSE "changed colab": the in-app sign-in moved on
+    onChanged(ev) {
+      appLogin.onChanged(ev);
+    },
     destroy() {
       alive = false;
+      appLogin.destroy();
     },
   };
 }

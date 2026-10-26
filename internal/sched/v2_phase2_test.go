@@ -229,13 +229,18 @@ func TestRequestFilenameRuleConditions(t *testing.T) {
 		e.s.RequestFilenameRule(e.course.ID)
 		time.Sleep(150 * time.Millisecond)
 	}
+	// 3.1.0 "只转写": without a model the task still runs, with the
+	// built-in Panopto pattern only (internal/stages filename_fallback.go).
 	t.Run("organizer not configured", func(t *testing.T) {
 		e := newEnvOpts(t, nil, debounce)
+		if ok, err := state.RoleConfigured(e.ctx, e.st, model.RoleOrganizer); err != nil || ok {
+			t.Fatalf("organizer must start unconfigured: %v %v", ok, err)
+		}
 		e.namedLecture("a_2026-09-30.mp4")
 		e.start()
 		settle(e)
-		if e.hasJob(model.ScopeCourse, e.course.ID, model.StageFilenameRule) {
-			t.Fatal("queued without the organizer role")
+		if !e.hasJob(model.ScopeCourse, e.course.ID, model.StageFilenameRule) {
+			t.Fatal("not queued without the organizer role")
 		}
 	})
 	t.Run("names already used", func(t *testing.T) {

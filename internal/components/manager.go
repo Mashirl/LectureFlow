@@ -405,7 +405,7 @@ func (m *Manager) List() []Status {
 		seen[c.ID] = true
 		s := Status{
 			ID: c.ID, Kind: c.Kind, NameKey: c.NameKey, DescKey: c.DescKey, Version: c.Version,
-			Upstream: c.Upstream, Bundled: c.Bundled, Depends: c.Depends, Backend: c.Backend,
+			Upstream: c.Upstream, Bundled: c.Bundled, Depends: c.DependsOn(m.platform), Backend: c.Backend,
 			Model: c.Model, Precision: c.Precision, License: c.License, LicenseNote: c.LicenseNote,
 			Source: c.Source, Revision: c.Revision, Task: busy[c.ID],
 		}
@@ -452,6 +452,8 @@ func (m *Manager) intact(e Installed) bool {
 		return venvOK(filepath.Join(dir, "venv"))
 	case KindPythonRuntime:
 		return venvOK(filepath.Join(dir, "venv")) && fileExists(filepath.Join(dir, filepath.FromSlash(e.Exe)))
+	case KindTool:
+		return fileExists(filepath.Join(dir, filepath.FromSlash(e.Exe)))
 	case KindModel, KindBinary:
 		for _, f := range e.Files {
 			if fi, err := os.Stat(filepath.Join(dir, filepath.FromSlash(f.Path))); err != nil || fi.Size() != f.Size {
@@ -650,7 +652,7 @@ func (m *Manager) plan(man *Manifest, st *state, ids []string, update map[string
 			}
 			return cerr(CodeUnavailable, map[string]any{"id": id, "reason": r}, fmt.Errorf("%s is unavailable: %s", id, r))
 		}
-		for _, d := range c.Depends {
+		for _, d := range c.DependsOn(m.platform) {
 			if err := visit(d); err != nil {
 				return err
 			}
@@ -1187,15 +1189,15 @@ func (m *Manager) uninstallCheck(id string) (Installed, error) {
 	}
 	// an active task still has to install something that needs it
 	for bid, t := range busy {
-		if bc := m.man.Component(bid); bc != nil && contains(bc.Depends, id) {
+		if bc := m.man.Component(bid); bc != nil && contains(bc.DependsOn(m.platform), id) {
 			return e, cerr(CodeBusy, map[string]any{"id": id, "task": string(t)}, fmt.Errorf("%s is needed by %s being installed", id, bid))
 		}
 	}
 	var dependents []string
 	for _, oid := range m.st.sortedIDs() {
-		if oc := m.man.Component(oid); oc != nil && contains(oc.Depends, id) {
+		if oc := m.man.Component(oid); oc != nil && contains(oc.DependsOn(m.platform), id) {
 			dependents = append(dependents, oid)
-		} else if oc == nil && id == IDPython && m.st.Active[oid].Kind == KindVenv {
+		} else if oc == nil && ((id == IDPython && m.st.Active[oid].Kind == KindVenv) || envUses(m.st.Active[oid].Env, id)) {
 			dependents = append(dependents, oid)
 		}
 	}

@@ -33,6 +33,7 @@ import { filenameNotice, openFilenameRuleDialog, recordingSection } from './file
 import { zhQuery } from './zh_display.js';
 import { lectureLabel, lectureTagText, kindSearchText } from './kinds.js';
 import { bindOf, bindSelect, fromFileName, materialGroups, suggestedWeek, weekChoices } from './material_bind.js';
+import { asrNotice } from './asr_ready.js';
 
 const MEDIA_ACCEPT = 'audio/*,video/*';
 // SYLLABUS.md top-level sections (A8.3) as shown on the syllabus card;
@@ -110,6 +111,8 @@ export function mountCourse(root, route, ctx) {
   const lecUploads = h('ul', { class: 'upload-list' });
   const lecBody = h('div', { class: 'lec-body' });
   const fnNoticeEl = h('div', { class: 'fn-notice-slot' });
+  // 3.1.0 M2: "cannot transcribe yet" above the lectures (asr_ready.js)
+  const asrSlot = asrNotice({ variant: 'page' });
   // P13.6: one search over titles (both languages), blurbs and numbers
   let query = '';
   const search = h('input', {
@@ -331,7 +334,7 @@ export function mountCourse(root, route, ctx) {
     }
     if (!lecSection.isConnected) {
       clear(bodyEl);
-      bodyEl.append(lecSection, list.bar, resSection, glossary.el);
+      bodyEl.append(asrSlot.el, lecSection, list.bar, resSection, glossary.el);
     }
     renderHead();
     renderLectures();
@@ -889,10 +892,12 @@ export function mountCourse(root, route, ctx) {
       } else if (ev.kind === 'lecture') {
         schedule('lec:' + ev.id, () => refetchLecture(ev.id));
       }
+      asrSlot.onChanged(ev);
     },
     destroy() {
       alive = false;
       glossary.destroy();
+      asrSlot.destroy();
       clearInterval(tick);
       window.removeEventListener('titlelangchange', onTitleLang);
       window.removeEventListener('kindschange', onKinds);

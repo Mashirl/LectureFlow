@@ -66,8 +66,14 @@ function thinkingName(level) {
   return t('settings.roles.thinking.off');
 }
 const optionalNote = (role) => t(`settings.role_unset.${role}`);
-// a role that is not usable and needs the user (optional roles never do)
-const roleBroken = (r) => !r.configured && !OPTIONAL_ROLES.has(r.role);
+// “只转写” (3.1.0): none of the launch roles has a provider. Lectures still
+// start (transcription, playback, English subtitles); summary, correction
+// and translation wait until a provider is set up, so this is not an error.
+const LAUNCH_ROLES = ['summary', 'repair', 'translate'];
+const transcribeOnly = (roles) => LAUNCH_ROLES.every((id) => roles.some((r) => r.role === id && !r.configured));
+// a role that is not usable and needs the user (optional roles never do,
+// nor any role while nothing is set up: transcription only)
+const roleBroken = (r, _i, roles) => !r.configured && !OPTIONAL_ROLES.has(r.role) && !(roles && transcribeOnly(roles));
 // The role's name: role.{id}, else the back end's label (a role the front
 // end does not know yet).
 const roleNameOf = (r) => (has(`role.${r.role}`) ? U.roleName(r.role) : r.label);
@@ -486,6 +492,17 @@ export function mountSettings(root, ctx, route) {
   function renderAlerts() {
     clear(alerts);
     if (!data) return;
+    if (transcribeOnly(data.roles)) {
+      alerts.append(
+        h(
+          'div',
+          { class: 'banner banner-info set-banner' },
+          icon('info', { size: 16 }),
+          h('span', { class: 'set-banner-text' }, t('settings.alert.transcribe_only')),
+          btn(t('settings.alert.add_provider'), { size: 'sm', onclick: () => jump('providers'), fkey: 'set:alert:transcribe_only' }),
+        ),
+      );
+    }
     const broken = data.roles.filter(roleBroken);
     if (broken.length) {
       alerts.append(
@@ -1098,9 +1115,12 @@ export function mountSettings(root, ctx, route) {
     const rowErr = rowErrors[r.role];
     const optional = OPTIONAL_ROLES.has(r.role);
     const name = roleNameOf(r);
-    // an optional role without a usable value falls back (G2): a note, not an error
-    const serverErr = !isDirty && !r.configured && !optional ? (r.error_info ? U.errorInfoText(r.error_info, r.error) : r.error) : '';
+    // an optional role without a usable value falls back (G2): a note, not an error;
+    // while nothing is set up (transcription only) no role is an error either
+    const quiet = transcribeOnly(data.roles);
+    const serverErr = !isDirty && !r.configured && !optional && !quiet ? (r.error_info ? U.errorInfoText(r.error_info, r.error) : r.error) : '';
     const fallback = !isDirty && !r.configured && optional;
+    const unsetQuiet = !isDirty && !r.configured && !optional && quiet;
     const fk = (x) => ({ fkey: `set:role:${r.role}:${x}` });
 
     // provider
@@ -1307,7 +1327,7 @@ export function mountSettings(root, ctx, route) {
           name,
           h('span', { class: 'set-dirty-dot', title: t('settings.roles.unsaved_tip') }),
           serverErr ? h('span', { class: 'chip set-chip-err' }, prov || !v.provider_id ? t('settings.not_configured') : t('settings.roles.provider_deleted_chip')) : null,
-          fallback ? h('span', { class: 'chip chip-quiet' }, t('settings.not_configured')) : null,
+          fallback || unsetQuiet ? h('span', { class: 'chip chip-quiet' }, t('settings.not_configured')) : null,
           r.default && !isDirty ? h('span', { class: 'chip rl-default', title: t('settings.roles.default_tip') }, t('settings.roles.default_chip')) : null,
           unlisted ? h('span', { class: 'rl-unlisted tip', tabindex: '0', role: 'img', 'aria-label': unlistedTip, 'data-tip': unlistedTip, dataset: fk('unlisted') }, icon('triangle-alert', { size: 13 })) : null,
         ),
@@ -2100,6 +2120,7 @@ export function mountSettings(root, ctx, route) {
       }
       if (ev.kind === 'devices') loadSoon(); // SPEC-v2 I6-I9: rows, pauses, tests, power
       appUI.onChanged(ev); // SPEC-v3 V8: "changed update" (the update status by the channel)
+      colabUI.onChanged(ev); // 3.1.0: "changed colab" (the in-app Google sign-in)
     },
     // #/settings/asr/{device} while the page is open: jump there
     update(r) {

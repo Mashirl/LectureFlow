@@ -16,6 +16,11 @@
 // missing) and the video area shows the lecture's title and chapters; once
 // the stream becomes ready the user can switch.
 //
+// "Transcribe only" (3.1.0, lecture_english.js): while the lecture has no
+// Chinese and waits for a model provider, the subtitles and the transcript
+// show the English only (the saved display setting is kept for the other
+// lectures; C and the CC panel then switch between English and off).
+//
 // The resume position (P6.4) is saved every 5 s while playing, on pause and
 // when leaving the page. Nothing here changes server state except the
 // sentence actions of the context menu, chapter generation and the resume
@@ -37,6 +42,7 @@ import { fmtPlayerTime, sentenceStart, readPref, writePref, codeText } from './p
 import { citeRef, coursePart } from './view_transcript.js';
 import { zh } from './zh_display.js';
 import { lectureTagText } from './kinds.js';
+import { englishOnly } from './lecture_english.js';
 
 const enc = encodeURIComponent;
 
@@ -98,6 +104,7 @@ export function mountPlayer(main, route, ctx) {
     muted: !!(savedVol && savedVol.m),
     loop: null, // {idx, start, end}
     subs: Subs.loadSettings(),
+    lastOn: null, // the last subtitle display that was not off (English-only lectures turn back on with it)
     theater: !!readPref(PREF_THEATER, false),
     narrow: window.innerWidth < NARROW_BELOW,
     fs: false,
@@ -142,7 +149,7 @@ export function mountPlayer(main, route, ctx) {
   const chapters = createChapters({
     lectureId: id,
     onSeek: (ms) => seekTo(ms),
-    display: () => S.subs.display,
+    display: () => shownDisplay(),
     duration,
     time: () => S.t,
     onChange: onChaptersChanged,
@@ -186,7 +193,8 @@ export function mountPlayer(main, route, ctx) {
 
   const ccPanel = Subs.createSubsPanel({
     getSettings: () => S.subs,
-    onChange: (patch) => setSubs(patch),
+    englishOnly: () => enOnly(),
+    onChange: (patch) => setSubs(enOnly() && patch.display ? { display: patch.display === 'off' ? 'off' : onDisplay() } : patch),
     isOverlay: () => S.overlay,
     onClose: (refocus) => {
       ccBtn.setAttribute('aria-expanded', 'false');
@@ -281,11 +289,28 @@ export function mountPlayer(main, route, ctx) {
     sub.show(cueText(S.cues[i]));
   }
 
+  // "Transcribe only": English only, whatever the saved display (3.1.0).
+  function enOnly() {
+    return englishOnly(S.lec);
+  }
+
+  // The display shown now: the setting, or English for an English-only lecture.
+  function shownDisplay() {
+    const d = S.subs.display;
+    return enOnly() && d !== 'off' ? 'en' : d;
+  }
+
+  // The display to turn the subtitles back on with: the current setting
+  // unless it is off, else the last one that was on.
+  function onDisplay() {
+    return S.subs.display !== 'off' ? S.subs.display : S.lastOn || 'both';
+  }
+
   // What the band shows for the display setting (P3). Where the translation
   // is not done yet, "Chinese only" shows the English (P1).
   function cueText(c) {
     if (!c) return null;
-    switch (S.subs.display) {
+    switch (shownDisplay()) {
       case 'off':
         return null;
       case 'en':
@@ -643,11 +668,12 @@ export function mountPlayer(main, route, ctx) {
 
   function setSubs(patch) {
     const before = S.subs.display;
+    if (before !== 'off') S.lastOn = before;
     S.subs = { ...S.subs, ...patch };
     Subs.saveSettings(S.subs);
     root.dataset.order = S.subs.order;
     root.style.setProperty('--pl-ov-alpha', String(S.subs.opacity));
-    transcript.setDisplay(S.subs.display, S.subs.order);
+    transcript.setDisplay(shownDisplay(), S.subs.order);
     sub.reset();
     layout();
     showCueAt(S.scrub != null ? S.scrub : S.t, true);
@@ -660,10 +686,27 @@ export function mountPlayer(main, route, ctx) {
   }
 
   function cycleDisplay() {
-    const i = Subs.DISPLAYS.indexOf(S.subs.display);
-    const next = Subs.DISPLAYS[(i + 1) % Subs.DISPLAYS.length];
-    setSubs({ display: next });
-    osd(t('player.osd.display', { mode: t(`player.cc.display_${next}`) }));
+    if (enOnly()) {
+      // English only: C switches the subtitles off and on again
+      setSubs({ display: shownDisplay() === 'off' ? onDisplay() : 'off' });
+    } else {
+      const i = Subs.DISPLAYS.indexOf(S.subs.display);
+      setSubs({ display: Subs.DISPLAYS[(i + 1) % Subs.DISPLAYS.length] });
+    }
+    osd(t('player.osd.display', { mode: t(`player.cc.display_${shownDisplay()}`) }));
+  }
+
+  // The lecture became English-only or stopped being so (a provider was
+  // set up, its first translation arrived): redraw what depends on it.
+  function syncEnglishOnly(was) {
+    if (was === enOnly()) return;
+    transcript.setDisplay(shownDisplay(), S.subs.order);
+    sub.reset();
+    layout();
+    showCueAt(S.scrub != null ? S.scrub : S.t, true);
+    ccPanel.refresh();
+    chapters.rerender();
+    renderChapterNow();
   }
 
   // ---------------------------------------------------------------- layout (P2)
@@ -672,11 +715,11 @@ export function mountPlayer(main, route, ctx) {
     const W = stage.clientWidth;
     const H = stage.clientHeight;
     if (!W || !H) return;
-    const s = S.subs;
+    const s = { ...S.subs, display: shownDisplay() };
     const fs = Subs.fontSizes(s, H);
     root.style.setProperty('--pl-fs-en', `${fs.en}px`);
     root.style.setProperty('--pl-fs-zh', `${fs.zh}px`);
-    const lines = Subs.reservedLines(s);
+    const lines = Subs.reservedLines(s); // English only: no Chinese lines reserved
     const showSubs = s.display !== 'off';
     const padY = Math.round(Math.max(8, H * 0.016));
     const gap = lines.en && lines.zh ? Math.round(fs.zh * 0.22) : 0;
@@ -1089,8 +1132,10 @@ export function mountPlayer(main, route, ctx) {
       const l = await api.lecture(id, { quiet: true });
       if (!alive || !l) return;
       const wasStream = streamStatus();
+      const wasEn = enOnly();
       S.lec = l;
       renderHead();
+      syncEnglishOnly(wasEn);
       if (S.kind === 'audio') {
         renderAudioPanel();
         if (wasStream !== 'ready' && streamStatus() === 'ready') toast(t('player.audio.stream_ready_toast'), 'success');
@@ -1209,7 +1254,7 @@ export function mountPlayer(main, route, ctx) {
     root.dataset.side = sideMode();
     root.dataset.order = S.subs.order;
     root.style.setProperty('--pl-ov-alpha', String(S.subs.opacity));
-    transcript.setDisplay(S.subs.display, S.subs.order);
+    transcript.setDisplay(shownDisplay(), S.subs.order);
     setRate(S.rate, true);
     setVolume(S.volume, S.muted);
     applyModes();
@@ -1225,8 +1270,10 @@ export function mountPlayer(main, route, ctx) {
       return;
     }
     if (!alive) return;
+    const wasEn = enOnly();
     S.lec = lec;
     renderHead();
+    syncEnglishOnly(wasEn);
     if (!lec.playable) {
       showFatal('not_playable');
       return;

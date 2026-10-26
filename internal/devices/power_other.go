@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
 
-//go:build !windows
+//go:build !windows && !darwin
 
 package devices
 
 import "errors"
 
-// Outside Windows the power state and the available memory are unknown
-// (LectureFlow targets Windows; the tests and the scheduler handle both).
+// Outside Windows and macOS the power state and the available memory are
+// unknown (the tests and the scheduler handle both).
 
 func readPower() Power { return Power{} }
 

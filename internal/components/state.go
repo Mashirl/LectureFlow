@@ -38,8 +38,12 @@ type Installed struct {
 	// Files are the downloaded files (model, binary, the runtime archive):
 	// their sha256 lets a later install reuse them.
 	Files []InstalledFile `json:"files,omitempty"`
-	// Exe is the runtime interpreter relative to Dir (python component).
+	// Exe is the runtime interpreter (python component) or the tool's
+	// executable (tool components), relative to Dir.
 	Exe string `json:"exe,omitempty"`
+	// Env are the variable templates of a tool (Build.Env when it was
+	// installed; ToolEnv expands them).
+	Env map[string]string `json:"env,omitempty"`
 }
 
 // InstalledFile is a file of an Installed component (Path relative to its Dir).

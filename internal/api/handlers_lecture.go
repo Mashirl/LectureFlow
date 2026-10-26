@@ -496,10 +496,15 @@ func (s *Server) batchResult(ctx context.Context, id string, err error, withLect
 
 // settingsReady checks once, before a batch launch, that the current
 // settings can produce the launch snapshots (otherwise every lecture would
-// fail with the same message).
+// fail with the same message). With no lecture role configured that is
+// "只转写" (SPEC-v3 V4.2, sched.LaunchSnapshots): the launch goes ahead.
 func (s *Server) settingsReady() error {
 	if s.set == nil {
 		return nil
+	}
+	if s.sc != nil {
+		_, err := s.sc.LaunchSnapshots()
+		return err
 	}
 	_, err := s.set.CurrentSnapshots()
 	return err

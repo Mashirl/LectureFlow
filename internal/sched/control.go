@@ -304,7 +304,7 @@ func (s *Scheduler) resumeIncremental(ctx context.Context) error {
 func (s *Scheduler) WaitingFor(j model.Job) string {
 	switch j.Status {
 	case model.StatusPending:
-		ok, w, err := state.Deps(context.Background(), s.st, j)
+		ok, w, err := s.deps(context.Background(), j) // incl. no_provider (transcribe_only.go)
 		if err != nil || ok {
 			return ""
 		}

@@ -1,9 +1,10 @@
 # Components: manifest, lock files and offline archives
 
 LectureFlow's installer carries only the core (SPEC-v3 V3). Python, the
-transcription back ends and the Whisper models are *components* that the
-component manager (`internal/components`) downloads on first start, checks
-against SHA-256 and installs under `{data_dir}/components/`.
+transcription back ends, the Whisper models and the Google Cloud CLI (3.1.0)
+are *components* that the component manager (`internal/components`)
+downloads on first start, checks against SHA-256 and installs under
+`{data_dir}/components/`.
 
 | File | What it is |
 |---|---|
@@ -50,7 +51,7 @@ Component:
   "id": "asr-cuda",                // core | python | asr-* | model:{backend}:{name}:{precision}
   "version": "1.0.0",              // semver of the component (not of the upstream software)
   "upstream": "faster-whisper 1.2.1, ...",
-  "kind": "venv",                  // python-runtime | venv | model | binary
+  "kind": "venv",                  // python-runtime | venv | model | binary | tool
   "bundled": false,                // true only for core (part of the installer)
   "name_key": "...", "desc_key": "...",
   "depends": ["python"],
@@ -60,11 +61,17 @@ Component:
   "min_app": "3.1.0",              // optional
   "unavailable": "",               // a reason code: such a component is never installed
   "check_imports": ["faster_whisper", "ctranslate2"],   // the post-install check
+  "check_args": ["--version"],     // tool: the post-install check runs exe with these arguments
+  "check_env": {"CLOUDSDK_CONFIG": "{tmp}"},             // tool: variables of the check only
   "platforms": {
     "windows-x64": {
       "download_size": 0, "installed_size": 0, "installed_size_estimated": true,
-      "files": [ { "name", "url": "{models}/...", "sha256", "size", "unpack": "tar.gz|zip|" } ],
-      "exe": "python/python.exe",  // python-runtime: interpreter inside the archive
+      "files": [ { "name", "url": "{models}/...", "sha256", "size", "unpack": "tar.gz|zip|",
+                   "strip": "google-cloud-sdk",          // archives: the top-level directory to unpack the contents of
+                   "exclude": ["lib/x/"] } ],            // archives: paths (after strip) not unpacked; "dir/" or a file
+      "exe": "python/python.exe",  // python-runtime: interpreter inside the archive; tool: its executable below tool/
+      "depends": ["python"],       // dependencies on this platform only (added to the component's)
+      "env": { "CLOUDSDK_PYTHON": "{exe:python}" },     // tool: variables it runs with ({dir}, {exe:ID})
       "lock": { "path": "locks/asr-cuda-windows-x64.txt", "url": "", "sha256", "packages" },
       "offline": { "name", "sha256", "size", "url" },   // offline archive (ImportFile)
       "min_os": "13.0",
@@ -130,6 +137,70 @@ manager hard-links them instead of downloading twice), OpenVINO uses `fp16` /
    `manifest.src.json` when publishing a manifest that replaces an older one.
 5. `go test ./internal/components/...` checks the shipped manifest (valid,
    lock hashes, every hwdetect id present, every i18n key has a text).
+
+## Tools (kind `tool`): gcloud
+
+`gcloud` is Google's own Google Cloud CLI, which LectureFlow runs to sign in
+to Google for Colab (3.1.0). The component manager downloads Google's
+archive from `dl.google.com` on the user's computer, checks its SHA-256,
+unpacks it into `components/gcloud/{version}/tool/` (the archive's
+`google-cloud-sdk/` directory is stripped; it is unpacked into `.u/` and
+renamed when complete) and runs `gcloud --version` with its own temporary
+`CLOUDSDK_CONFIG` as the post-install check (it replaces the worker
+self-test of an update). `Manager.ToolPath("gcloud")` is the executable
+(`tool\bin\gcloud.cmd`, `tool/bin/gcloud`); `ToolEnv` the variables to run
+it with (`config.Config.GcloudPath` / `GcloudEnv`: the component first, else
+the `gcloud` on PATH).
+
+| Platform | Archive | Python |
+|---|---|---|
+| windows-x64 | `google-cloud-sdk-{v}-windows-x86_64-bundled-python.zip` | its bundled Python (`CLOUDSDK_PYTHON={dir}/platform/bundledpython/python.exe`) |
+| darwin-arm64 | `google-cloud-cli-{v}-darwin-arm.tar.gz` | none in Google's macOS archive (its installer would `sudo installer` a python.org package): the build depends on the `python` component and runs with `CLOUDSDK_PYTHON={exe:python}` |
+
+Pinned: Google Cloud CLI **590.0.1** (2026-10-23).
+
+| Platform | Bytes | SHA-256 | Installed bytes | `max_path` |
+|---|---:|---|---:|---:|
+| windows-x64 | 104 431 171 | `38dad2c60c8507a2042e419ac9293e66b9f96156226c6cda92dcb1c4e8c65cf2` (equal to Google's table) | 388 078 184 | 140 |
+| darwin-arm64 | 54 234 180 | `02f20618f43b9147e049a73fec37ab71b586b0dc6a242fa6ca835229cb5e542f` | 324 839 056 + `__pycache__` (330 000 000, estimated) | — |
+
+Google's versioned-archives page lists the SHA-256 of the *unversioned*
+macOS file (`google-cloud-cli-darwin-arm.tar.gz`, `71a0aab5…`); the
+versioned file differs only in its gzip header (the decompressed tar is
+byte-identical, `c8f7bd93…`), and its MD5 equals the one Google's storage
+reports (`x-goog-hash`, `cloud-sdk-release` bucket).
+
+**Windows path length.** The complete Windows tree needs 152 characters
+below the version directory, which leaves only 69 characters for the data
+directory (`TestShippedManifestPathNeeds` asks for 80). The Windows build
+therefore leaves out (`exclude`) the few directories whose paths are longer:
+two Vertex AI "semantic governance" API clients, the Privileged Access
+Manager schemas, a v1alpha1 commerce procurement client and gsutil's copy of
+the google-auth tests (180 files, 2 MB; only `gcloud ai`, `gcloud pam`,
+`gcloud commerce-procurement` subcommands that LectureFlow never runs use
+them). `max_path` 140 is measured without them.
+
+Refreshing to a newer release:
+
+1. Download both archives (versioned names), compute the SHA-256 and compare
+   the Windows one with
+   https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives
+   (while that version is current), the macOS one via the decompressed tar or
+   the storage MD5 as above. Check that the Windows archive still has
+   `platform/bundledpython/` and whether the macOS one gained a Python.
+2. Edit the `gcloud` entry of `manifest.src.json` (URL, `sha256`, `size`,
+   `download_size`, `upstream`, `revision`, a new component `version`).
+3. Measure: `go test -tags realnet -run TestRealNetGcloud -v ./internal/components/`
+   on Windows and on the Mac (`LF_REALNET_UV=$(which uv)`) installs it,
+   runs `--version`, the sign-in up to its link (`--no-launch-browser`, empty
+   input: nothing signs in) and logs the installed size and the longest path;
+   update `installed_size`, `max_path` and `exclude`.
+4. `go run ./packaging/components/gen` (it checks every tool URL with a HEAD
+   request against the pinned size) and `make.ps1 audit`.
+
+A tool never gets an offline archive (`gen -offline` refuses it, `licaudit`
+fails an `offline` entry): it is downloaded from its vendor, LectureFlow does
+not redistribute it. THIRD_PARTY_NOTICES.md lists it in section 10.
 
 ## Offline archives
 

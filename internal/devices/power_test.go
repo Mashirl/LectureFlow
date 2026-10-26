@@ -66,11 +66,81 @@ func TestPowerBatteryMachine(t *testing.T) {
 	}
 }
 
+// pmset output → Power (macOS, mac-opti). The Mac mini lines are a real
+// reading (Apple M6, macOS 27); the MacBook lines follow pmset's format
+// (power source, charge, state, estimate, present).
+func TestPowerFromPmset(t *testing.T) {
+	const lowPowerOn = "Currently in use:\n standby              0\n lowpowermode         1\n womp                 1\n"
+	const lowPowerOff = "Currently in use:\n lowpowermode         0\n"
+	const (
+		onAC      = "Now drawing from 'AC Power'\n"
+		onBattery = "Now drawing from 'Battery Power'\n"
+		onUPS     = "Now drawing from 'UPS Power'\n"
+	)
+	battery := func(rest string) string { return " -InternalBattery-0 (id=24117347)\t" + rest + "\n" }
+	for _, c := range []struct {
+		name, batt, settings string
+		want                 Power
+	}{
+		{"Mac mini (real)", onAC, lowPowerOff, Power{Known: true}},
+		{"Mac mini, Low Power Mode", onAC, lowPowerOn, Power{Known: true, Saver: true}},
+		{"MacBook on battery", onBattery + battery("54%; discharging; 3:44 remaining present: true"),
+			lowPowerOff, Power{Known: true, OnBattery: true, HasBattery: true, BatteryPct: pct(54)}},
+		{"MacBook on battery, Low Power Mode", onBattery + battery("18%; discharging; (no estimate) present: true"),
+			lowPowerOn, Power{Known: true, OnBattery: true, Saver: true, HasBattery: true, BatteryPct: pct(18)}},
+		{"MacBook charging", onAC + battery("75%; charging; 0:45 remaining present: true"),
+			lowPowerOff, Power{Known: true, HasBattery: true, Charging: true, BatteryPct: pct(75)}},
+		{"MacBook finishing charge", onAC + battery("99%; finishing charge; 0:05 remaining present: true"),
+			"", Power{Known: true, HasBattery: true, Charging: true, BatteryPct: pct(99)}},
+		{"MacBook charged", onAC + battery("100%; charged; 0:00 remaining present: true"),
+			"", Power{Known: true, HasBattery: true, BatteryPct: pct(100)}},
+		{"MacBook held at 80% (optimised charging)", onAC + battery("80%; AC attached; not charging present: true"),
+			"", Power{Known: true, HasBattery: true, BatteryPct: pct(80)}},
+		{"battery removed", onAC + battery("0%; AC attached; not charging present: false"), "", Power{Known: true}},
+		{"Mac mini on a UPS", onUPS + " -Back-UPS ES 700 (id=1234)\t96%; discharging; 0:21 remaining present: true\n", "", Power{Known: true}},
+		{"Mac mini, UPS on standby", onAC + " -Back-UPS ES 700 (id=1234)\t100%; charged; 0:00 remaining present: true\n", "", Power{Known: true}},
+		{"on battery without a battery line", onBattery, "", Power{Known: true, OnBattery: true, HasBattery: true}},
+		{"charge out of range", onAC + battery("101%; charging; present: true"), "", Power{Known: true, HasBattery: true, Charging: true}},
+		// A MacBook Air (Mac16,12, Apple M4, macOS 27.0.1), real readings
+		// (2026-10-27; the battery id replaced): plugged in and full,
+		// unplugged, unplugged with Low Power Mode.
+		{"MacBook Air plugged in, full (real)", onAC + " -InternalBattery-0 (id=1000001)\t100%; charged; 0:00 remaining present: true\n",
+			" lowpowermode         0\n", Power{Known: true, HasBattery: true, BatteryPct: pct(100)}},
+		{"MacBook Air unplugged (real)", onBattery + " -InternalBattery-0 (id=1000001)\t100%; discharging; (no estimate) present: true\n",
+			" lowpowermode         0\n", Power{Known: true, OnBattery: true, HasBattery: true, BatteryPct: pct(100)}},
+		{"MacBook Air unplugged, Low Power Mode (real)", onBattery + " -InternalBattery-0 (id=1000001)\t100%; discharging; (no estimate) present: true\n",
+			" lowpowermode         1\n", Power{Known: true, OnBattery: true, Saver: true, HasBattery: true, BatteryPct: pct(100)}},
+		{"empty output (pmset failed)", "", lowPowerOn, Power{}},
+		{"unrelated output", "pmset: unknown option\n", "", Power{}},
+	} {
+		if got := PowerFromPmset(c.batt, c.settings); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: %+v, want %+v", c.name, got, c.want)
+		}
+	}
+	if p := PowerFromPmset(onBattery+battery("54%; discharging; 3:44 remaining present: true"), ""); !p.BatteryMachine() || !p.OnBatteryPower() {
+		t.Errorf("a MacBook on battery is a battery machine on battery: %+v", p)
+	}
+	if p := PowerFromPmset(onUPS, ""); p.BatteryMachine() {
+		t.Errorf("a desktop on a UPS is not a battery machine: %+v", p)
+	}
+}
+
 // The real readings: on Windows the calls succeed (the values depend on the
-// machine); elsewhere they are unknown.
+// machine); on macOS pmset answers (the AC state is known) and the
+// available unified memory is read through Mach; elsewhere both are
+// unknown.
 func TestReadPowerAndMemory(t *testing.T) {
 	p := ReadPower()
 	mb, err := AvailableMemoryMB()
+	if runtime.GOOS == "darwin" {
+		if !p.Known || err != nil || mb <= 0 {
+			t.Fatalf("macOS: %+v %d %v", p, mb, err)
+		}
+		if again := ReadPower(); !reflect.DeepEqual(again, p) {
+			t.Fatalf("macOS: a second reading within the cache interval differs: %+v %+v", p, again)
+		}
+		return
+	}
 	if runtime.GOOS != "windows" {
 		if p.Known || err == nil {
 			t.Fatalf("not Windows: %+v %d %v", p, mb, err)

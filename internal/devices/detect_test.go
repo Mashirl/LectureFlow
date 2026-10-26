@@ -121,6 +121,16 @@ func TestWorkerProbe(t *testing.T) {
 	if e := d.OVErr; e == nil || e.Code != CodeOVPythonMissing || e.Params["path"] != cfg.PythonOpenVINO || d.Python != cfg.PythonOpenVINO {
 		t.Fatalf("python missing: %+v", e)
 	}
+	// 3.1.0: no interpreter at all (the desktop application without
+	// asr-openvino): devices.ov_not_installed without a path, no process.
+	cfg.PythonOpenVINO = ""
+	d, _, _ = r.Detect(tctx())
+	if e := d.OVErr; e == nil || e.Code != CodeOVNotInstalled || len(e.Params) != 0 || d.Python != "" || d.OV != nil {
+		t.Fatalf("not installed: %+v (python %q)", e, d.Python)
+	}
+	if got := r.RunningPythons(); len(got) != 0 {
+		t.Fatalf("running %v", got)
+	}
 	// No worker script: probe_failed (python would exit 2 for a missing
 	// script, which is not an import failure).
 	cfg.PythonOpenVINO = probeConfig(t).PythonOpenVINO

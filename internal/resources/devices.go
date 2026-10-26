@@ -319,6 +319,8 @@ func (s *Service) deviceCards(in deviceInput, g GPU, asr model.ASRSettings) ([]D
 					c.MemUsedMB, c.MemTotalMB = cloneInt(v), cloneInt(sharedTotal)
 				}
 			}
+		case model.DeviceKindApple: // mac-opti M6: ioreg (apple.go)
+			s.appleCard(&c)
 		}
 		cards = append(cards, c)
 	}

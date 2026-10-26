@@ -64,6 +64,7 @@ func init() {
 		handle("GET /api/app/storage", a(m.setStorage))
 		handle("GET /api/app/data-dir", a(m.setDataDirStatus))
 		handle("POST /api/app/data-dir", a(m.setMove))
+		handle("POST /api/app/data-dir/check", a(m.setCheckDir)) // 3.1.0 (v31_onboarding.go)
 		handle("GET /api/app/old-data-dir", a(m.setGetOld))
 		handle("DELETE /api/app/old-data-dir", a(m.setDeleteOld))
 		handle("POST /api/app/open-logs", a(m.setOpenLogs))
@@ -86,6 +87,8 @@ type setMoveRun struct {
 	path    string
 	started time.Time
 	fail    bool
+	total   int64         // bytes to copy
+	copyDur time.Duration // how long the copy takes
 }
 
 var setStates sync.Map // *mock → *setState
@@ -157,7 +160,7 @@ func (m *mock) setStorage(w http.ResponseWriter, r *http.Request, _ *store) {
 	st := m.appSet()
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	writeJSON(w, http.StatusOK, api.AppStorage{DataDir: st.dataDir, UsedBytes: setDataSize, FreeBytes: 118_400_000_000})
+	writeJSON(w, http.StatusOK, api.AppStorage{DataDir: st.dataDir, UsedBytes: setDataSize, FreeBytes: setFreeBytes(st.dataDir, obMode(r))})
 }
 
 // status advances the simulated move; after the restart gap the "new
@@ -168,22 +171,22 @@ func (st *setState) status(now time.Time) (api.DataDirStatus, bool) {
 	if mv == nil {
 		return out, true
 	}
-	out.Kind, out.Path, out.TotalBytes = "move", mv.path, setDataSize
+	out.Kind, out.Path, out.TotalBytes = "move", mv.path, mv.total
 	el := now.Sub(mv.started)
-	frac := float64(el) / float64(setCopyDuration)
+	frac := float64(el) / float64(mv.copyDur)
 	switch {
 	case mv.fail && frac >= 0.4:
-		out.State, out.CopiedBytes = "failed", int64(0.4*float64(setDataSize))
+		out.State, out.CopiedBytes = "failed", int64(0.4*float64(mv.total))
 		out.Error = &model.ErrorInfo{Code: "data_dir.copy_failed", Params: map[string]any{"path": mv.path + `\lectures\01JD3631\media.mp4`}}
 	case frac < 1:
-		out.State, out.CopiedBytes = "copying", int64(frac*float64(setDataSize))
-	case el < setCopyDuration+setVerifyDuration:
-		out.State, out.CopiedBytes = "verifying", setDataSize
-	case el < setCopyDuration+setVerifyDuration+setRestartGap:
-		out.State, out.CopiedBytes = "done", setDataSize
+		out.State, out.CopiedBytes = "copying", int64(frac*float64(mv.total))
+	case el < mv.copyDur+setVerifyDuration:
+		out.State, out.CopiedBytes = "verifying", mv.total
+	case el < mv.copyDur+setVerifyDuration+setRestartGap:
+		out.State, out.CopiedBytes = "done", mv.total
 		return out, false // restarting
 	default: // the restarted server
-		st.oldDir, st.oldBytes = st.dataDir, setDataSize
+		st.oldDir, st.oldBytes = st.dataDir, mv.total
 		st.dataDir = mv.path
 		st.move = nil
 		return api.DataDirStatus{State: "idle", DataDir: st.dataDir, CanMove: true}, true
@@ -200,7 +203,8 @@ func (m *mock) setDataDirStatus(w http.ResponseWriter, r *http.Request, _ *store
 		codedError(w, http.StatusServiceUnavailable, "server.unavailable", map[string]any{"service": "restart"})
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	// 3.1.0: free_bytes of the data folder's disk (v31_onboarding.go)
+	writeJSON(w, http.StatusOK, setDataDirView{DataDirStatus: out, FreeBytes: setFreeBytes(out.DataDir, obMode(r))})
 }
 
 func (m *mock) setHealth(w http.ResponseWriter, r *http.Request, _ *store) {
@@ -224,32 +228,44 @@ func (m *mock) setMove(w http.ResponseWriter, r *http.Request, _ *store) {
 		return
 	}
 	p := strings.TrimSpace(in.Path)
-	lp := strings.ToLower(p)
-	switch {
-	case p == "" || !(strings.Contains(p, `:\`) || strings.HasPrefix(p, "/")):
-		codedError(w, http.StatusBadRequest, "data_dir.path_invalid", map[string]any{"path": p})
-		return
-	case strings.Contains(lp, "busy"):
-		codedError(w, http.StatusConflict, "data_dir.busy", map[string]any{"running": 1, "queued": 2})
-		return
-	case strings.Contains(lp, "notempty"):
-		codedError(w, http.StatusConflict, "data_dir.target_not_empty", map[string]any{"path": p})
-		return
-	}
 	st := m.appSet()
 	st.mu.Lock()
 	defer st.mu.Unlock()
-	if cur, _ := st.status(time.Now()); cur.State == "copying" || cur.State == "verifying" {
-		codedError(w, http.StatusConflict, "data_dir.in_progress", nil)
+	if status, info := st.checkTarget(p); info != nil {
+		writeJSON(w, status, api.ErrorBody{Error: *info})
 		return
 	}
-	if strings.EqualFold(p, st.dataDir) {
-		codedError(w, http.StatusConflict, "data_dir.same_dir", nil)
-		return
+	mv := &setMoveRun{path: p, started: time.Now(), fail: strings.Contains(strings.ToLower(p), "fail"), total: setDataSize, copyDur: setCopyDuration}
+	if strings.HasPrefix(scenario(r), "ob_") {
+		// the onboarding's move: a fresh install has hardly any data
+		mv.total, mv.copyDur = setFreshSize, setFreshCopy
 	}
-	st.move = &setMoveRun{path: p, started: time.Now(), fail: strings.Contains(lp, "fail")}
+	st.move = mv
 	out, _ := st.status(time.Now())
 	writeJSON(w, http.StatusAccepted, out)
+}
+
+// checkTarget applies the refusals of POST /api/app/data-dir to path p (also
+// POST /api/app/data-dir/check): the HTTP status and the error, or nil.
+// Paths containing "busy" / "notempty" are refused like a running job / a
+// folder with files. Must hold st.mu.
+func (st *setState) checkTarget(p string) (int, *model.ErrorInfo) {
+	lp := strings.ToLower(p)
+	switch {
+	case p == "" || !(strings.Contains(p, `:\`) || strings.HasPrefix(p, "/")):
+		return http.StatusBadRequest, &model.ErrorInfo{Code: "data_dir.path_invalid", Params: map[string]any{"path": p}}
+	case strings.Contains(lp, "busy"):
+		return http.StatusConflict, &model.ErrorInfo{Code: "data_dir.busy", Params: map[string]any{"running": 1, "queued": 2}}
+	case strings.Contains(lp, "notempty"):
+		return http.StatusConflict, &model.ErrorInfo{Code: "data_dir.target_not_empty", Params: map[string]any{"path": p}}
+	}
+	if cur, _ := st.status(time.Now()); cur.State == "copying" || cur.State == "verifying" {
+		return http.StatusConflict, &model.ErrorInfo{Code: "data_dir.in_progress"}
+	}
+	if strings.EqualFold(p, st.dataDir) {
+		return http.StatusConflict, &model.ErrorInfo{Code: "data_dir.same_dir"}
+	}
+	return 0, nil
 }
 
 func (m *mock) setGetOld(w http.ResponseWriter, r *http.Request, _ *store) {

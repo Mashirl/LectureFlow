@@ -108,8 +108,12 @@ func lockFiles(src *srcManifest, dir, id string) ([]string, error) {
 }
 
 // offlineRefusal explains why id must not get an offline archive ("" = it
-// may): its lock files contain user-fetched packages, or cannot be read.
+// may): it is a tool (tools.go), its lock files contain user-fetched
+// packages, or they cannot be read.
 func offlineRefusal(src *srcManifest, dir, id string, uf userFetched) string {
+	if why := toolRefusal(src, id); why != "" {
+		return why
+	}
 	locks, err := lockFiles(src, dir, id)
 	if err != nil {
 		return fmt.Sprintf("cannot read the manifest source: %v", err)

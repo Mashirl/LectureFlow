@@ -125,6 +125,33 @@ func (l Lifecycle) valid() bool {
 	return false
 }
 
+// ---- credential source ----
+
+// Credential sources (CredentialInfo.Source, 3.1.0): where the imported ADC
+// file came from. They decide what "断开连接" means for the user's own
+// gcloud.
+const (
+	// SourceApp: the in-app sign-in (Login). gcloud ran in the app's own
+	// configuration directory, whose ADC file is wiped right after the
+	// import: the user's own gcloud holds no copy of this refresh token.
+	SourceApp = "app"
+	// SourceGcloud: the user's own gcloud ADC file ("导入授权", ImportADC).
+	// gcloud keeps the same refresh token, so revoking it also signs
+	// gcloud's application-default login out (remote.gcloud_signed_out). A
+	// stored credential without a source (imported by 3.0.0) is this one.
+	SourceGcloud = "gcloud"
+)
+
+// normSource is the source a stored or requested value stands for: only
+// SourceApp is taken as given; anything else ("" of a 3.0.0 record, an
+// unknown value) is SourceGcloud, whose disconnect warns about gcloud.
+func normSource(s string) string {
+	if s == SourceApp {
+		return SourceApp
+	}
+	return SourceGcloud
+}
+
 // ---- stored credential ----
 
 // storedCredential is kv colab.credential. It holds secrets: it is never
@@ -140,6 +167,9 @@ type storedCredential struct {
 	ExpiresAt    time.Time `json:"expires_at,omitzero"` // LifecycleDays: ImportedAt + Days
 	RunID        string    `json:"run_id,omitempty"`    // LifecycleSession: the run that imported it
 	Scopes       []string  `json:"scopes,omitempty"`    // as Google reported them when importing
+	// Source is SourceApp or SourceGcloud (3.1.0); absent in a 3.0.0
+	// record, which counts as SourceGcloud (normSource).
+	Source string `json:"source,omitempty"`
 }
 
 // String, GoString, LogValue and Format keep every formatting of the
@@ -183,6 +213,10 @@ type CredentialInfo struct {
 	// RemainingSec until ExpiresAt; -1 = no time limit (session, manual).
 	RemainingSec int64    `json:"remaining_sec"`
 	Scopes       []string `json:"scopes,omitempty"`
+	// Source: SourceApp (the in-app sign-in) or SourceGcloud (imported from
+	// the user's own gcloud; also every credential 3.0.0 imported). Absent
+	// when no credential is present.
+	Source string `json:"source,omitempty"`
 }
 
 // ADCInfo is what "检测授权" shows before importing.
@@ -383,7 +417,7 @@ func (a *authManager) info(ctx context.Context) CredentialInfo {
 func describe(c *storedCredential, now time.Time) CredentialInfo {
 	imp := c.ImportedAt
 	info := CredentialInfo{Present: true, Lifecycle: c.Lifecycle.String(), ImportedAt: &imp, RemainingSec: -1,
-		Scopes: slices.Clone(c.Scopes)}
+		Scopes: slices.Clone(c.Scopes), Source: normSource(c.Source)}
 	if d, ok := c.deadline(); ok {
 		info.ExpiresAt = &d
 		info.RemainingSec = max(0, int64(d.Sub(now)/time.Second))
@@ -516,8 +550,9 @@ func (a *authManager) refresh(ctx context.Context, c *storedCredential, stored b
 }
 
 // importADC reads the ADC file at path, checks it with one refresh
-// (scopes included) and stores it with the lifecycle.
-func (a *authManager) importADC(ctx context.Context, path string, lc Lifecycle) (CredentialInfo, error) {
+// (scopes included) and stores it with the lifecycle and its source
+// (SourceApp or SourceGcloud; normSource).
+func (a *authManager) importADC(ctx context.Context, path string, lc Lifecycle, source string) (CredentialInfo, error) {
 	if !lc.valid() {
 		return CredentialInfo{RemainingSec: -1}, newErr(CodeLifecycleInvalid, map[string]any{"value": lc.String()}, kindLocal, "",
 			errors.New("unknown credential lifecycle"))
@@ -530,7 +565,7 @@ func (a *authManager) importADC(ctx context.Context, path string, lc Lifecycle) 
 	now := a.now()
 	c := &storedCredential{
 		Version: credVersion, ClientID: f.ClientID, ClientSecret: f.ClientSecret, RefreshToken: f.RefreshToken,
-		QuotaProject: f.QuotaProject, Lifecycle: lc, ImportedAt: now,
+		QuotaProject: f.QuotaProject, Lifecycle: lc, ImportedAt: now, Source: normSource(source),
 	}
 	switch lc.Kind {
 	case LifecycleDays:
@@ -568,7 +603,7 @@ func (a *authManager) importADC(ctx context.Context, path string, lc Lifecycle) 
 		return CredentialInfo{RemainingSec: -1}, err
 	}
 	a.access, a.accessExp = tok, exp
-	a.log.Info("colab: credential imported", "lifecycle", lc.String())
+	a.log.Info("colab: credential imported", "lifecycle", lc.String(), "source", c.Source)
 	return describe(c, now), nil
 }
 
@@ -576,26 +611,28 @@ func (a *authManager) importADC(ctx context.Context, path string, lc Lifecycle) 
 // copy whatever the revocation's outcome ("断开连接", V14.2). The error is
 // CodeRevokeFailed when Google could not be told; the local copy is gone
 // either way. Without a stored credential it only clears the memory.
-func (a *authManager) revokeAndDelete(ctx context.Context) (bool, error) {
+// source is the stored credential's (normSource; "" when there was none).
+func (a *authManager) revokeAndDelete(ctx context.Context) (revoked bool, source string, err error) {
 	v, ok, err := getKV(ctx, a.kv, KVCredential)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	var c storedCredential
 	if !ok || json.Unmarshal([]byte(v), &c) != nil || c.RefreshToken == "" {
-		return false, a.deleteLocal(ctx)
+		return false, "", a.deleteLocal(ctx)
 	}
+	source = normSource(c.Source)
 	a.secrets.add(c.RefreshToken, c.ClientSecret)
 	revokeErr := a.revoke(ctx, c.RefreshToken)
 	if err := a.deleteLocal(ctx); err != nil {
-		return false, err
+		return false, source, err
 	}
 	if revokeErr != nil {
-		a.log.Warn("colab: revoking the credential failed; the local copy was deleted", "code", Code(revokeErr))
-		return false, revokeErr
+		a.log.Warn("colab: revoking the credential failed; the local copy was deleted", "code", Code(revokeErr), "source", source)
+		return false, source, revokeErr
 	}
-	a.log.Info("colab: credential revoked and deleted")
-	return true, nil
+	a.log.Info("colab: credential revoked and deleted", "source", source)
+	return true, source, nil
 }
 
 // revoke calls Google's revocation endpoint (RFC 7009). A token Google

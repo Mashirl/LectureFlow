@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -105,7 +106,7 @@ func (e *ddEnv) waitRun() {
 func TestDataDirWebModeNotFound(t *testing.T) {
 	e := newEnv(t)
 	for _, c := range []struct{ method, path string }{
-		{"GET", "/api/app/data-dir"}, {"POST", "/api/app/data-dir"}, {"GET", "/api/app/import"},
+		{"GET", "/api/app/data-dir"}, {"POST", "/api/app/data-dir"}, {"POST", "/api/app/data-dir/check"}, {"GET", "/api/app/import"},
 		{"POST", "/api/app/import"}, {"GET", "/api/app/old-data-dir"}, {"DELETE", "/api/app/old-data-dir"},
 	} {
 		res, b := e.do(c.method, c.path, map[string]string{"path": "C:\\x"})
@@ -422,5 +423,130 @@ func writeTree(t *testing.T, root string, files map[string]string) {
 		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// 3.1.0 (.claude/v31-brief.md §2.2): GET /api/app/data-dir reports the free
+// space of the data directory's volume (-1 when it cannot be read).
+func TestDataDirFreeBytes(t *testing.T) {
+	e := newDDEnv(t)
+	var asked []string
+	e.srv.freeSpace = func(dir string) (int64, error) {
+		asked = append(asked, dir)
+		return 123 << 30, nil
+	}
+	if st := e.status(); st.FreeBytes != 123<<30 || len(asked) != 1 || !samePathOS(asked[0], e.srv.absDataDir()) {
+		t.Fatalf("free_bytes %d (asked %v)", st.FreeBytes, asked)
+	}
+	e.srv.freeSpace = func(string) (int64, error) { return 0, errors.New("no statfs") }
+	if st := e.status(); st.FreeBytes != -1 {
+		t.Fatalf("unreadable: free_bytes %d", st.FreeBytes)
+	}
+	// A directory not created yet: its nearest existing parent's volume.
+	e.srv.freeSpace = diskFree
+	if got := e.srv.volumeFree(filepath.Join(t.TempDir(), "not", "yet")); got <= 0 {
+		t.Fatalf("volumeFree of a missing directory: %d", got)
+	}
+	if got := e.srv.volumeFree("relative"); got != -1 {
+		t.Fatalf("volumeFree of a relative path: %d", got)
+	}
+	_, b := e.req("GET", "/api/app/data-dir", nil)
+	if !bytes.Contains(b, []byte(`"free_bytes":`)) {
+		t.Fatalf("no free_bytes in %s", b)
+	}
+}
+
+func (e *ddEnv) check(path string) DataDirCheck {
+	e.t.Helper()
+	res, b := e.req("POST", "/api/app/data-dir/check", map[string]string{"path": path})
+	if res.StatusCode != http.StatusOK {
+		e.t.Fatalf("check %q: %d %s", path, res.StatusCode, b)
+	}
+	var c DataDirCheck
+	if err := json.Unmarshal(b, &c); err != nil {
+		e.t.Fatal(err)
+	}
+	if !bytes.Contains(b, []byte(`"error":`)) || c.OK != (c.Error == nil) ||
+		(c.Error != nil && checkErrorBody(mustJSONBytes(e.t, ErrorBody{Error: *c.Error})) != "") {
+		e.t.Fatalf("check %q: inconsistent body %s", path, b)
+	}
+	return c
+}
+
+// POST /api/app/data-dir/check: the checks of the move, with its codes, as
+// {ok, error}; nothing is copied, claimed or restarted.
+func TestDataDirCheck(t *testing.T) {
+	e := newDDEnv(t)
+	e.srv.dataDirRun().move = func(context.Context, relocate.MoveOptions) error {
+		t.Error("the check moved the data")
+		return nil
+	}
+	dst := filepath.Join(t.TempDir(), "Big Disk", "LectureFlow")
+	c := e.check(dst + string(filepath.Separator))
+	if !c.OK || c.Error != nil || !samePathOS(c.Path, dst) || c.FreeBytes <= 0 {
+		t.Fatalf("good target: %+v", c)
+	}
+	if pathExists(dst) || pathExists(e.loc) || e.status().State != ddIdle || e.restarts.Load() != 0 {
+		t.Fatal("the check changed something")
+	}
+
+	// The refusals of POST /api/app/data-dir, as 200 {ok: false}.
+	full := filepath.Join(t.TempDir(), "full")
+	writeTree(t, full, map[string]string{"x": "x"})
+	for _, tc := range []struct {
+		path, code string
+		free       bool // free_bytes known
+	}{
+		{"relative", "data_dir.path_invalid", false},
+		{"", "data_dir.path_invalid", false},
+		{e.cfg.DataDir, "data_dir.same_dir", true},
+		{filepath.Join(e.cfg.DataDir, "inner"), "data_dir.target_inside_source", true},
+		{filepath.Dir(e.cfg.DataDir), "data_dir.target_contains_source", true},
+		{full, "data_dir.target_not_empty", true},
+	} {
+		c := e.check(tc.path)
+		if c.OK || c.Error == nil || c.Error.Code != tc.code || (c.FreeBytes > 0) != tc.free {
+			t.Errorf("%q: %+v / %+v", tc.path, c, c.Error)
+		}
+	}
+	if c := e.check("relative"); c.Path != "relative" || c.FreeBytes != -1 {
+		t.Errorf("relative path echoed as %+v", c)
+	}
+
+	// A move running or waiting for the restart: data_dir.in_progress.
+	run := e.srv.dataDirRun()
+	run.mu.Lock()
+	run.busy = true
+	run.mu.Unlock()
+	if c := e.check(dst); c.OK || c.Error.Code != "data_dir.in_progress" {
+		t.Errorf("in progress: %+v", c)
+	}
+	run.release()
+
+	// The data directory from LECTUREFLOW_DATA_DIR: data_dir.env_override.
+	e.d.LocationFile = ""
+	if c := e.check(dst); c.OK || c.Error.Code != "data_dir.env_override" {
+		t.Errorf("env override: %+v", c)
+	}
+	e.d.LocationFile = e.loc
+
+	// Jobs running or queued: data_dir.busy {running, queued}.
+	e.asWeb(func() {
+		co := e.course("Busy")
+		l := e.lecture(co.ID, "W1")
+		if j := e.moveJob(model.ScopeLecture, l.ID, model.StagePrep); j.Status != model.StatusQueued {
+			e.moveJob(model.ScopeLecture, l.ID, model.StagePrep, model.StatusQueued)
+		}
+	})
+	if c := e.check(dst); c.OK || c.Error.Code != "data_dir.busy" || c.Error.Params["queued"] != float64(1) {
+		t.Errorf("busy: %+v / %+v", c, c.Error)
+	}
+
+	res, b := e.doWith("POST", "/api/app/data-dir/check", []byte("{"), testToken, "")
+	if res.StatusCode != http.StatusBadRequest || errCode(t, b) != "request.bad_json" {
+		t.Fatalf("bad JSON: %d %s", res.StatusCode, b)
+	}
+	if e.status().State != ddIdle || e.restarts.Load() != 0 || pathExists(e.loc) {
+		t.Fatal("a check changed the state")
 	}
 }

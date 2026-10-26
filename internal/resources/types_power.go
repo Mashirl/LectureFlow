@@ -38,6 +38,16 @@ type System struct {
 	// Information(*)\Temperature", Kelvin → °C, rounded); null when no zone
 	// reports one (common on desktops and some laptops).
 	CPUTempC *int `json:"cpu_temp_c"`
+
+	// mac-opti M6 (apple.go). Unsupported names the readings this system
+	// cannot give at all (ReadingCPUTemp on macOS): the front end leaves
+	// them out instead of showing "--" (null alone means "not known right
+	// now"); omitted when every reading is supported (Windows).
+	Unsupported []string `json:"unsupported,omitempty"`
+	// UnifiedMemory: the memory is shared by the CPU and the GPU (Apple
+	// silicon): MemUsedMB / MemTotalMB are the unified memory, the GPU has
+	// no memory of its own ("显存"). Omitted (false) elsewhere.
+	UnifiedMemory bool `json:"unified_memory,omitempty"`
 }
 
 // Policy is the power policy's state (sched.PowerStatus →

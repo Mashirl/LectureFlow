@@ -8,13 +8,17 @@
 // lecture kinds: the eyebrow says "CSC1003 · Week 1 · Lecture · No. 2" (the
 // citation number on hover), and the slides this lecture uses are listed
 // with where they come from (its week, itself, the whole course).
+// "Transcribe only" (3.1.0, lecture_english.js): while the API stages wait
+// for a model provider, a notice says so (with a link to the providers),
+// Play is the primary action, and the English subtitles and transcript are
+// in the download menu as soon as asr is done.
 
 import { api } from './api.js';
 import { h, clear, btn, iconBtn, preserveFocus, toast } from './dom.js';
 import { icon } from './icons.js';
 import { pipelineBar } from './pipeline.js';
 import { menuButton, bindContextMenu } from './menu.js';
-import { downloadMenu } from './widgets.js';
+import { lectureDownloadMenu, waitsForProvider, englishOnly } from './lecture_english.js';
 import * as A from './actions.js';
 import * as Clip from './audiobar.js';
 import { mountTranscript } from './view_transcript.js';
@@ -165,15 +169,18 @@ export function mountLecture(root, route, ctx) {
   function headActions(lec) {
     const acts = lec.lecture_actions || [];
     const out = [];
-    // SPEC-v2 P1: Play once asr is done (primary when everything is done)
-    if (lec.playable) out.push(btn(t('player.entry.play'), { kind: U.isAllDone(lec.stages) && !acts.includes('update') ? 'primary' : '', icon: 'play', fkey: `lecd:${lec.id}:play`, title: t('player.entry.play_hint'), onclick: () => (location.hash = `#/play/${encodeURIComponent(lec.id)}`) }));
+    // SPEC-v2 P1: Play once asr is done (primary when everything is done,
+    // or when the English is all there will be until a provider is set up)
+    const playMain = (U.isAllDone(lec.stages) || englishOnly(lec)) && !acts.includes('update');
+    if (lec.playable) out.push(btn(t('player.entry.play'), { kind: playMain ? 'primary' : '', icon: 'play', fkey: `lecd:${lec.id}:play`, title: t('player.entry.play_hint'), onclick: () => (location.hash = `#/play/${encodeURIComponent(lec.id)}`) }));
     if (acts.includes('launch')) out.push(btn(t('lecture.page.launch'), { kind: 'primary', icon: 'play', fkey: `lecd:${lec.id}:launch`, onclick: () => run(A.launchLectures([lec])) }));
     // "Update" sits in the stale notice when there is one.
     if (acts.includes('update') && !U.lectureStaleText(lec)) out.push(btn(t('lecture.page.update'), { kind: 'warn', icon: 'refresh-cw', fkey: `lecd:${lec.id}:update`, onclick: () => run(A.updateLectures([lec])) }));
     if (acts.includes('cancel')) out.push(btn(t('lecture.page.cancel'), { kind: 'danger', icon: 'ban', fkey: `lecd:${lec.id}:cancel`, onclick: () => run(A.cancelLectures([lec])) }));
-    if (lec.exports.length) {
-      const dl = downloadMenu(lec.exports, `lecd:${lec.id}:dl`);
-      if (!U.isAllDone(lec.stages)) dl.title = t('lecture.page.exports_outdated');
+    // export files, and the English files once asr is done (3.1.0)
+    if (lec.exports.length || lec.playable) {
+      const dl = lectureDownloadMenu(lec, `lecd:${lec.id}:dl`);
+      if (lec.exports.length && !U.isAllDone(lec.stages)) dl.title = t('lecture.page.exports_outdated');
       out.push(dl);
     }
     out.push(
@@ -270,6 +277,20 @@ export function mountLecture(root, route, ctx) {
           icon('info', { size: 16 }),
           h('span', { class: 'lec-notice-text' }, t('lecture.notice.draft')),
           acts.includes('launch') ? btn(t('lecture.page.launch'), { kind: 'primary', icon: 'play', size: 'sm', fkey: `lecd:${lec.id}:launch2`, onclick: () => run(A.launchLectures([lec])) }) : null,
+        ),
+      );
+    }
+    // "Transcribe only" (3.1.0): no model provider yet. Says what still
+    // works (playing, English subtitles and transcript) and where to set
+    // one up; the stages then continue by themselves.
+    if (!lec.draft && waitsForProvider(lec)) {
+      out.push(
+        h(
+          'div',
+          { class: 'lec-notice is-draft', role: 'status' },
+          icon('info', { size: 16 }),
+          h('span', { class: 'lec-notice-text' }, t('lecture.notice.no_provider')),
+          h('a', { class: 'btn btn-sm', href: '#/settings/providers', dataset: { fkey: `lecd:${lec.id}:providers` } }, icon('settings', { size: 14 }), h('span', { class: 'btn-label' }, t('lecture.notice.no_provider_settings'))),
         ),
       );
     }

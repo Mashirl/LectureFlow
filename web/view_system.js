@@ -17,6 +17,17 @@
 // environment come from the component manager, so their development hints
 // (.venv, README, requirements.txt) give way to "install it in Settings →
 // Components" with a link there; web mode keeps the server's hints.
+// mac-opti M3: the server picks the checks by platform and installed
+// components (macOS: the MLX group instead of GPU / CUDA; GPU, CUDA and
+// OpenVINO only with that hardware) and, in desktop mode, sends hints that
+// name the component to install (check.hint_install_*): they keep their
+// text and get the link to the Components page. The NVIDIA card is left
+// out when the server shows no GPU check (no NVIDIA GPU).
+// 3.1.0: the read-only configuration lists what is in effect here: the
+// interpreter of each back end of this platform with its source ("not
+// installed" without one), the transcription devices with their own
+// model, precision and parallel tasks; nvidia-smi and the VRAM settings
+// only with an NVIDIA GPU (the server decides).
 
 import { api } from './api.js';
 import { h, clear, btn, skeleton, errorBlock, preserveFocus, copyText, toast } from './dom.js';
@@ -30,11 +41,22 @@ const CHECK_PENDING = 'check.checking';
 // Fix hints that point at a development setup (.venv, requirements.txt):
 // in desktop mode the components replace them.
 const COMPONENT_HINTS = new Set(['check.hint_python', 'check.hint_python_version', 'check.hint_pip', 'check.hint_selftest', 'check.hint_openvino_venv']);
+// The desktop mode's own hints that name a component (mac-opti M3): their
+// text, plus the link to the Components page.
+const INSTALL_HINTS = new Set([
+  'check.hint_install_python',
+  'check.hint_install_fw',
+  'check.hint_install_mlx',
+  'check.hint_install_openvino',
+  'check.hint_install_mlx_model',
+  'check.hint_selftest_desktop',
+]);
 // The application's mode (GET /api/app), fetched once per page load.
 let appMode = null;
 const GROUPS = [
   ['env', 'layers', (n) => ['data_dir', 'ffmpeg', 'python', 'faster-whisper', 'pypdf'].includes(n)],
   ['gpu', 'cpu', (n) => n === 'gpu' || n === 'cuda'],
+  ['mlx', 'cpu', (n) => n === 'mlx_python' || n === 'mlx' || n === 'mlx_model'],
   ['openvino', 'cpu', (n) => ['openvino_venv', 'openvino', 'openvino_devices', 'npu_driver'].includes(n)],
   ['api', 'server', (n) => n.startsWith('api_key:') || n.startsWith('api:') || n.startsWith('role_model:')],
   ['disk', 'hard-drive', (n) => n === 'disk'],
@@ -53,6 +75,7 @@ const CONFIG_KEYS = new Set([
   'worker_dir',
   'log_level',
   'asr',
+  'asr_devices',
   'general',
   'asr.model',
   'asr.compute_type',
@@ -79,6 +102,23 @@ const CONFIG_SETTING_LABELS = {
 // policy; "复制" keeps the whole configuration).
 const CONFIG_HIDDEN = new Set(['asr.battery_aware']);
 const configLabel = (key) => (CONFIG_KEYS.has(key) ? t(`system.config.label.${key}`) : CONFIG_SETTING_LABELS[key] ? t(CONFIG_SETTING_LABELS[key]) : '');
+// 3.1.0: the sections of the configuration in the order they are shown
+// (the server's JSON is sorted by key); others follow.
+const CONFIG_ORDER = ['python', 'asr', 'asr_devices', 'general'];
+const configOrder = (key) => (CONFIG_ORDER.includes(key) ? CONFIG_ORDER.indexOf(key) : CONFIG_ORDER.length);
+// The component whose interpreter a backend runs (config python list).
+const PYTHON_COMPONENT = {
+  'faster-whisper': 'compui.name.asr_cuda',
+  openvino: 'compui.name.asr_openvino',
+  mlx: 'compui.name.asr_mlx',
+  base: 'compui.name.python',
+};
+// Where an interpreter comes from (config.PythonSource).
+const PYTHON_SOURCE = {
+  component: 'system.config.python.source.component',
+  config: 'system.config.python.source.config',
+  default: 'system.config.python.source.default',
+};
 
 function checkState(c) {
   return c.detail_info && c.detail_info.code === CHECK_PENDING ? 'pending' : c.status;
@@ -173,7 +213,7 @@ export function mountSystem(root, ctx) {
       );
       return;
     }
-    el.append(summary(sys), checksCard(sys), sys.devices || sys.openvino ? devicesCard(sys) : null, h('div', { class: 'sys-grid' }, gpuCard(sys), apiCard(sys), usageCard(sys), diskCard(sys)), configCard(sys.config || {}));
+    el.append(summary(sys), checksCard(sys), sys.devices || sys.openvino ? devicesCard(sys) : null, h('div', { class: 'sys-grid' }, nvidiaShown(sys) ? gpuCard(sys) : null, apiCard(sys), usageCard(sys), diskCard(sys)), configCard(sys.config || {}));
     gpuKey = gpuSig();
   }
 
@@ -269,6 +309,7 @@ export function mountSystem(root, ctx) {
     const st = checkState(c);
     const provider = c.name.startsWith('api_key:') || c.name.startsWith('api:') || c.name.startsWith('role_model:');
     const toComponents = desktopMode && st !== 'ok' && st !== 'pending' && !!c.hint_info && COMPONENT_HINTS.has(c.hint_info.code);
+    const installLink = st !== 'ok' && st !== 'pending' && !!c.hint_info && INSTALL_HINTS.has(c.hint_info.code);
     return h(
       'li',
       { class: `sys-check is-${st}` },
@@ -287,6 +328,7 @@ export function mountSystem(root, ctx) {
               icon('info', { size: 13 }),
               h('span', null, checkText(c.hint_info, c.hint)),
               provider && st !== 'ok' ? h('a', { class: 'sys-hint-link', href: '#/settings', dataset: { fkey: `sys:goset:${c.name}` } }, t('system.open_settings'), icon('chevron-right', { size: 13 })) : null,
+              installLink ? h('a', { class: 'sys-hint-link', href: '#/settings/components', dataset: { fkey: `sys:gocomp:${c.name}` } }, t('system.open_components'), icon('chevron-right', { size: 13 })) : null,
             )
           : null,
       ),
@@ -315,6 +357,12 @@ export function mountSystem(root, ctx) {
   function gpuSig() {
     const r = ctx.resources();
     return r && r.gpu ? `${r.gpu.name}|${r.gpu.backend}|${r.gpu.available}` : '';
+  }
+
+  // With the device list the GPU card is the NVIDIA card's: only where the
+  // server shows the GPU check (an NVIDIA GPU; never on a Mac, mac-opti M3).
+  function nvidiaShown(sys) {
+    return !sys.devices || (sys.checks || []).some((c) => c.name === 'gpu');
   }
 
   function gpuCard(sys) {
@@ -369,7 +417,7 @@ export function mountSystem(root, ctx) {
     const ovByID = new Map(((ov && ov.devices) || []).filter((x) => x.device_id).map((x) => [x.device_id, x]));
     const rows = devs.map((d) => {
       const o = ovByID.get(d.id);
-      const sub = [U.deviceKindName(d.kind), d.backend === 'openvino' ? 'OpenVINO' : d.backend];
+      const sub = [U.deviceKindName(d.kind), d.backend === 'openvino' ? 'OpenVINO' : d.backend === 'mlx' ? 'MLX' : d.backend];
       if (o) sub.push(o.name, o.driver_version ? t('system.openvino.driver', { version: o.driver_version }) : '');
       return h(
         'tr',
@@ -532,15 +580,28 @@ export function mountSystem(root, ctx) {
 
   // ---- configuration ----
 
+  // 3.1.0: the interpreters (python) and the devices (asr_devices) are
+  // lists with a table each; the other sections are flattened key / value
+  // rows. Tables in this order, then any other section.
   function configCard(cfg) {
     const scalars = Object.entries(cfg).filter(([, v]) => v === null || typeof v !== 'object');
-    const objects = Object.entries(cfg).filter(([, v]) => v && typeof v === 'object');
+    const objects = Object.entries(cfg)
+      .filter(([, v]) => v && typeof v === 'object')
+      .sort((a, b) => configOrder(a[0]) - configOrder(b[0]));
     const row = (key, label, v) =>
       h('tr', null, h('th', { scope: 'row' }, h('span', { class: 'mono' }, key.split('.').pop()), label ? h('span', { class: 'sys-cfg-label' }, label) : null), h('td', { class: 'mono' }, fmtValue(v)));
     const flatten = (prefix, obj) =>
       Object.entries(obj)
         .flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flatten(`${prefix}.${k}`, v) : [[`${prefix}.${k}`, v]]))
         .filter(([k]) => !CONFIG_HIDDEN.has(k));
+    const caption = (k) => h('caption', null, configLabel(k) ? t('system.config.caption', { label: configLabel(k), key: k }) : k);
+    const section = (k, v) => {
+      if (k === 'python' && Array.isArray(v)) return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, v.map(pythonRow)));
+      if (k === 'asr_devices' && Array.isArray(v)) {
+        return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, v.length ? v.map(deviceRow) : h('tr', null, h('td', { colspan: 2, class: 'dim' }, t('devices.empty_title')))));
+      }
+      return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, flatten(k, v).map(([kk, vv]) => row(kk, configLabel(kk), vv))));
+    };
     return h(
       'section',
       { class: 'card sys-config' },
@@ -569,16 +630,45 @@ export function mountSystem(root, ctx) {
               'div',
               { class: 'sys-cfg-grid' },
               scalars.length ? h('table', { class: 'sys-cfg' }, h('caption', null, t('system.config.startup')), h('tbody', null, scalars.map(([k, v]) => row(k, configLabel(k), v)))) : null,
-              objects.map(([k, v]) =>
-                h(
-                  'table',
-                  { class: 'sys-cfg' },
-                  h('caption', null, configLabel(k) ? t('system.config.caption', { label: configLabel(k), key: k }) : k),
-                  h('tbody', null, flatten(k, v).map(([kk, vv]) => row(kk, configLabel(kk), vv))),
-                ),
-              ),
+              objects.map(([k, v]) => section(k, v)),
             ),
       ),
+    );
+  }
+
+  // One interpreter: the backend with the component it belongs to, the
+  // path and where it comes from; "not installed" without a path.
+  function pythonRow(p) {
+    const name = PYTHON_COMPONENT[p.backend];
+    let value;
+    if (p.source === 'none' || !p.path) {
+      value = h('span', { class: 'dim' }, t('system.config.python.none'));
+    } else {
+      const src = PYTHON_SOURCE[p.source];
+      value = [
+        h('span', { class: 'mono' }, p.path),
+        h(
+          'span',
+          { class: 'sys-cfg-label' },
+          src ? t(src) : p.source,
+          p.exists ? null : [' · ', h('span', { class: 'tone-warn' }, t('system.config.python.missing'))],
+        ),
+      ];
+    }
+    return h('tr', null, h('th', { scope: 'row' }, h('span', { class: 'mono' }, p.backend), name ? h('span', { class: 'sys-cfg-label' }, t(name)) : null), h('td', null, value));
+  }
+
+  // One transcription device: what it runs with (its own model, precision
+  // and parallel tasks: the global ones of the legacy settings are not in
+  // effect with the device table).
+  function deviceRow(d) {
+    const sub = [`${t('devices.max_parallel')} ${d.max_parallel}`];
+    if (!d.enabled) sub.push(t('devices.disabled'));
+    return h(
+      'tr',
+      { class: d.enabled ? '' : 'is-muted' },
+      h('th', { scope: 'row' }, h('span', { class: 'mono' }, d.id), d.label ? h('span', { class: 'sys-cfg-label' }, d.label) : null),
+      h('td', null, h('span', { class: 'mono' }, [d.backend, U.comboText(d.model, d.precision)].filter(Boolean).join(' · ')), h('span', { class: 'sys-cfg-label' }, sub.join(' · '))),
     );
   }
 

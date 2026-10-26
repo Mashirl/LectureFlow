@@ -5,6 +5,7 @@ package stages
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -234,12 +235,62 @@ func TestASRInterpreterMissing(t *testing.T) {
 		!paramsMatch(info, "path", missing) || !strings.Contains(r.err.Error(), "python_openvino") {
 		t.Errorf("err %v, job.error %+v", r.err, info)
 	}
+	// 3.1.0: an empty python_openvino (the desktop application without
+	// asr-openvino) is "not installed", still without falling back to the
+	// config python (the fake worker would run).
 	e.cfg.PythonOpenVINO = ""
 	l2 := e.lecture("L2", "m.mp4")
 	e.writeWAV(l2, "wav")
 	e.setSnapshot(l2.ID, model.StageASR, deviceSnapshot(model.DeviceOVNPU, "large-v3-turbo", "fp16", "en"))
-	if r := e.run(e.stage(e.deps(nil), model.StageASR), l2.ID); codeOf(r.err) != devices.CodeOVPythonMissing {
+	if r := e.run(e.stage(e.deps(nil), model.StageASR), l2.ID); !sched.IsPermanent(r.err) || codeOf(r.err) != devices.CodeOVNotInstalled {
 		t.Errorf("empty python_openvino: %v (must not fall back to config python)", r.err)
+	}
+}
+
+// 3.1.0: in the desktop application a worker without a component and
+// without the key in config.toml has no interpreter at all (config
+// WorkerPython ""): it fails permanently with the code that names the
+// component to install, runs nothing, and never names an empty path.
+func TestWorkerNotInstalled(t *testing.T) {
+	e := newEnv(t)
+	e.useFakeWorker("ok", fakeASROV)
+	log := e.jobLog()
+	cases := []struct {
+		name  string
+		empty func()
+		snap  string
+		code  string
+	}{
+		{"faster-whisper", func() { e.cfg.Python = "" }, deviceSnapshot(model.DeviceCUDA0, "large-v3", "float16", "en"), CodeWorkerFWNotInstalled},
+		{"fw:cpu", func() { e.cfg.Python = "" }, deviceSnapshot(model.DeviceFWCPU, "small", "int8", "en"), CodeWorkerFWNotInstalled},
+		{"openvino", func() { e.cfg.PythonOpenVINO = "" }, deviceSnapshot(model.DeviceOVGPU, "large-v3-turbo", "fp16", "en"), devices.CodeOVNotInstalled},
+		{"mlx", func() { e.cfg.PythonMLX = "" }, deviceSnapshot(model.DeviceMLXGPU, "large-v3-turbo", "fp16", "en"), devices.CodeMLXNotInstalled},
+	}
+	for i, c := range cases {
+		py, ov, mlx := e.cfg.Python, e.cfg.PythonOpenVINO, e.cfg.PythonMLX
+		c.empty()
+		l := e.lecture(fmt.Sprintf("L%d", i), "m.mp4")
+		e.writeWAV(l, "wav")
+		e.setSnapshot(l.ID, model.StageASR, c.snap)
+		n := len(fakeJobs(t, log))
+		r := e.run(e.stage(e.deps(nil), model.StageASR), l.ID)
+		info, _ := state.ParseJobError(deref(r.job.Error))
+		if r.err == nil || !sched.IsPermanent(r.err) || codeOf(r.err) != c.code || info.Code != c.code || len(info.Params) != 0 {
+			t.Errorf("%s: err %v, job.error %+v", c.name, r.err, info)
+		}
+		if strings.Contains(deref(r.job.Error), `""`) {
+			t.Errorf("%s: the error names an empty path: %s", c.name, deref(r.job.Error))
+		}
+		if got := len(fakeJobs(t, log)); got != n {
+			t.Errorf("%s: a worker ran (%d -> %d jobs)", c.name, n, got)
+		}
+		e.cfg.Python, e.cfg.PythonOpenVINO, e.cfg.PythonMLX = py, ov, mlx
+	}
+	// The slide text extraction: the python component.
+	e.cfg.Python = ""
+	_, err := e.deps(nil).extractPDF(e.ctx, e.root, filepath.Join(e.root, "slides.pdf"), nil)
+	if !sched.IsPermanent(err) || codeOf(err) != CodeWorkerPythonNotInstalled {
+		t.Errorf("PDF extraction: %v", err)
 	}
 }
 

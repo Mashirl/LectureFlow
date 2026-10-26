@@ -25,6 +25,11 @@
 // lectures fit, the current lecture's step, the plan, compute units, the
 // authorization's time left) and the two shutdown buttons; without a
 // session it is one line "远端 GPU：未使用".
+// mac-opti M6: a reading the system cannot give at all (system.unsupported,
+// e.g. the CPU temperature on macOS) is left out instead of showing "--";
+// on Apple silicon (system.unified_memory) the memory is "统一内存", and the
+// Apple GPU's card shows how much of it the GPU holds, without a
+// temperature tile.
 
 import { h, clear, iconBtn, errorBlock, skeleton, preserveFocus, toast } from './dom.js';
 import { icon } from './icons.js';
@@ -533,24 +538,33 @@ export function mountInspector(el, opts) {
     const memFrac = y.mem_used_mb != null && y.mem_total_mb ? y.mem_used_mb / y.mem_total_mb : null;
     const tile = (k, v, unit, spark) =>
       h('div', { class: 'tile' }, h('div', { class: 'tile-k' }, k), h('div', { class: 'tile-v' }, num(v), v != null ? h('small', null, unit) : null), spark || null);
+    // readings this system cannot give at all are left out (mac-opti M6)
+    const unsupported = new Set(Array.isArray(y.unsupported) ? y.unsupported : []);
+    const memKey = y.unified_memory ? 'resources.system.unified_mem' : 'resources.system.mem';
+    const tiles = [
+      unsupported.has('cpu_pct') ? null : tile(t('resources.system.cpu'), y.cpu_pct, '%', sparkline(cpuHist, { lo: 0, hi: 100, label: t('resources.system.cpu') })),
+      unsupported.has('cpu_temp') ? null : tile(t('resources.system.cpu_temp'), y.cpu_temp_c, '°C', sparkline(tempHist, { label: t('resources.system.cpu_temp') })),
+    ].filter(Boolean);
     return h(
       'div',
       { class: 'sys-body' },
       powerLine(res.power),
       p && p.wait_ac > 0 ? h('p', { class: 'insp-note pw-wait tone-warn' }, icon('plug', { size: 14 }), t('resources.power.wait_ac', { n: p.wait_ac })) : null,
       p && p.wait_no_device > 0 ? h('p', { class: 'insp-note pw-wait tone-warn' }, icon('battery-low', { size: 14 }), t('resources.power.wait_no_device', { n: p.wait_no_device })) : null,
-      h(
-        'div',
-        { class: 'tiles' },
-        tile(t('resources.system.cpu'), y.cpu_pct, '%', sparkline(cpuHist, { lo: 0, hi: 100, label: t('resources.system.cpu') })),
-        tile(t('resources.system.cpu_temp'), y.cpu_temp_c, '°C', sparkline(tempHist, { label: t('resources.system.cpu_temp') })),
-      ),
-      h(
-        'div',
-        { class: 'metric' },
-        h('div', { class: 'metric-top' }, h('span', { class: 'metric-k' }, icon('memory-stick', { size: 14 }), t('resources.system.mem')), h('span', { class: 'metric-v' }, `${y.mem_used_mb == null ? NA : U.fmtMB(y.mem_used_mb)} / ${y.mem_total_mb == null ? NA : U.fmtMB(y.mem_total_mb)}`)),
-        meter(memFrac, memFrac != null && memFrac > 0.92 ? 'meter-warn' : 'meter-accent'),
-      ),
+      tiles.length ? h('div', { class: 'tiles' }, tiles) : null,
+      unsupported.has('mem')
+        ? null
+        : h(
+            'div',
+            { class: 'metric' },
+            h(
+              'div',
+              { class: 'metric-top' },
+              h('span', { class: 'metric-k', title: y.unified_memory ? t('resources.system.unified_mem_tip') : undefined }, icon('memory-stick', { size: 14 }), t(memKey)),
+              h('span', { class: 'metric-v' }, `${y.mem_used_mb == null ? NA : U.fmtMB(y.mem_used_mb)} / ${y.mem_total_mb == null ? NA : U.fmtMB(y.mem_total_mb)}`),
+            ),
+            meter(memFrac, memFrac != null && memFrac > 0.92 ? 'meter-warn' : 'meter-accent'),
+          ),
     );
   }
 
@@ -693,13 +707,15 @@ export function mountInspector(el, opts) {
     );
   }
 
-  // An Intel device's shared GPU memory (power management: "显存或内存").
+  // An Intel device's shared GPU memory (power management: "显存或内存");
+  // the Apple GPU's share of the unified memory (mac-opti M6).
   function sharedMem(d) {
     const frac = d.mem_used_mb != null && d.mem_total_mb ? d.mem_used_mb / d.mem_total_mb : null;
+    const label = d.kind === 'apple' ? t('resources.devices.apple_mem') : t('resources.system.mem');
     return h(
       'div',
       { class: 'metric' },
-      h('div', { class: 'metric-top' }, h('span', { class: 'metric-k' }, icon('memory-stick', { size: 14 }), t('resources.system.mem')), h('span', { class: 'metric-v' }, `${d.mem_used_mb == null ? NA : U.fmtMB(d.mem_used_mb)} / ${d.mem_total_mb == null ? NA : U.fmtMB(d.mem_total_mb)}`)),
+      h('div', { class: 'metric-top' }, h('span', { class: 'metric-k' }, icon('memory-stick', { size: 14 }), label), h('span', { class: 'metric-v' }, `${d.mem_used_mb == null ? NA : U.fmtMB(d.mem_used_mb)} / ${d.mem_total_mb == null ? NA : U.fmtMB(d.mem_total_mb)}`)),
       meter(frac, 'meter-accent'),
     );
   }
@@ -825,13 +841,16 @@ export function mountInspector(el, opts) {
         h('div', { class: 'tile-v' }, num(d.util_pct), !na ? h('small', null, '%') : null),
         sparkline(d.util_history, { lo: 0, hi: 100, label: t('resources.gpu.util_history') }),
       ),
-      h(
-        'div',
-        { class: 'tile', title: temp == null ? t('resources.devices.temp_na') : undefined },
-        h('div', { class: 'tile-k' }, t('resources.gpu.temp')),
-        h('div', { class: 'tile-v' }, num(temp), temp != null ? h('small', null, '°C') : null),
-        sparkline(Array.isArray(d.temp_history) ? d.temp_history : [], { label: t('resources.gpu.temp_history') }),
-      ),
+      // the Apple GPU has no readable temperature (mac-opti M6): no tile
+      d.kind === 'apple'
+        ? null
+        : h(
+            'div',
+            { class: 'tile', title: temp == null ? t('resources.devices.temp_na') : undefined },
+            h('div', { class: 'tile-k' }, t('resources.gpu.temp')),
+            h('div', { class: 'tile-v' }, num(temp), temp != null ? h('small', null, '°C') : null),
+            sparkline(Array.isArray(d.temp_history) ? d.temp_history : [], { label: t('resources.gpu.temp_history') }),
+          ),
     );
   }
 
@@ -1042,8 +1061,13 @@ export function mountInspector(el, opts) {
     const r = parts.rail;
     const g = res && res.gpu;
     const prov = (res && res.providers) || [];
+    // .rail-stat sets display: flex, which beats the hidden attribute
+    const hide = (k) => {
+      r[k].box.hidden = true;
+      r[k].box.style.display = 'none';
+    };
     if (!g) {
-      for (const k of Object.keys(r)) r[k].box.hidden = true;
+      for (const k of Object.keys(r)) hide(k);
       return;
     }
     const set = (k, value, title, warn = false) => {
@@ -1051,12 +1075,18 @@ export function mountInspector(el, opts) {
       r[k].box.title = title;
       r[k].box.classList.toggle('is-warn', warn);
       r[k].box.hidden = false;
+      r[k].box.style.display = '';
     };
     const inflight = prov.reduce((n, p) => n + p.inflight, 0);
     const max = prov.reduce((n, p) => n + p.max, 0);
-    const util = g.util_pct == null ? NA : U.fmtPercent(g.util_pct / 100, 0);
+    // Without an NVIDIA card the Apple GPU's usage (its card, from ioreg) and
+    // no temperature, which macOS does not give (mac-opti M6).
+    const apple = !g.available ? rows().find((d) => d.kind === 'apple' && d.present) : null;
+    const utilPct = apple ? apple.util_pct : g.util_pct;
+    const util = utilPct == null ? NA : U.fmtPercent(utilPct / 100, 0);
     set('gpu', util, t('resources.rail.gpu', { value: util }));
-    set('temp', g.temp_c == null ? NA : U.fmtCelsius(g.temp_c, true), t('resources.rail.temp', { value: g.temp_c == null ? NA : U.fmtCelsius(g.temp_c) }), !!g.temp_warn);
+    if (apple) hide('temp');
+    else set('temp', g.temp_c == null ? NA : U.fmtCelsius(g.temp_c, true), t('resources.rail.temp', { value: g.temp_c == null ? NA : U.fmtCelsius(g.temp_c) }), !!g.temp_warn);
     if (devMode()) {
       // the slots of every turned-on device (SPEC-v2 I10); with the power
       // policy the tasks it suspended are named too

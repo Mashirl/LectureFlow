@@ -15,6 +15,9 @@ import { zhOn, zhMode, zhConvertible, zhFileName, zhConvertAll } from './zh_disp
 import { openKindDialog } from './kind_dialog.js';
 import { kindTag } from './kinds.js';
 import { useColabMenuItem } from './settings_colab.js';
+// (lecture_english.js imports exportItems from here: the cycle only meets
+// inside functions, never at the top level of either module)
+import { lectureDownloadItems } from './lecture_english.js';
 
 let courseLookup = () => null;
 
@@ -422,7 +425,9 @@ export function lectureMenuItems(lec, hd) {
           items: reruns.map((s) => ({ id: `rerun:${s.stage}`, label: U.stageName(s.stage), hint: U.statusName(U.displayStatus(s)), onSelect: () => done(stageAction(lec, s.stage, 'rerun')) })),
         }
       : null,
-    { id: 'export', label: t('menu.lecture.export'), icon: 'download', items: exportItems(lec.exports) },
+    // the export files, and once the lecture is playable the English
+    // subtitles and transcript made on demand (3.1.0 "transcribe only")
+    { id: 'export', label: t('menu.lecture.export'), icon: 'download', items: lectureDownloadItems(lec) || [] },
     'sep',
     { id: 'rename', label: t('menu.lecture.rename'), icon: 'pencil', hint: 'F2', onSelect: () => (hd.onRename ? hd.onRename(lec) : done(renameLectureDialog(lec))) },
     // v2 P13: numbers come from the recording time (editing the number is gone, P13.2)

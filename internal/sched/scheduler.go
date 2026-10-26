@@ -525,7 +525,7 @@ func (s *Scheduler) scan() {
 		}
 		depsOK := false
 		if j.Status == model.StatusPending {
-			ok, _, err := state.Deps(ctx, s.st, j)
+			ok, _, err := s.deps(ctx, j)
 			if err != nil {
 				if ctx.Err() == nil {
 					slog.Error("scheduler deps", "job", j.ID, "err", err)
@@ -533,6 +533,14 @@ func (s *Scheduler) scan() {
 				continue
 			}
 			if !ok {
+				continue
+			}
+			// "只转写" (transcribe_only.go): a deferred lecture gets its
+			// LLM snapshots before its first LLM job leaves pending.
+			if _, err := s.fillDeferred(ctx, j); err != nil {
+				if ctx.Err() == nil {
+					slog.Error("scheduler: record deferred snapshots", "job", j.ID, "err", err)
+				}
 				continue
 			}
 			if err := state.TransitionJob(ctx, s.st, j.ID, model.StatusPending, model.StatusQueued, db.JobFinish{}); err != nil {
@@ -611,7 +619,7 @@ func (s *Scheduler) tryStart(ctx context.Context, j model.Job, depsOK bool, sc *
 	// A queued job may have got there by retry/auto-retry/recovery after its
 	// dependencies changed (e.g. a syllabus uploaded meanwhile): re-check.
 	if !depsOK {
-		ok, w, err := state.Deps(ctx, s.st, j)
+		ok, w, err := s.deps(ctx, j)
 		if err != nil {
 			if ctx.Err() == nil {
 				slog.Error("scheduler deps", "job", j.ID, "err", err)
@@ -620,6 +628,20 @@ func (s *Scheduler) tryStart(ctx context.Context, j model.Job, depsOK bool, sc *
 		}
 		if !ok {
 			return w
+		}
+		// A queued job of a deferred lecture (e.g. retried): its snapshots
+		// are recorded before it starts (transcribe_only.go).
+		filled, err := s.fillDeferred(ctx, j)
+		if err != nil {
+			if ctx.Err() == nil {
+				slog.Error("scheduler: record deferred snapshots", "job", j.ID, "err", err)
+			}
+			return ""
+		}
+		if filled {
+			if fresh, err := s.st.GetJob(ctx, j.ID); err == nil {
+				j = fresh
+			}
 		}
 	}
 	r := &run{job: j, stage: stg, res: stg.Resource()}

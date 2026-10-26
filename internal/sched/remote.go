@@ -617,7 +617,7 @@ func (s *Scheduler) remoteRequeue(ctx context.Context, r *run, runErr error) {
 		return
 	}
 	if snap, ok := model.ParseASRSnapshot(r.job.ConfigSnapshot); ok && !snap.Auto && isRemote(snap.DeviceID) {
-		if cur, err := s.currentSnapshots([]string{model.StageASR}); err == nil && cur[model.StageASR] != "" {
+		if cur, err := s.currentSnapshots([]string{model.StageASR}, false); err == nil && cur[model.StageASR] != "" {
 			if err := s.st.SetJobSnapshot(ctx, id, cur[model.StageASR]); err != nil {
 				slog.Warn("replacing the colab snapshot of a lecture Colab handed back", "job", id, "err", err)
 			}

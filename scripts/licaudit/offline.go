@@ -49,6 +49,9 @@ func auditOffline(opt Options, r *Report, _ *allowlist) error {
 	}
 	for _, mf := range manifests {
 		for _, comp := range mf.components {
+			if toolOfflineViolations(r, mf, comp) {
+				continue // a tool: never an offline archive (tools.go)
+			}
 			id, _ := comp["id"].(string)
 			hits := offlineEntries(comp)
 			if len(hits) == 0 {

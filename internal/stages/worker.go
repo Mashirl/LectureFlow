@@ -21,6 +21,7 @@ import (
 	"unicode/utf8"
 
 	"lectureflow/internal/config"
+	"lectureflow/internal/devices"
 	"lectureflow/internal/model"
 	"lectureflow/internal/sched"
 )
@@ -87,6 +88,20 @@ func executable(p string) (string, error) {
 	return exec.LookPath(p)
 }
 
+// notInstalledCode is the job error of a worker without an interpreter
+// (3.1.0): the component its backend needs is not installed.
+func notInstalledCode(workerCode string) string {
+	switch workerCode {
+	case workerASR:
+		return CodeWorkerFWNotInstalled
+	case workerASROV:
+		return devices.CodeOVNotInstalled
+	case workerASRMLX:
+		return devices.CodeMLXNotInstalled
+	}
+	return CodeWorkerPythonNotInstalled
+}
+
 // workerCall is one Python worker invocation (SPEC §6.0).
 type workerCall struct {
 	name     string // asr | asr_openvino | asr_mlx | extract_pdf
@@ -105,7 +120,10 @@ type workerCall struct {
 	// (config.Config.WorkerPython); pythonCode is the code of a missing
 	// one ("" = worker.python_missing; devices.ov_python_missing,
 	// devices.mlx_python_missing), pythonKey the config key named in the
-	// text ("" = "python"; its development venv, config.DevVenv, too).
+	// text ("" = "python"; its development venv, config.DevVenv, too). An
+	// empty interpreter (no component, nothing configured: the desktop
+	// application) fails with the "not installed" code of its worker
+	// (notInstalledCode) instead.
 	python     string
 	pythonCode string
 	pythonKey  string
@@ -142,6 +160,13 @@ func (d Deps) runWorker(ctx context.Context, w workerCall) ([]byte, error) {
 		if w.pythonKey != "" {
 			pyKey = w.pythonKey
 		}
+	}
+	if pyPath == "" {
+		// The desktop application without the component (config
+		// WorkerPython ""): not a path to look for, the component to install.
+		code := notInstalledCode(w.code)
+		return nil, sched.Permanent(model.Errorf(code, nil,
+			fmt.Errorf("没有可用的 Python 解释器（%s）：请在“组件”中安装对应的组件", w.label)))
 	}
 	py, err := executable(pyPath)
 	if err != nil {

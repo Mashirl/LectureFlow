@@ -6,6 +6,9 @@
 // remove components and models, pick the download sources). Users in
 // mainland China get the mirror sources preselected once (suggest_mirror),
 // with a quiet way back to the default. The download itself starts in step 5.
+// 3.1.0 M2: when the plan fails (GET /api/hardware plan_error, or POST
+// /api/components/plan answering an error) the error is shown instead of a
+// size, with "detect again"; nothing is estimated silently.
 
 import { h, btn, errorBlock } from './dom.js';
 import { icon } from './icons.js';
@@ -36,6 +39,8 @@ export function computerStep(env) {
     sources: null,
     plan: null,
     planning: false,
+    planError: '', // POST /api/components/plan failed: its text
+    hwPlanError: null, // GET /api/hardware plan_error (ErrorInfo)
     custom: !!env.data.custom,
     selected: new Set(Array.isArray(env.data.components) ? env.data.components : []),
     fromRec: !Array.isArray(env.data.components),
@@ -60,6 +65,8 @@ export function computerStep(env) {
     if (!env.alive()) return;
     S.hw = hw ? hw.hw : null;
     S.rec = hw ? hw.recommendation : null;
+    S.hwPlanError = (hw && hw.plan_error) || null;
+    if (hw) env.cache.hardware = hw; // the "transcription mode" step uses it too
     S.comps = comps ? comps.components || [] : null;
     S.sources = sources;
     env.cache.components = S.comps;
@@ -101,13 +108,16 @@ export function computerStep(env) {
     S.planning = true;
     env.rerender();
     let plan = null;
+    let error = '';
     try {
       plan = await obApi.plan([...S.selected], { quiet: true });
-    } catch {
+    } catch (e) {
       plan = null;
+      error = e.message || t('common.unknown_error');
     }
     if (!env.alive() || seq !== planSeq) return;
     S.plan = plan;
+    S.planError = error;
     S.planning = false;
     env.rerender();
   }
@@ -151,6 +161,23 @@ export function computerStep(env) {
     );
   }
 
+  // The plan failed: what the server said (no estimated size instead).
+  function planErrorBlock() {
+    const text = S.planError || (!S.plan && S.hwPlanError ? U.errorInfoText(S.hwPlanError, t('common.unknown_error')) : '');
+    if (!text) return null;
+    return h(
+      'div',
+      { class: 'ob-callout is-warn', role: 'alert' },
+      icon('circle-alert', { size: 16 }),
+      h(
+        'div',
+        null,
+        h('p', null, t('onboarding.computer.plan_failed', { error: text })),
+        h('p', { class: 'dim' }, t('onboarding.computer.plan_failed_todo'), ' ', h('button', { type: 'button', class: 'ob-linkbtn', dataset: { fkey: 'ob:plan:retry' }, onclick: () => load(true) }, t('onboarding.computer.redetect'))),
+      ),
+    );
+  }
+
   function planBlock() {
     const plan = S.plan;
     const space = planSpaceText(plan);
@@ -162,8 +189,11 @@ export function computerStep(env) {
         ? componentPicker({ components: S.comps, selected: S.selected, implied: implied(), recommended: new Set((S.rec && S.rec.components) || []), onToggle: toggle })
         : plan
           ? componentList(plan.ids, S.comps)
-          : null,
+          : S.selected.size
+            ? componentList([...S.selected], S.comps) // the plan failed: what was chosen, without a total
+            : null,
       h('p', { class: 'ob-sum', 'aria-live': 'polite' }, S.planning && !plan ? t('onboarding.computer.planning') : planSummary(plan)),
+      S.planning ? null : planErrorBlock(),
       space
         ? h(
             'div',

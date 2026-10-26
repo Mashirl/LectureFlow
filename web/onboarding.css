@@ -28,7 +28,7 @@
 /* ---- the step rail ---- */
 
 .ob-steps { margin: 4px 0 16px; }
-.ob-steps ol { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; }
+.ob-steps ol { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; margin: 0; padding: 0; list-style: none; }
 .ob-step { min-width: 0; }
 .ob-step-btn {
   width: 100%; min-width: 0;
@@ -164,6 +164,61 @@
 .ob-test.is-ok { color: var(--ok); }
 .ob-test.is-fail { color: var(--err); }
 
+/* ---- transcription mode (3.1.0) ---- */
+
+.ob-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ob-mode {
+  position: relative; display: flex; align-items: flex-start; gap: 12px; min-width: 0;
+  padding: 14px 16px; border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  background: var(--bg-card); cursor: pointer;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.ob-mode:hover { border-color: var(--border-3); }
+.ob-mode.is-on { border-color: var(--accent); background: var(--bg-selected); }
+.ob-mode:focus-within { box-shadow: 0 0 0 3px var(--accent-soft); }
+.ob-mode input { position: absolute; opacity: 0; pointer-events: none; }
+.ob-mode-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 36px; height: 36px; border-radius: var(--r-md);
+  background: var(--bg-sunken); color: var(--text-2);
+}
+.ob-mode.is-on .ob-mode-icon { background: var(--accent-soft); color: var(--accent-text); }
+.ob-mode-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ob-mode-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ob-mode-head .chip { border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.ob-mode-name { font-weight: 600; font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.ob-mode-desc { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.55; }
+.ob-mode-size { color: var(--text-3); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+/* ---- data folder (3.1.0) ---- */
+
+.ob-store-path {
+  display: block; padding: 8px 10px; border: 1px solid var(--border-1); border-radius: var(--r-md);
+  background: var(--bg-sunken); color: var(--text-1); font-size: var(--fs-sm); overflow-wrap: anywhere;
+}
+
+/* ---- the remote GPU's sign-in (3.1.0) ---- */
+
+.ob-remote-link { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-sm); }
+.ob-detail { margin-top: 6px; }
+.ob-detail summary { color: var(--text-2); font-size: var(--fs-sm); cursor: pointer; }
+.ob-detail-text {
+  margin: 6px 0 0; padding: 8px 10px; border-radius: var(--r-sm, 6px);
+  background: var(--bg-card); color: var(--text-2); font-size: var(--fs-xs);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+/* ---- the same sign-in in Settings → Colab (settings_colab.js, 3.1.0) ---- */
+
+.colab-login { display: flex; flex-direction: column; gap: 10px; min-width: 0; margin: 6px 0 4px; max-width: 760px; }
+.colab-login-hint { margin: 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.55; }
+.colab-login-actions { flex-wrap: wrap; gap: 8px; }
+.colab-login .ob-callout { font-size: var(--fs-sm); }
+.colab-advanced { margin: 4px 0 2px; }
+.colab-advanced > summary { color: var(--text-2); font-size: var(--fs-sm); font-weight: 500; cursor: pointer; }
+.colab-advanced[open] > summary { margin-bottom: 6px; }
+.colab-advanced-hint { margin: 0 0 4px; max-width: 72ch; }
+
 /* ---- step 6: devices ---- */
 
 .ob-devs { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
@@ -242,11 +297,43 @@
 .cu-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .cu-actions-quiet { margin-top: 0; }
 
+/* =========================================================================
+   "Cannot transcribe yet" (asr_ready.js, 3.1.0 M2): the onboarding's last
+   step, the workbench and the course page
+   ========================================================================= */
+
+.asr-notice {
+  display: flex; align-items: center; gap: 12px 14px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border-1)); border-left-width: 4px; border-left-color: var(--warn);
+  border-radius: var(--r-lg); background: var(--warn-soft);
+}
+.asr-notice-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: none;
+  border-radius: 10px; background: var(--bg-card); color: var(--warn);
+}
+.asr-notice-main { flex: 1 1 320px; min-width: 0; }
+.asr-notice-title { margin: 0; font-weight: 650; font-size: var(--fs-lg); color: var(--text-1); }
+.asr-notice-text { margin: 2px 0 0; color: var(--text-2); line-height: 1.55; overflow-wrap: anywhere; }
+.asr-notice-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: none; }
+/* "preparing transcription": the download runs (calm blue, with progress) */
+.asr-notice.is-preparing {
+  align-items: flex-start;
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-1)); border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+.asr-notice.is-preparing .asr-notice-icon { color: var(--accent-text); }
+.asr-notice-bar { margin-top: 10px; max-width: 520px; }
+.asr-notice-progress { margin: 6px 0 0; color: var(--text-2); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.asr-notice-slot[data-variant="onboarding"] .asr-notice { margin-bottom: 4px; }
+.asr-notice-slot:empty { display: none; }
+
 /* ---- narrow windows ---- */
 
 @media (max-width: 720px) {
   .ob-card { padding: 22px 18px 16px; }
   .ob-tiers { grid-template-columns: minmax(0, 1fr); }
+  .ob-modes { grid-template-columns: minmax(0, 1fr); }
   .ob-step-label { display: none; }
   .cu-src-row { grid-template-columns: minmax(0, 1fr); }
 }

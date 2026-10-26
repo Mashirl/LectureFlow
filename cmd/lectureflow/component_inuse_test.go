@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"lectureflow/internal/api"
@@ -153,5 +154,29 @@ func TestComponentInUse(t *testing.T) {
 	}
 	if id := u.componentOf(loc.root); id != "" {
 		t.Errorf("componentOf(root) = %q", id)
+	}
+}
+
+// A running Colab sign-in keeps gcloud (and, on macOS, the python
+// component gcloud runs on) in use; nothing else, and nothing once it ends.
+func TestComponentInUseColabLogin(t *testing.T) {
+	u := newComponentUse(&config.Config{DataDir: t.TempDir()})
+	if in, _ := u.InUse("gcloud"); in {
+		t.Fatal("gcloud in use without a sign-in")
+	}
+	active := true
+	u.setLogin(func() bool { return active })
+	if in, reason := u.InUse("gcloud"); !in || reason != useReasonColabLogin {
+		t.Fatalf("gcloud during a sign-in: %v %q", in, reason)
+	}
+	if in, _ := u.InUse("python"); in != (runtime.GOOS == "darwin") {
+		t.Fatalf("python during a sign-in on %s: %v", runtime.GOOS, in)
+	}
+	if in, _ := u.InUse("asr-mlx"); in {
+		t.Fatal("asr-mlx in use during a sign-in")
+	}
+	active = false
+	if in, _ := u.InUse("gcloud"); in {
+		t.Fatal("gcloud in use after the sign-in")
 	}
 }

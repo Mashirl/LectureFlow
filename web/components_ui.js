@@ -303,8 +303,10 @@ const ERR_KEYS = {
  * The four failures of V3.3 have their own texts; another code uses its
  * catalog text (or detail) with a general suggestion.
  */
-export function taskErrorText(err) {
-  if (!err) return { what: t('compui.err.generic'), todo: t('compui.err.generic_todo') };
+export function taskErrorText(err, kind = '') {
+  // An import has no download source to change: its own wording.
+  const g = kind === 'import' ? 'import_' : '';
+  if (!err) return { what: t(`compui.err.${g}generic`), todo: t(`compui.err.${g || 'generic_'}todo`) };
   const k = ERR_KEYS[err.code];
   if (k) {
     const p = err.params || {};
@@ -316,7 +318,7 @@ export function taskErrorText(err) {
     return { what: t(`compui.err.${k}`, params), todo: t(`compui.err.${k}_todo`) };
   }
   const text = codeText(err);
-  return { what: text ? t('compui.err.with_reason', { reason: text }) : t('compui.err.generic'), todo: t('compui.err.generic_todo') };
+  return { what: text ? t(`compui.err.${g}with_reason`, { reason: text }) : t(`compui.err.${g}generic`), todo: t(`compui.err.${g || 'generic_'}todo`) };
 }
 
 /** The text of a task note (e.g. the mirror fell back to the default source). */
@@ -340,6 +342,8 @@ function bar(fraction, label, cls = '') {
 }
 
 function stateText(task) {
+  // An import that failed was not a download.
+  if (task.kind === 'import' && task.state === 'failed') return t('compui.task.state.import_failed');
   return t(`compui.task.state.${task.state}`);
 }
 
@@ -361,8 +365,10 @@ export function taskView({ components = () => [], onAction, busy = () => false, 
     const total = task.total_bytes || 0;
     const done = Math.min(task.done_bytes || 0, total || Infinity);
     const frac = task.state === 'done' ? 1 : total ? done / total : 0;
+    // An import copies the component file: its progress is a copy, not a download.
+    const progress = (d, n) => (task.kind === 'import' ? t('onboarding.import.progress', { copied: U.fmtBytes(d), total: U.fmtBytes(n) }) : t('compui.task.progress', { done: U.fmtBytes(d), total: U.fmtBytes(n) }));
     const facts = [];
-    if (total) facts.push(t('compui.task.progress', { done: U.fmtBytes(done), total: U.fmtBytes(total) }));
+    if (total) facts.push(progress(done, total));
     if (task.state === 'running' && task.speed_bps > 0) facts.push(t('compui.task.speed', { speed: U.fmtBytes(task.speed_bps) }));
     if (task.state === 'running' && task.eta_s > 0) facts.push(t('compui.task.eta', { time: U.fmtDuration(task.eta_s * 1000) }));
     const ic = task.state === 'done' ? 'circle-check' : task.state === 'failed' ? 'circle-alert' : task.state === 'paused' || task.state === 'cancelled' ? 'circle-pause' : 'download';
@@ -380,7 +386,7 @@ export function taskView({ components = () => [], onAction, busy = () => false, 
       if (s) el.append(h('p', { class: 'cu-note' }, icon('info', { size: 14 }), h('span', null, s)));
     }
     if (task.state === 'failed') {
-      const e = taskErrorText(task.error);
+      const e = taskErrorText(task.error, task.kind);
       el.append(
         h(
           'div',
@@ -391,7 +397,7 @@ export function taskView({ components = () => [], onAction, busy = () => false, 
             'div',
             { class: 'cu-actions' },
             can('retry') ? btn(t('compui.task.retry'), { kind: 'primary', size: 'sm', icon: 'rotate-cw', disabled: busy(), fkey: 'cu:task:retry', onclick: () => onAction && onAction('retry') }) : null,
-            can('change_source') ? btn(t('compui.task.change_source'), { size: 'sm', icon: 'server', disabled: busy(), fkey: 'cu:task:source', onclick: () => onAction && onAction('change_source') }) : null,
+            can('change_source') && task.kind !== 'import' ? btn(t('compui.task.change_source'), { size: 'sm', icon: 'server', disabled: busy(), fkey: 'cu:task:source', onclick: () => onAction && onAction('change_source') }) : null,
           ),
         ),
       );
@@ -415,7 +421,7 @@ export function taskView({ components = () => [], onAction, busy = () => false, 
             const c = byID.get(it.id) || it.id;
             const f = it.total_bytes ? Math.min(1, (it.done_bytes || 0) / it.total_bytes) : ['installed', 'verifying', 'installing', 'downloaded'].includes(it.state) ? 1 : 0;
             const st = has(`compui.item.state.${it.state}`) ? t(`compui.item.state.${it.state}`) : it.state;
-            const size = !it.total_bytes ? '' : it.done_bytes > 0 && it.done_bytes < it.total_bytes ? t('compui.task.progress', { done: U.fmtBytes(it.done_bytes), total: U.fmtBytes(it.total_bytes) }) : U.fmtBytes(it.total_bytes);
+            const size = !it.total_bytes ? '' : it.done_bytes > 0 && it.done_bytes < it.total_bytes ? progress(it.done_bytes, it.total_bytes) : U.fmtBytes(it.total_bytes);
             return h(
               'li',
               { class: 'cu-item', dataset: { state: it.state || '' } },

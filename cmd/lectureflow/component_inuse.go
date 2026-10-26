@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -32,6 +33,10 @@ type componentUse struct {
 	// work lists the scheduler's asr runs, device self-tests and material
 	// extraction (sched.Scheduler.WorkerUses); set once the scheduler exists.
 	work atomic.Pointer[func() []sched.WorkerUse]
+	// login reports a running Colab sign-in (colab.Backend.LoginActive):
+	// it runs gcloud, and on macOS gcloud runs on the python component
+	// (CLOUDSDK_PYTHON; NOTES “决定（3.1.0 gcloud 组件…）” 2).
+	login atomic.Pointer[func() bool]
 
 	mu sync.Mutex
 	// pythons list interpreters that run outside the scheduler, with the
@@ -52,6 +57,7 @@ const (
 	useReasonDeviceTest = "device_test"
 	useReasonSelfCheck  = "self_check"
 	useReasonMaterial   = "material"
+	useReasonColabLogin = "colab_login"
 )
 
 func newComponentUse(cfg *config.Config) *componentUse {
@@ -123,8 +129,19 @@ func (u *componentUse) wrapSelfTest(f func(context.Context, components.SelfTestR
 	}
 }
 
+// setLogin wires the Colab sign-in (nil: no Colab backend).
+func (u *componentUse) setLogin(f func() bool) { u.login.Store(&f) }
+
+// gcloudUses: the components a running gcloud uses on this platform.
+func gcloudUses(id string) bool {
+	return id == "gcloud" || (runtime.GOOS == "darwin" && id == "python")
+}
+
 // InUse reports whether id is used by local work now, with the reason key.
 func (u *componentUse) InUse(id string) (bool, string) {
+	if lp := u.login.Load(); lp != nil && *lp != nil && gcloudUses(id) && (*lp)() {
+		return true, useReasonColabLogin
+	}
 	if wp := u.work.Load(); wp != nil {
 		for _, w := range (*wp)() {
 			if u.workUses(w, id) {

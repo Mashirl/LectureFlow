@@ -153,7 +153,8 @@ func TestMockColabSettingsFlow(t *testing.T) {
 		t.Fatalf("check: %d %s", code, b)
 	}
 	var info colab.CredentialInfo
-	if code, b, _ = mockDo(t, "POST", u+"/api/colab/auth/import?mock=colab_off", `{"lifecycle":"days","days":3}`); code != 200 || json.Unmarshal(b, &info) != nil || info.Lifecycle != "3d" || info.RemainingSec < 3*86400-60 {
+	if code, b, _ = mockDo(t, "POST", u+"/api/colab/auth/import?mock=colab_off", `{"lifecycle":"days","days":3}`); code != 200 || json.Unmarshal(b, &info) != nil || info.Lifecycle != "3d" || info.RemainingSec < 3*86400-60 ||
+		info.Source != colab.SourceGcloud {
 		t.Fatalf("import: %d %s", code, b)
 	}
 	if strings.Contains(string(b), "refresh_token") || strings.Contains(string(b), "client_secret") {
@@ -175,6 +176,37 @@ func TestMockColabSettingsFlow(t *testing.T) {
 	}
 	if r := colabResources(t, u, "colab_off"); r.Remote == nil || r.Remote.Configured {
 		t.Errorf("after disconnecting: %+v", r.Remote)
+	}
+	// the user's own gcloud was signed out with it: its file needs a new login
+	if code, b, _ = mockDo(t, "GET", u+"/api/colab?mock=colab_off", ""); code != 200 || json.Unmarshal(b, &v) != nil || v.ADC.Detected {
+		t.Errorf("gcloud's credential after disconnecting: %d %s", code, b)
+	}
+}
+
+// The pre-authorized scenarios hold a credential of the in-app sign-in
+// (source app): disconnecting it has no remote.gcloud_signed_out note and
+// leaves the user's own gcloud file alone, as the real server does.
+func TestMockColabDisconnectAppCredential(t *testing.T) {
+	srv := testServer(t)
+	u := srv.URL
+	var v api.ColabView
+	if code, b, _ := mockDo(t, "GET", u+"/api/colab?mock=colab_none", ""); code != 200 || json.Unmarshal(b, &v) != nil ||
+		!v.Status.Auth.Present || v.Status.Auth.Source != colab.SourceApp || !strings.Contains(string(b), `"source":"app"`) {
+		t.Fatalf("colab_none: %d %s", code, b)
+	}
+	var d api.ColabDisconnectView
+	code, b, _ := mockDo(t, "DELETE", u+"/api/colab/auth?mock=colab_none", "")
+	if code != 200 || json.Unmarshal(b, &d) != nil || !d.Revoked || len(d.Notes) != 0 || !strings.Contains(string(b), `"notes":[]`) {
+		t.Fatalf("disconnect: %d %s", code, b)
+	}
+	var after api.ColabView
+	if code, b, _ := mockDo(t, "GET", u+"/api/colab?mock=colab_none", ""); code != 200 || json.Unmarshal(b, &after) != nil ||
+		after.Status.Auth.Present || after.Status.Auth.Source != "" || !after.ADC.Detected {
+		t.Fatalf("after disconnecting: %d %s", code, b)
+	}
+	// a second disconnect: nothing to revoke, no note
+	if code, b, _ := mockDo(t, "DELETE", u+"/api/colab/auth?mock=colab_none", ""); code != 200 || json.Unmarshal(b, &d) != nil || d.Revoked || len(d.Notes) != 0 {
+		t.Fatalf("second disconnect: %d %s", code, b)
 	}
 }
 

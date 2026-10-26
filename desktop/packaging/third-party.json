@@ -31,6 +31,10 @@
           "url": "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz"
         },
         {
+          "what": "dav1d 1.5.4 (commit 54706fc6bc0c)",
+          "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
+        },
+        {
           "what": "MinGW-w64 runtime 11.0.1 as packaged by Ubuntu 24.04 (static CRT parts)",
           "url": "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1"
         },
@@ -49,6 +53,8 @@
         "make",
         "cmake",
         "nasm",
+        "meson",
+        "ninja-build",
         "pkgconf",
         "python3",
         "gcc-mingw-w64-x86-64-win32",
@@ -103,6 +109,19 @@
           "licenses": [
             "LICENSE"
           ]
+        },
+        {
+          "name": "dav1d",
+          "version": "1.5.4",
+          "commit": "54706fc6bc0cdecab7e9593974a4039cc038fca7",
+          "license": "BSD-2-Clause",
+          "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz",
+          "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5",
+          "root": "dav1d-1.5.4",
+          "licenses": [
+            "COPYING",
+            "doc/PATENTS"
+          ]
         }
       ],
       "configure": [
@@ -124,6 +143,7 @@
         "--enable-nvenc",
         "--enable-libvpl",
         "--enable-libopenh264",
+        "--enable-libdav1d",
         "--enable-shared",
         "--disable-static",
         "--disable-doc",
@@ -166,7 +186,7 @@
         "swresample-*.dll",
         "swscale-*.dll"
       ],
-      "note": "Minimal LGPL build (gate fix 2, lead ruling): FFmpeg 9.0.2 with only its internal codecs and formats plus NVENC (nv-codec-headers, headers only; NVIDIA driver 531.61 or newer at run time), Intel Quick Sync (libvpl dispatcher) and OpenH264 built from source (not Cisco's binary). Shared DLLs next to ffmpeg.exe and ffprobe.exe, so they can be replaced (LGPL). The GCC runtime (libgcc, libstdc++) and parts of the MinGW-w64 runtime are linked statically; no other DLL than Windows system libraries is needed.",
+      "note": "Minimal LGPL build (gate fix 2, lead ruling): FFmpeg 9.0.2 with only its internal codecs and formats plus NVENC (nv-codec-headers, headers only; NVIDIA driver 531.61 or newer at run time), Intel Quick Sync (libvpl dispatcher), OpenH264 built from source (not Cisco's binary) and the dav1d AV1 software decoder (static, in avcodec). Shared DLLs next to ffmpeg.exe and ffprobe.exe, so they can be replaced (LGPL). The GCC runtime (libgcc, libstdc++) and parts of the MinGW-w64 runtime are linked statically; no other DLL than Windows system libraries is needed.",
       "toolchain": {
         "gcc-mingw-w64-x86-64-win32": "13.2.0-6ubuntu1+26.1",
         "g++-mingw-w64-x86-64-win32": "13.2.0-6ubuntu1+26.1",
@@ -180,6 +200,10 @@
         {
           "what": "FFmpeg 9.0.2 release tarball (this URL; the build script is desktop/scripts/build-ffmpeg-macos.sh)",
           "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
+        },
+        {
+          "what": "dav1d 1.5.4 (commit 54706fc6bc0c)",
+          "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
         }
       ],
       "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
@@ -189,6 +213,8 @@
         "--prefix=PREFIX",
         "--arch=arm64",
         "--cc=clang",
+        "--pkg-config=pkg-config",
+        "--pkg-config-flags=--static",
         "--enable-pthreads",
         "--disable-gpl",
         "--disable-nonfree",
@@ -196,6 +222,7 @@
         "--enable-zlib",
         "--enable-videotoolbox",
         "--enable-audiotoolbox",
+        "--enable-libdav1d",
         "--enable-static",
         "--disable-shared",
         "--disable-doc",
@@ -208,9 +235,45 @@
       ],
       "licenses": [
         "COPYING.LGPLv2.1",
-        "LICENSE.md"
+        "LICENSE.md",
+        "thirdparty/*"
       ],
-      "note": "Static executables (no dylib paths to fix). --disable-autodetect keeps optional libraries that a CI image may happen to have (some of them GPL) out of the build; only zlib, pthreads and the macOS frameworks named here are enabled."
+      "note": "Static executables (no dylib paths to fix). --disable-autodetect keeps optional libraries that a CI image may happen to have (some of them GPL) out of the build; only zlib, pthreads and the macOS frameworks named here are enabled, plus dav1d (AV1 software decoder, BSD-2-Clause), built from the pinned tarball with meson and linked statically. build_tools (meson, ninja, pkgconf) are PyPI wheels pinned by SHA-256, used only to build and not shipped.",
+      "deps": [
+        {
+          "name": "dav1d",
+          "version": "1.5.4",
+          "commit": "54706fc6bc0cdecab7e9593974a4039cc038fca7",
+          "license": "BSD-2-Clause",
+          "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz",
+          "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5",
+          "root": "dav1d-1.5.4",
+          "licenses": [
+            "COPYING",
+            "doc/PATENTS"
+          ]
+        }
+      ],
+      "build_tools": [
+        {
+          "name": "meson",
+          "version": "1.12.1",
+          "file": "meson-1.12.1-py3-none-any.whl",
+          "sha256": "930bc7542cbd9f57009e182fd014eba48cf1a0180a7b9006d2d32d8f168d8b02"
+        },
+        {
+          "name": "ninja",
+          "version": "1.13.2",
+          "file": "ninja-1.13.2-py3-none-macosx_10_9_universal2.whl",
+          "sha256": "fd82e26c0706ad4ab88e5fdd26f3fab0a987a90f810160f6c322e752c6af298b"
+        },
+        {
+          "name": "pkgconf",
+          "version": "3.0.7.post0",
+          "file": "pkgconf-3.0.7.post0-py3-none-macosx_11_0_arm64.whl",
+          "sha256": "47cbf6889d84297b9a4e1741ae016daa4e198f3ec8bab7ce74554cc50b77cce4"
+        }
+      ]
     },
     "forbidden_configure": [
       "--enable-gpl",

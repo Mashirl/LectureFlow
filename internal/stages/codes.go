@@ -51,6 +51,13 @@ const (
 	CodeWorkerScriptMissing = "worker.script_missing" // path
 	CodePDFResultUnparsable = "pdf.result_unparsable" //
 
+	// No interpreter at all (3.1.0): the desktop application without the
+	// component and without the key in config.toml (config WorkerPython
+	// ""): the python component (extract_pdf.py) or asr-cuda (asr.py, the
+	// NVIDIA and CPU devices) is not installed.
+	CodeWorkerPythonNotInstalled = "worker.python_not_installed" //
+	CodeWorkerFWNotInstalled     = "worker.fw_not_installed"     //
+
 	CodePrepMediaMissing      = "prep.media_missing"       // file
 	CodePrepMediaVanished     = "prep.media_vanished"      // file
 	CodePrepFFmpegMissing     = "prep.ffmpeg_missing"      // path
@@ -146,6 +153,7 @@ var ErrorCodes = func() []string {
 		CodeASRMLXDeviceUnavailable,
 		CodeSelfTestNoAudio, CodeSelfTestCompileTimeout,
 		CodeWorkerPythonMissing, CodeWorkerScriptMissing, CodePDFResultUnparsable,
+		CodeWorkerPythonNotInstalled, CodeWorkerFWNotInstalled,
 		CodePrepMediaMissing, CodePrepMediaVanished, CodePrepFFmpegMissing, CodePrepFFmpegStartFailed,
 		CodeSummaryNoSentences, CodeSummaryEmpty, CodeRepairNoSummary, CodeRepairAllFailed,
 		CodeTranslateNoSummary, CodeTranslateFailed, CodeTranslatePrefixChanged,

@@ -10,7 +10,7 @@ const { app, dialog, Menu } = require('electron');
 
 const { resolveDataDir } = require('./lib/datadir');
 const { refuseDebugging } = require('./lib/debugflags');
-const { loadTranslator } = require('./lib/i18n');
+const { LOCALE_FILE, createShellTranslator, loadTranslator, readLocaleMemo } = require('./lib/i18n');
 const { buildMenuTemplate } = require('./lib/menu');
 const { updateFeedFrom, updateFeedNote } = require('./lib/updatefeed');
 const { createLogger } = require('./logger');
@@ -117,11 +117,16 @@ function main() {
   process.on('unhandledRejection', (err) => log.error(`unhandled rejection: ${err && err.stack ? err.stack : err}`));
 
   app.whenReady().then(() => {
-    const { locale, t } = loadTranslator(app.getLocale());
-    const menu = buildMenuTemplate({ platform: process.platform, isDev, t });
-    Menu.setApplicationMenu(menu ? Menu.buildFromTemplate(menu) : null);
+    // The app's last language choice, so the splash already speaks it.
+    const localeFile = path.join(app.getPath('userData'), LOCALE_FILE);
+    const translator = createShellTranslator({ systemLocale: app.getLocale(), uiLocale: readLocaleMemo(localeFile) });
+    const setMenu = () => {
+      const menu = buildMenuTemplate({ platform: process.platform, isDev, t: translator.t, onOpenSettings: () => shellCtl && shellCtl.openSettings() });
+      Menu.setApplicationMenu(menu ? Menu.buildFromTemplate(menu) : null);
+    };
+    setMenu();
     const { updater, note } = loadUpdater(log);
-    shellCtl = new Shell({ t, locale, log, isDev, updater, updateNote: note });
+    shellCtl = new Shell({ translator, localeFile, onLocaleChange: setMenu, log, isDev, updater, updateNote: note });
     shellCtl.init();
   });
 }

@@ -16,7 +16,9 @@
 // -offline refuses components whose lock file contains a Python package that
 // packaging/licenses/allowlist.json accepts only as "user-fetched" (asr-cuda
 // with the NVIDIA libraries, av and ctranslate2; asr-mlx with regex): an
-// offline archive would distribute those packages (userfetched.go).
+// offline archive would distribute those packages (userfetched.go). It also
+// refuses tools (gcloud), which are downloaded from their vendor; their
+// pinned archives are checked with a HEAD request (tools.go).
 //
 // Run it from the repository root. It needs the network; nothing in the
 // test suite runs it.
@@ -178,6 +180,9 @@ func run(srcPath, outPath, offline, offlineOut, allowlistPath string) error {
 			return err
 		}
 		m.Components = append(m.Components, cs...)
+	}
+	if err := checkTools(m); err != nil {
+		return err
 	}
 	preserveOffline(m, outPath)
 	if ufErr != nil {

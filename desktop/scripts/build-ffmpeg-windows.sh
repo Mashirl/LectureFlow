@@ -6,7 +6,7 @@
 # ruling of gate fix 2) by cross compiling on Linux with mingw-w64. Every
 # input is pinned in packaging/third-party.json (ffmpeg["windows-x64"]):
 # the FFmpeg 9.0.2 tarball and the libraries (zlib, nv-codec-headers,
-# OpenH264, libvpl), each by URL and SHA-256. Nothing else is linked in:
+# OpenH264, libvpl, dav1d), each by URL and SHA-256. Nothing else is linked in:
 # --disable-autodetect, no GPL, no non-free, no version3.
 #
 #   CI:      ubuntu runner:  sudo bash scripts/build-ffmpeg-windows.sh --install-deps
@@ -136,6 +136,34 @@ cmake --build "$d/build" -j"$jobs" >/dev/null
 cmake --install "$d/build" >/dev/null
 cp "$d/LICENSE" "$out/thirdparty/libvpl-LICENSE.txt"
 
+# AV1 software decoder (libdav1d): FFmpeg's own av1 decoder only works with
+# hardware acceleration. A static library linked into avcodec; dav1d has its
+# own win32 thread layer, so no winpthread is needed.
+echo "== dav1d"
+d=$(unpack "$(dep_index dav1d)")
+cat > "$work/meson-cross.txt" <<EOF
+[binaries]
+c = '$cc'
+ar = '$host-ar'
+strip = '$host-strip'
+windres = '$host-windres'
+pkg-config = 'pkg-config'
+nasm = 'nasm'
+
+[host_machine]
+system = 'windows'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+EOF
+meson setup "$d/build" "$d" --cross-file "$work/meson-cross.txt" --prefix="$deps" --libdir=lib \
+  --buildtype=release --default-library=static -Denable_asm=true -Denable_tools=false \
+  -Denable_examples=false -Denable_tests=false -Denable_docs=false >/dev/null
+ninja -C "$d/build" -j"$jobs" install >/dev/null
+cp "$d/COPYING" "$out/thirdparty/dav1d-COPYING.txt"
+# The AOMedia Patent License 1.0 (doc/PATENTS) asks binaries to carry it.
+cp "$d/doc/PATENTS" "$out/thirdparty/dav1d-PATENTS.txt"
+
 # C++ libraries: link libstdc++ statically (no libstdc++-6.dll next to ffmpeg).
 for pc in "$deps"/lib/pkgconfig/*.pc; do
   sed -i -E 's/(^| )-lstdc\+\+( |$)/\1-l:libstdc++.a\2/g; s/(^| )-lpthread( |$)/\1\2/g' "$pc"
@@ -189,7 +217,7 @@ done
 {
   echo "FFmpeg $version for Windows x64, built by desktop/scripts/build-ffmpeg-windows.sh"
   echo "compiler: $($cc --version | head -1)"
-  dpkg-query -W -f='package: ${Package} ${Version}\n' gcc-mingw-w64-x86-64-win32 g++-mingw-w64-x86-64-win32 binutils-mingw-w64-x86-64 mingw-w64-x86-64-dev 2>/dev/null || true
+  dpkg-query -W -f='package: ${Package} ${Version}\n' gcc-mingw-w64-x86-64-win32 g++-mingw-w64-x86-64-win32 binutils-mingw-w64-x86-64 mingw-w64-x86-64-dev nasm meson ninja-build 2>/dev/null || true
   echo "license checks (SPEC-v3 V7): passed"
   echo "  configure line without --enable-gpl, --enable-nonfree, --enable-version3"
   echo "  config.h: FFMPEG_LICENSE \"LGPL version 2.1 or later\"; config.mak: CONFIG_GPL, CONFIG_NONFREE, CONFIG_VERSION3 off"

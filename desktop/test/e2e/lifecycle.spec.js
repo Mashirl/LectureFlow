@@ -211,6 +211,27 @@ test('system sleep is blocked while tasks run and allowed again afterwards', asy
   await expect.poll(() => app.evaluate(() => globalThis.__psb), { timeout: 15_000 }).toEqual([['start', 'prevent-app-suspension'], ['stop', 101]]);
 });
 
+test("the shell follows the app's language choice and remembers it for the next start", async ({ launch }) => {
+  const { app, page } = await launch({ lang: 'en-US' });
+  await waitForApp(page);
+  const port = new URL(page.url()).port;
+  const memo = path.join(await app.evaluate(({ app: a }) => a.getPath('userData')), 'locale.json');
+  const read = () => {
+    try {
+      return JSON.parse(fs.readFileSync(memo, 'utf8')).locale;
+    } catch {
+      return null;
+    }
+  };
+  expect(read()).toBe(null);
+  await setFake(port, { ui: { locale: 'ru' } });
+  await expect.poll(read, { timeout: 15_000 }).toBe('ru');
+  await setFake(port, { ui: { locale: 'yue-Hant-HK' } });
+  await expect.poll(read, { timeout: 15_000 }).toBe('yue-Hant-HK');
+  await setFake(port, { ui: { locale: '' } });
+  await expect.poll(read, { timeout: 15_000 }).toBe(null);
+});
+
 test('no menu bar on Windows; Ctrl + = / Ctrl + 0 still zoom', async ({ launch }) => {
   const { app, page } = await launch();
   await waitForApp(page);

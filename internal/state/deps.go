@@ -39,6 +39,21 @@ func satisfied(status string) bool {
 //     → "upstream:summary", stream → "upstream:prep"; filename_rule none);
 //   - prep, material_extract, glossary_seed: no dependencies.
 func Deps(ctx context.Context, st db.Store, job model.Job) (bool, string, error) {
+	return DepsWith(ctx, st, job, DepsOpts{})
+}
+
+// DepsOpts adjusts Deps (3.1.0 "只转写", pipeline-builder; NOTES.md).
+type DepsOpts struct {
+	// SkipTermJobs: asr does not wait for the course's glossary_seed nor
+	// for any material_terms. The scheduler sets it while the term
+	// extraction role is not configured: those jobs then wait for a
+	// provider themselves and must not hold the transcription (SPEC-v3
+	// V4.2 "只转写": transcription works without any provider).
+	SkipTermJobs bool
+}
+
+// DepsWith is Deps with opt; Deps(...) is DepsWith(..., DepsOpts{}).
+func DepsWith(ctx context.Context, st db.Store, job model.Job, opt DepsOpts) (bool, string, error) {
 	if job.Stage == model.StageGlossaryReview {
 		return reviewDeps(ctx, st, job.ScopeID)
 	}
@@ -70,6 +85,23 @@ func Deps(ctx context.Context, st db.Store, job model.Job) (bool, string, error)
 	if job.Stage != model.StageASR {
 		return true, "", nil
 	}
+	if !opt.SkipTermJobs {
+		if ok, w, err := termDeps(ctx, st, lec); err != nil || !ok {
+			return ok, w, err
+		}
+	}
+	held, err := reviewHoldsASR(ctx, st, lec.CourseID)
+	if err != nil {
+		return false, "", err
+	}
+	if held {
+		return false, model.WaitGlossaryReview, nil
+	}
+	return true, "", nil
+}
+
+// termDeps is the term-extraction part of asr's dependencies (Deps).
+func termDeps(ctx context.Context, st db.Store, lec model.Lecture) (bool, string, error) {
 	_, err := st.GetSyllabus(ctx, lec.CourseID)
 	switch {
 	case err == nil:
@@ -106,13 +138,6 @@ func Deps(ctx context.Context, st db.Store, job model.Job) (bool, string, error)
 		if err != nil || !satisfied(mt.Status) {
 			return false, model.WaitMaterialTerms(m.Filename), nil
 		}
-	}
-	held, err := reviewHoldsASR(ctx, st, lec.CourseID)
-	if err != nil {
-		return false, "", err
-	}
-	if held {
-		return false, model.WaitGlossaryReview, nil
 	}
 	return true, "", nil
 }

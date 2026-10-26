@@ -149,8 +149,8 @@ Programs shipped next to the server. Their license texts ship alongside the bina
 
 | Name | Version | License | Component / platforms | Source | Note |
 |---|---|---|---|---|---|
-| ffmpeg / ffprobe (macOS build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz in CI) | LGPL-2.1-or-later | core darwin | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables with no third-party library inside (bundled is empty): zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically. Corresponding source: the pinned ffmpeg-9.0.2.tar.xz and that build script. |
-| ffmpeg / ffprobe (Windows build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz with mingw-w64) | LGPL-2.1-or-later | core windows | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264 and libvpl in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer. |
+| ffmpeg / ffprobe (macOS build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz in CI) | LGPL-2.1-or-later | core darwin | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables; the one third-party library inside is dav1d (bundled), linked statically. zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically; the build checks that nothing else is. Corresponding source: the pinned ffmpeg-9.0.2.tar.xz, dav1d-1.5.4.tar.xz and that build script. |
+| ffmpeg / ffprobe (Windows build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz with mingw-w64) | LGPL-2.1-or-later | core windows | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264, libvpl and dav1d in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer. |
 | uv | 0.13.1 | MIT OR Apache-2.0 | core windows darwin | https://github.com/astral-sh/uv/releases/tag/0.13.1 | Creates the component virtual environments (SPEC-v3 V3.1). LICENSE-MIT and LICENSE-APACHE of the 0.13.1 tag ship in resources/licenses/uv. |
 
 ### ffmpeg / ffprobe (macOS build)
@@ -158,6 +158,13 @@ Programs shipped next to the server. Their license texts ship alongside the bina
 Corresponding source code / 对应源码:
 
 - https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
+- https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz
+
+Statically linked libraries / 静态链入的库:
+
+| Library | Version | License | Source | Note |
+|---|---|---|---|---|
+| dav1d | 1.5.4 (commit 54706fc6bc0c) | BSD-2-Clause | https://code.videolan.org/videolan/dav1d/-/tree/54706fc6bc0cdecab7e9593974a4039cc038fca7 | AV1 software decoder (libdav1d) linked statically into ffmpeg and ffprobe, built from the pinned 1.5.4 release tarball with meson. COPYING and the AOMedia Patent License 1.0 (doc/PATENTS) ship in resources/licenses/ffmpeg. |
 
 ### ffmpeg / ffprobe (Windows build)
 
@@ -168,6 +175,7 @@ Corresponding source code / 对应源码:
 - https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz
 - https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz
 - https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz
+- https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz
 - https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1
 - https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1
 
@@ -177,6 +185,7 @@ Statically linked libraries / 静态链入的库:
 |---|---|---|---|---|
 | OpenH264 | 2.6.0 (commit 652bdb7719f3) | BSD-2-Clause | https://github.com/cisco/openh264/tree/652bdb7719f30b52b08e506645a7322ff1b2cc6f | H.264 encoder (libopenh264) in avcodec, compiled from source; Cisco's patent coverage applies only to Cisco's own binaries. |
 | libvpl (Intel Video Processing Library dispatcher) | 2.16.0 (commit 778a66d6c653) | MIT | https://github.com/intel/libvpl/tree/778a66d6c6537f08eabb91955dbbf1bce3812894 | Intel Quick Sync (h264_qsv) in avcodec; loads the Intel runtime from the driver at run time. |
+| dav1d | 1.5.4 (commit 54706fc6bc0c) | BSD-2-Clause | https://code.videolan.org/videolan/dav1d/-/tree/54706fc6bc0cdecab7e9593974a4039cc038fca7 | AV1 software decoder (libdav1d) linked statically into avcodec, built from the pinned 1.5.4 release tarball with meson. COPYING and the AOMedia Patent License 1.0 (doc/PATENTS) ship in resources/licenses/ffmpeg. |
 | zlib | 1.3.1 (commit 51b7f2abdade) | Zlib | https://github.com/madler/zlib/tree/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf | Compression (PNG, compressed MP4 headers). |
 | nv-codec-headers | 12.1.14.0 (commit 1889e62e2d35) | MIT | https://github.com/FFmpeg/nv-codec-headers/tree/1889e62e2d35ff7aa9baca2bceb14f053785e6f1 | Headers only (NVENC, h264_nvenc); the NVIDIA driver is loaded at run time. |
 | GCC runtime libraries (libgcc, libstdc++) | 13.2.0 (Ubuntu 13.2.0-6ubuntu1+26.1) | GPL-3.0-or-later WITH GCC-exception-3.1 | https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1 | Linked statically (-static-libgcc; libstdc++ for OpenH264 and libvpl). The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL: no GPL obligations attach to ffmpeg. |
@@ -238,6 +247,16 @@ LectureFlow 不包含这些项目的代码。下列部分参照它们的协议�
 - Changes: Reimplemented in Go from the protocol; no upstream source was copied or translated line by line. The WebSocket client is LectureFlow's own minimal RFC 6455 implementation.
 - Details: `internal/colab/UPSTREAM.md`
 - License text: jupyter_kernel_client-0.9.0.dist-info/licenses/LICENSE in the wheel
+
+## 10. Programs downloaded from their vendor on your computer, not distributed with LectureFlow / 由组件管理器从官方下载到你的电脑、不随本程序分发的程序
+
+When you install one of these components, the component manager downloads the vendor's own archive from the vendor's server, checks its SHA-256 against the component manifest and unpacks it; LectureFlow runs it as a separate program. It is not part of the LectureFlow installer or of any LectureFlow download, and LectureFlow publishes no offline archive of it. Its license, listed here, is between you and its vendor; the parts the vendor bundles in its archive keep their own licenses (see the note and the license files inside the installed tool).
+
+安装这些组件时，组件管理器从官方服务器下载官方压缩包，按组件清单核对 SHA-256 后解压，LectureFlow 把它作为独立程序运行。它们不包含在 LectureFlow 安装包或任何 LectureFlow 下载中，LectureFlow 也不发布它们的离线压缩包。其许可证如下，由你与其发布者之间约定；官方压缩包内附带的部分各自遵循其许可证（见备注与安装目录中的许可证文件）。
+
+| Name | Version | License | Platforms | Source | Note |
+|---|---|---|---|---|---|
+| gcloud | 590.0.1 | Apache-2.0 | darwin-arm64 windows-x64 | https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives | Google Cloud CLI 590.0.1 (Windows: with its bundled Python 3.14; macOS: runs on the python component). Downloaded from Google (dl.google.com) on the user's computer by the component manager and run as a separate program; not part of the LectureFlow installer and never put into an offline archive. The Google Cloud CLI is Apache-2.0 unless an alternate license file says otherwise; the Python bundled in the Windows archive (PSF-2.0, with the Microsoft C runtime DLLs) and the third-party libraries under lib/third_party and platform/ keep their own licenses (license files inside the installed tool). On Windows the component leaves out six directories of API clients and test data that LectureFlow never uses and whose paths are too long for Windows (packaging/components/README.md, Tools). |
 
 ## Appendix A: License texts and notices
 
@@ -3923,5 +3942,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - Python packages whose wheel carries no license file (for example mlx-whisper): the text is reproduced in Appendix A from a copy kept in `packaging/licenses/texts/`, pinned to an upstream commit (see the package note in section 4).
 - Upstreams reimplemented from their protocol (section 9): copies of their license files are kept in `packaging/licenses/texts/` and reproduced in Appendix A.
 - Models: the license file or model card of each source repository listed in section 5.
+- Programs downloaded from their vendor (section 10): the license files inside the installed tool (`components/{id}/{version}/tool/`; for the Google Cloud CLI its `LICENSE` and the license files of the parts it bundles).
 - Bundled binaries: the license files shipped next to each binary (section 6).
 - Electron: `LICENSE` and `LICENSES.chromium.html` in the application directory.

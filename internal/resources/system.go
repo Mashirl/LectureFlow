@@ -23,7 +23,8 @@ import (
 //     plausible value (common on desktops and some laptops: "--").
 //
 // Everything in this file is pure or OS-independent; system_windows.go reads
-// the counters and the memory status, system_other.go reports them unknown.
+// the counters and the memory status, system_darwin.go the Mach statistics
+// of macOS (mac-opti M6, apple.go), system_other.go reports them unknown.
 
 // PDH counter paths of the readings (English names, PdhAddEnglishCounterW).
 const (
@@ -193,6 +194,7 @@ func (s *Service) sampleSystem() {
 // it gives are null meanwhile.
 func (s *Service) readSystem() System {
 	var v System
+	v.Unsupported, v.UnifiedMemory = s.platform()
 	if total, avail, err := s.memStatus(); err == nil {
 		v.MemUsedMB, v.MemTotalMB = MemOf(total, avail)
 	} else if msg := err.Error(); msg != s.memErr {
@@ -240,7 +242,8 @@ func (s *Service) closeSystemLocked() {
 // systemOf is the snapshot's System (a copy of the last sample). s.mu held.
 func (s *Service) systemOf() *System {
 	v := System{CPUPct: cloneInt(s.sys.CPUPct), MemUsedMB: cloneInt(s.sys.MemUsedMB),
-		MemTotalMB: cloneInt(s.sys.MemTotalMB), CPUTempC: cloneInt(s.sys.CPUTempC)}
+		MemTotalMB: cloneInt(s.sys.MemTotalMB), CPUTempC: cloneInt(s.sys.CPUTempC),
+		Unsupported: append([]string(nil), s.sys.Unsupported...), UnifiedMemory: s.sys.UnifiedMemory}
 	return &v
 }
 

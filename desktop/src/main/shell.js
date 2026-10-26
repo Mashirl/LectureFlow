@@ -32,6 +32,7 @@ const { createApiClient } = require('./apiclient');
 const { SleepGuard } = require('./sleepguard');
 const { TrayController } = require('./tray');
 const { registerIpc } = require('./ipc');
+const { writeLocaleMemo } = require('./lib/i18n');
 const { hardenSession, hardenWebContents } = require('./websecurity');
 
 const SHELL_ROOT = path.resolve(__dirname, '..');
@@ -64,9 +65,16 @@ function isDir(p) {
 }
 
 class Shell {
-  constructor({ t, locale, log, isDev, updater = null, updateNote = null }) {
-    this.t = t;
-    this.locale = locale;
+  /**
+   * translator: createShellTranslator(); its t is handed to the tray and IPC
+   * and follows the app's language choice (poll), which is remembered in
+   * localeFile; onLocaleChange() rebuilds the application menu.
+   */
+  constructor({ translator, localeFile = null, onLocaleChange = () => {}, log, isDev, updater = null, updateNote = null }) {
+    this.translator = translator;
+    this.t = translator.t;
+    this.localeFile = localeFile;
+    this.onLocaleChange = onLocaleChange;
     this.log = log;
     this.isDev = isDev;
     this.platform = process.platform;
@@ -93,7 +101,7 @@ class Shell {
     this.updates = updater ? new UpdateController({ updater, api: this.api, log }) : null;
     this.sleepGuard = new SleepGuard({ blocker: powerSaveBlocker, log });
     this.tray = new TrayController({
-      t,
+      t: this.t,
       icon: this._trayIcon(),
       onOpen: () => this.showMainWindow(),
       onQuit: () => setImmediate(() => app.quit()), // not inside the tray's own click handler
@@ -249,7 +257,7 @@ class Shell {
   }
 
   showSplash(state) {
-    this._loadShellPage({ state, lang: this.locale, status: this.t(`splash.${state}`) });
+    this._loadShellPage({ state, lang: this.translator.locale, status: this.t(`splash.${state}`) });
   }
 
   /** showError({ title: key, body: text, detail: text, kind }) */
@@ -260,7 +268,7 @@ class Shell {
     this._loadShellPage({
       ...extra,
       state: 'error',
-      lang: this.locale,
+      lang: this.translator.locale,
       title: this.t(title),
       body,
       detail: String(detail).slice(0, 2000),
@@ -275,6 +283,14 @@ class Shell {
     win.loadURL(`${this.server.origin}/`).catch(() => {
       // reported by did-fail-load
     });
+  }
+
+  /** openSettings: "Settings…" (Cmd+,) of the macOS application menu. */
+  openSettings() {
+    this.showMainWindow();
+    const win = this.win;
+    if (this.phase !== 'ready' || !win || win.isDestroyed() || !isServerUrl(win.webContents.getURL(), this.port())) return;
+    win.webContents.executeJavaScript("location.hash = '#/settings'").catch(() => {});
   }
 
   // ---- service lifecycle ----
@@ -510,6 +526,19 @@ class Shell {
     this.poll();
   }
 
+  /**
+   * followLocale: the app's language choice ("" = none: the system's). The
+   * shell's own strings switch at once (the tray menu is built when it is
+   * shown); the choice is remembered for the next splash.
+   */
+  followLocale(uiLocale) {
+    if (!this.translator.use(uiLocale)) return;
+    this.log.info(`shell language: ${this.translator.locale}`);
+    if (this.localeFile) writeLocaleMemo(this.localeFile, uiLocale);
+    this.tray.refresh();
+    this.onLocaleChange();
+  }
+
   stopPolling() {
     if (this.pollTimer) clearInterval(this.pollTimer);
     this.pollTimer = null;
@@ -524,6 +553,8 @@ class Shell {
       let settings = this.lastSettings;
       if (runningCount(activity) > 0) settings = await this.api.settings().catch(() => this.lastSettings);
       if (settings) this.lastSettings = settings;
+      const ui = await this.api.uiSettings().catch(() => null);
+      if (ui) this.followLocale(ui.locale);
       if (this.phase !== 'ready') return;
       this.sleepGuard.update(wantSleepBlock(activity, settings));
       this.tray.setRunning(runningCount(activity));

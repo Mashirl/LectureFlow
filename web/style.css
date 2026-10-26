@@ -1839,6 +1839,10 @@ mark.hl { background: color-mix(in srgb, #f5c400 38%, transparent); color: inher
   .srow > .s-more { grid-column: 4; grid-row: 1; }
   .tx-legend { margin-left: 0; }
 }
+/* "transcribe only" (3.1.0): no Chinese yet and none coming until a model
+   provider is set up: English only, no empty Chinese column */
+.tx-card.is-en-only { --tx-cols: 66px 22px minmax(0, 1fr) 30px; }
+.tx-card.is-en-only .s-head > :nth-child(4), .tx-card.is-en-only .srow > .s-zh { display: none; }
 
 /* ---- review (§9.7) ---- */
 

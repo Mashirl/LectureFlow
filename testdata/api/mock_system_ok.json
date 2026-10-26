@@ -177,18 +177,17 @@
  "config": {
   "listen": "127.0.0.1:8420",
   "data_dir": "./data",
-  "python": ".venv\\Scripts\\python.exe",
-  "python_openvino": ".venv-ov\\Scripts\\python.exe",
+  "python": [
+   {"backend": "faster-whisper", "path": "C:\\Users\\Student\\LectureFlow\\.venv\\Scripts\\python.exe", "source": "default", "exists": true},
+   {"backend": "openvino", "path": "C:\\Users\\Student\\LectureFlow\\.venv-ov\\Scripts\\python.exe", "source": "default", "exists": true},
+   {"backend": "base", "path": "C:\\Users\\Student\\LectureFlow\\.venv\\Scripts\\python.exe", "source": "default", "exists": true}
+  ],
   "ffmpeg": "ffmpeg",
   "nvidia_smi": "nvidia-smi",
   "worker_dir": "worker",
   "log_level": "info",
   "asr": {
-   "model": "large-v2",
-   "compute_type": "auto",
-   "device": "cuda",
    "language": "en",
-   "max_parallel": 1,
    "vram_reserve_mb": 1024,
    "vram_per_job_mb": 5000,
    "device_mode": "auto",

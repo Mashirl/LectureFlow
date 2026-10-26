@@ -31,17 +31,17 @@
 
 3. 打开 **License audit**，作业 `audit` 应为绿色（依赖许可证审计 + SPDX 文件头两步）。
 
-**哪些失败要回报**：任何一个红色作业都要回报。在回报里写作业名、失败的步骤名（例如 `Go tests`、`Python worker tests`、`Desktop unit tests`），并附上该步骤日志里**第一处**报错前后约 30 行（复制文本即可，不要整份日志）。`test (macos-14)` 的结果最重要：macOS 部分此前从未在真机或 CI 上运行过。
+**哪些失败要回报**：任何一个红色作业都要回报。在回报里写作业名、失败的步骤名（例如 `Go tests`、`Python worker tests`、`Desktop unit tests`），并附上该步骤日志里**第一处**报错前后约 30 行（复制文本即可，不要整份日志）。`test (macos-14)` 的结果最重要：macOS 版的 ffmpeg 构建在 3.1.0 加入了 dav1d。
 
 ### 打 tag 后（生成草稿 Release）
 
-1. tag 必须与应用版本一致：当前是 **`v3.0.0`**（见 `desktop/package.json` 的 `version`）。只推送这一个 tag：`git push origin v3.0.0`。
+1. tag 必须与应用版本一致：当前是 **`v3.1.0`**（见 `desktop/package.json` 的 `version`）。只推送这一个 tag：`git push origin v3.1.0`。
    **不要用 `git push --tags`**：仓库里已有 `v2`、`v3` 等旧 tag，它们也会触发发布流程，并在 “Tag matches the app version” 一步失败（这种失败可以忽略，但会造成干扰）。
 2. Actions 中应该出现工作流 **Release**，作业：`ffmpeg-windows` → `build (windows-latest)`、`build (macos-14)` → `draft-release`，全部为绿色。
    `build` 作业里有一步 “Smoke test the packaged app”，它启动打包好的应用做冒烟测试，失败要回报。
-3. 打开仓库的 **Releases** 页面，应该看到一个标为 **Draft** 的 `LectureFlow 3.0.0`（草稿只有有写权限的人能看到，不会自动发布）。附件应包括：
-   - `LectureFlow-Setup-3.0.0-x64.exe`、`LectureFlow-3.0.0-x64-portable.exe`
-   - `LectureFlow-3.0.0-arm64.dmg` 与一个 `.zip`
+3. 打开仓库的 **Releases** 页面，应该看到一个标为 **Draft** 的 `LectureFlow 3.1.0`（草稿只有有写权限的人能看到，不会自动发布）。附件应包括：
+   - `LectureFlow-Setup-3.1.0-x64.exe`、`LectureFlow-3.1.0-x64-portable.exe`
+   - `LectureFlow-3.1.0-arm64.dmg` 与一个 `.zip`
    - 若干 `.blockmap`
    - `size-report-Windows.md/.json`、`size-report-macOS.md/.json`
    Release 正文是两份大小报告。安装包应**不超过 250 MB**；超过时报告里会列出最大的几项，把这部分抄进回报。
@@ -72,9 +72,9 @@
 
 **After a tag** (draft release)
 
-1. The tag must match the app version: **`v3.0.0`** (`version` in `desktop/package.json`). Push only that tag: `git push origin v3.0.0`. **Do not use `git push --tags`**: older tags such as `v2` and `v3` would also start the release workflow and fail at "Tag matches the app version" (harmless, but noisy).
+1. The tag must match the app version: **`v3.1.0`** (`version` in `desktop/package.json`). Push only that tag: `git push origin v3.1.0`. **Do not use `git push --tags`**: older tags such as `v2` and `v3` would also start the release workflow and fail at "Tag matches the app version" (harmless, but noisy).
 2. Workflow **Release** runs `ffmpeg-windows` → `build (windows-latest)` and `build (macos-14)` → `draft-release`, all green. Report a failure of the step "Smoke test the packaged app".
-3. **Releases** shows a **Draft** `LectureFlow 3.0.0` (visible only to people with write access; nothing is published automatically) with the Windows installer and portable `.exe`, `LectureFlow-3.0.0-arm64.dmg` plus a `.zip`, `.blockmap` files, and `size-report-Windows.*` / `size-report-macOS.*`. Installers should be **250 MB or less**; if not, copy the "largest items" part of the size report into your report.
+3. **Releases** shows a **Draft** `LectureFlow 3.1.0` (visible only to people with write access; nothing is published automatically) with the Windows installer and portable `.exe`, `LectureFlow-3.1.0-arm64.dmg` plus a `.zip`, `.blockmap` files, and `size-report-Windows.*` / `size-report-macOS.*`. Installers should be **250 MB or less**; if not, copy the "largest items" part of the size report into your report.
 4. Do not click "Publish release"; the maintainer decides.
 
 **Optional: turn on automatic updates.** By default the installers never check for updates (expected). To turn updates on, add the Actions variable `LECTUREFLOW_UPDATE_REPO` = `owner/name` (Settings → Secrets and variables → Actions → Variables), optionally `LECTUREFLOW_PUBLISHER_NAME` for signed Windows builds, then tag a **new** version. The draft release then also contains `latest.yml` and `latest-mac.yml`.
@@ -83,12 +83,12 @@
 
 ## 2. macOS 真机验收（Apple Silicon）
 
-**你需要准备什么**：一台 Apple 芯片（M1 或更新）的 Mac，macOS 12 以上，可用磁盘至少 10 GB，能接电源也能用电池（笔记本）；第 1 部分生成的 `LectureFlow-3.0.0-arm64.dmg`；一段约 10 分钟的英文讲座录音或视频（自己的、或公开授权的，**不要**用含他人隐私的素材）；可选：一个修复与翻译用的模型服务 API key（例如 DeepSeek）。没有 key 也能验收，选“只转写”档位即可。准备一个计时器，记下每步开始和结束的时间。
+**你需要准备什么**：一台 Apple 芯片（M1 或更新）的 Mac，macOS 12 以上，可用磁盘至少 10 GB，能接电源也能用电池（笔记本）；第 1 部分生成的 `LectureFlow-3.1.0-arm64.dmg`；一段约 10 分钟的英文讲座录音或视频（自己的、或公开授权的，**不要**用含他人隐私的素材）；可选：一个修复与翻译用的模型服务 API key（例如 DeepSeek）。没有 key 也能验收，选“只转写”档位即可。准备一个计时器，记下每步开始和结束的时间。
 
 ### 安装与启动
 
 1. **下载 dmg**：从草稿 Release 下载；或在 Release 工作流那次运行的页面底部 **Artifacts** 里下载 `installers-macOS`（zip，解压后得到 dmg）。
-   应该看到：文件 `LectureFlow-3.0.0-arm64.dmg`，约 150–250 MB。
+   应该看到：文件 `LectureFlow-3.1.0-arm64.dmg`，约 150–250 MB。
 2. **安装**：打开 dmg，把 LectureFlow 拖进“应用程序”。
 3. **第一次打开**：双击 LectureFlow。安装包未签名，系统会提示无法验证开发者：点 **完成**（不要点“移到废纸篓”），然后按 [docs/install.md](install.md#macos隐私与安全性) 在 **系统设置 → 隐私与安全性** 里点 **仍要打开**。
    应该看到：短暂的启动画面后，打开引导页（第一步“欢迎”）。截图：隐私与安全性里的“仍要打开”。
@@ -120,7 +120,7 @@
 14. **电池模式**：拔掉电源，等资源栏的电源状态变成“电池”（On battery）。再添加两段短录音（各 1–2 分钟即可）同时启动。
     应该看到：两节**不会同时**转写，第二节等第一节转写完才开始；鼠标悬停在“ASR 槽位”上，提示里“上限”为 **1**（英文：“Transcription slots: … limit 1”）。转写仍然使用 Apple 芯片，而不是停下来等电源。接回电源后上限恢复。
 15. **快捷键与菜单**：
-    - 屏幕左上角的应用菜单 **LectureFlow** 里应该有：关于 LectureFlow、设置…（`Cmd+,`）、隐藏、退出（`Cmd+Q`）。逐个点一下：关于显示版本 3.0.0；设置… 打开设置页。
+    - 屏幕左上角的应用菜单 **LectureFlow** 里应该有：关于 LectureFlow、设置…（`Cmd+,`）、隐藏、退出（`Cmd+Q`）。逐个点一下：关于显示版本 3.1.0；设置… 打开设置页。
     - `Cmd+C` / `Cmd+V` 能在输入框里复制粘贴；`Cmd+=` / `Cmd+-` / `Cmd+0` 缩放界面。
     - 窗口左上角绿色按钮（或“视图 → 进入全屏幕”、`Ctrl+Cmd+F`）进入**原生全屏**（独占一个桌面空间），再退出。
     - 界面里任何提示快捷键的地方应该写 `Cmd` 而不是 `Ctrl`。
@@ -133,11 +133,11 @@
 
 ### English: macOS acceptance (Apple silicon)
 
-**What you need**: an Apple silicon Mac (M1 or newer, macOS 12+), at least 10 GB free; the `LectureFlow-3.0.0-arm64.dmg` from part 1; an English lecture recording of about 10 minutes (your own or openly licensed; nothing with other people's private data); optionally an API key for a repair/translation service (e.g. DeepSeek). Without a key, choose the "Transcription only" tier. Note the start and end time of each step.
+**What you need**: an Apple silicon Mac (M1 or newer, macOS 12+), at least 10 GB free; the `LectureFlow-3.1.0-arm64.dmg` from part 1; an English lecture recording of about 10 minutes (your own or openly licensed; nothing with other people's private data); optionally an API key for a repair/translation service (e.g. DeepSeek). Without a key, choose the "Transcription only" tier. Note the start and end time of each step.
 
 **Install and start**
 
-1. Download the dmg from the draft release, or the `installers-macOS` artifact at the bottom of the Release workflow run. Expect `LectureFlow-3.0.0-arm64.dmg`, about 150–250 MB.
+1. Download the dmg from the draft release, or the `installers-macOS` artifact at the bottom of the Release workflow run. Expect `LectureFlow-3.1.0-arm64.dmg`, about 150–250 MB.
 2. Open it and drag LectureFlow to Applications.
 3. Open LectureFlow. It is unsigned: click **Done** (not "Move to Bin"), then **System Settings → Privacy & Security → Open Anyway** (see [docs/install.md](install.md#english)). Expect a short splash screen, then the setup guide ("Welcome"). Screenshot the "Open Anyway" step.
 4. Data folder: on a Mac that never ran LectureFlow, use the default `~/Library/Application Support/LectureFlow/`. Otherwise quit the app and start it from Terminal with a fresh folder: `LECTUREFLOW_DATA_DIR="$HOME/lf-acceptance" /Applications/LectureFlow.app/Contents/MacOS/LectureFlow` (delete `~/lf-acceptance` afterwards).
@@ -157,7 +157,7 @@
 12. **Player**: on the course page click the lecture title, then play. Expect working video/audio, subtitles in sync at three different positions, and the transcript highlighting the current sentence. One screenshot (no personal data in it).
 13. **Resource bar**: expect the chip model (e.g. Apple M2) and memory use; GPU utilisation shows `--` when it cannot be read, and **no administrator password prompt**. Screenshot.
 14. **Battery**: unplug the power cable and wait until the power status says "On battery". Start two short recordings (1–2 minutes each). Expect only one to transcribe at a time; hovering "Transcription slots" shows "limit 1". Transcription keeps using the Apple chip. Plug in again: the limit goes back up.
-15. **Shortcuts and menus**: the **LectureFlow** application menu has About, Settings… (`Cmd+,`), Hide and Quit (`Cmd+Q`); About shows version 3.0.0, Settings… opens settings. `Cmd+C`/`Cmd+V` work in text fields, `Cmd+=`/`Cmd+-`/`Cmd+0` zoom. The green window button (or `Ctrl+Cmd+F`) enters **native full screen** (its own Space) and leaves it. Shortcut hints in the UI say `Cmd`, not `Ctrl`.
+15. **Shortcuts and menus**: the **LectureFlow** application menu has About, Settings… (`Cmd+,`), Hide and Quit (`Cmd+Q`); About shows version 3.1.0, Settings… opens settings. `Cmd+C`/`Cmd+V` work in text fields, `Cmd+=`/`Cmd+-`/`Cmd+0` zoom. The green window button (or `Ctrl+Cmd+F`) enters **native full screen** (its own Space) and leaves it. Shortcut hints in the UI say `Cmd`, not `Ctrl`.
 16. **Component sizes**: **Settings → Components** lists installed components, versions and sizes. Note them.
 17. **Diagnostics** (if something went wrong): **Settings → App → Logs and diagnostics → Export diagnostics** creates a zip (no lecture content, no API keys). Send it to the maintainer with your report.
 18. **Quit** from the application menu. The app should exit within a few seconds, with no LectureFlow or python processes left in Activity Monitor.

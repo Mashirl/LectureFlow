@@ -35,6 +35,13 @@ package main
 //	           Python / faster-whisper / pypdf errors of a fresh desktop
 //	           install (v3_accfix.go)
 //
+// The 3.1.0 scenarios (v31_onboarding.go has the details): ob_storage and
+// ob_storage_full (desktop mode; the data folder's disk has room / 2 GB),
+// ob_noasr (desktop mode, nothing usable to transcribe with), ob_planerr
+// (the recommendation cannot be planned: plan_error), ob_login_wait,
+// ob_login_nourl, ob_login_fail and ob_login_timeout (the Google sign-in of
+// the Colab branch).
+//
 // Scenario "empty" (no courses) is the one where the front end enters the
 // onboarding by itself (GET /api/app onboarding_done false + no course).
 // No key is ever stored or returned in full: use-env-key only sets the
@@ -54,7 +61,7 @@ import (
 	"lectureflow/internal/settings"
 )
 
-var obFlag = flag.String("onboarding", "", "onboarding failure mode for every scenario: fail | mirror | disk | cpu | noenv (v3_onboarding.go)")
+var obFlag = flag.String("onboarding", "", "onboarding mode for every scenario: fail | mirror | disk | cpu | noenv | staged | desktop | storage | storage_full | noasr | planerr | login_wait | login_nourl | login_fail | login_timeout (v3_onboarding.go, v31_onboarding.go)")
 
 // obInstallDuration is how long a whole simulated install downloads (tests
 // shorten it); verifying and installing take obPhase each after that.
@@ -141,8 +148,8 @@ func (m *mock) obGetApp(w http.ResponseWriter, r *http.Request, s *store) {
 	done := st.onboarding.Done
 	st.mu.Unlock()
 	info := api.AppInfo{Version: "3.0.0-mock", Mode: "web", Platform: "windows", Arch: "amd64",
-		DataDir: `C:\Users\Student\AppData\Roaming\LectureFlow`, OnboardingDone: done}
-	if obMode(r) == "desktop" {
+		DataDir: m.appSetDataDir(), OnboardingDone: done}
+	if obDesktopMode(obMode(r)) {
 		info.Mode, info.ResourcesDir = "desktop", `C:\Program Files\LectureFlow\resources`
 	}
 	writeJSON(w, http.StatusOK, info)
@@ -155,7 +162,8 @@ func (m *mock) obGet(w http.ResponseWriter, r *http.Request, s *store) {
 	writeJSON(w, http.StatusOK, st.onboarding)
 }
 
-var obSteps = map[string]bool{"welcome": true, "privacy": true, "computer": true, "providers": true, "download": true, "selftest": true, "first_course": true, "done": true}
+var obSteps = map[string]bool{"welcome": true, "privacy": true, "computer": true, "asr_mode": true, "storage": true,
+	"providers": true, "download": true, "selftest": true, "first_course": true, "done": true}
 
 // obPut mirrors internal/api putOnboarding (step a non-empty string, done a
 // boolean, data an object); the mock also checks the step names of §7.4.
@@ -233,10 +241,12 @@ type obRecommendation struct {
 type obHardwareView struct {
 	HW             obHW             `json:"hw"`
 	Recommendation obRecommendation `json:"recommendation"`
+	// PlanError: the recommendation could not be planned (3.1.0 M2); null otherwise.
+	PlanError *model.ErrorInfo `json:"plan_error"`
 }
 
 func obDiskFreeMB(mode string) int {
-	if mode == "disk" {
+	if mode == "disk" || mode == "storage_full" {
 		return 2048
 	}
 	return 214500
@@ -261,19 +271,29 @@ func (m *mock) obHardware(w http.ResponseWriter, r *http.Request, s *store) {
 			model.ErrorInfo{Code: "hw.reason.nvidia", Params: map[string]any{"name": hw.NVIDIA[0].Name, "vram_gb": 8}},
 			model.ErrorInfo{Code: "hw.reason.npu_battery", Params: map[string]any{"name": hw.IntelNPUName}})
 	}
+	view := obHardwareView{HW: hw}
+	if mode == "planerr" {
+		// a recommended model the manifest does not have: the plan fails
+		// (the real server then reports the estimate as download_bytes)
+		rec.Components = append(rec.Components, obPlanErrModel)
+		view.PlanError = &model.ErrorInfo{Code: "components.unknown", Params: map[string]any{"id": obPlanErrModel}}
+	}
 	st := m.ob()
 	st.mu.Lock()
 	rec.DownloadBytes = st.plan(rec.Components, mode).DownloadBytes
 	st.mu.Unlock()
-	writeJSON(w, http.StatusOK, obHardwareView{HW: hw, Recommendation: rec})
+	view.Recommendation = rec
+	writeJSON(w, http.StatusOK, view)
 }
 
 // ---------- components ----------
 
 type obComp struct {
 	ID            string   `json:"id"`
-	Kind          string   `json:"kind"` // python-runtime | venv | model | binary
+	Kind          string   `json:"kind"` // python-runtime | venv | model | binary | tool
 	Version       string   `json:"version"`
+	NameKey       string   `json:"name_key,omitempty"`
+	DescKey       string   `json:"desc_key,omitempty"`
 	Backend       string   `json:"backend,omitempty"`
 	Model         string   `json:"model,omitempty"`
 	Precision     string   `json:"precision,omitempty"`
@@ -300,6 +320,8 @@ var obCatalog = []obComp{
 	{ID: "asr-cuda", Kind: "venv", Version: "1.1.1-1", Backend: "faster-whisper", DownloadBytes: 1290 * obMB, InstallBytes: 2900 * obMB, Requires: []string{"python"}, License: "MIT"},
 	{ID: "asr-openvino", Kind: "venv", Version: "2025.3-1", Backend: "openvino", DownloadBytes: 385 * obMB, InstallBytes: 1100 * obMB, Requires: []string{"python"}, License: "Apache-2.0"},
 	{ID: "asr-mlx", Kind: "venv", Version: "0.4.2-1", Backend: "mlx", DownloadBytes: 120 * obMB, InstallBytes: 300 * obMB, Requires: []string{"python"}, License: "MIT", Unavailable: "platform"},
+	// 3.1.0: the Google Cloud CLI of the Colab branch (a tool with its own Python)
+	{ID: "gcloud", Kind: "tool", Version: "548.0.0", NameKey: "compui.name.gcloud", DescKey: "compui.hint.gcloud", DownloadBytes: 118 * obMB, InstallBytes: 430 * obMB, Requires: []string{}, License: "Apache-2.0"},
 	{ID: "model:faster-whisper:large-v3:float16", Kind: "model", Version: "1", Backend: "faster-whisper", Model: "large-v3", Precision: "float16", DownloadBytes: 3087 * obMB, InstallBytes: 3087 * obMB, Requires: []string{"asr-cuda"}, License: "MIT"},
 	{ID: "model:faster-whisper:large-v3-turbo:float16", Kind: "model", Version: "1", Backend: "faster-whisper", Model: "large-v3-turbo", Precision: "float16", DownloadBytes: 1620 * obMB, InstallBytes: 1620 * obMB, Requires: []string{"asr-cuda"}, License: "MIT"},
 	{ID: "model:faster-whisper:medium:int8_float16", Kind: "model", Version: "1", Backend: "faster-whisper", Model: "medium", Precision: "int8_float16", DownloadBytes: 1530 * obMB, InstallBytes: 1530 * obMB, Requires: []string{"asr-cuda"}, License: "MIT"},
@@ -669,7 +691,11 @@ func (m *mock) obInstall(w http.ResponseWriter, r *http.Request, s *store) {
 		t.items = append(t.items, obItem{ID: id, Total: c.DownloadBytes, Source: src})
 		t.total += c.DownloadBytes
 	}
-	t.speed = float64(t.total) / obInstallDuration.Seconds()
+	dur := obInstallDuration
+	if obToolsOnly(todo) {
+		dur /= 4 // the Google Cloud CLI of the Colab branch is a small download
+	}
+	t.speed = float64(t.total) / dur.Seconds()
 	if t.speed <= 0 {
 		t.speed = 1
 	}

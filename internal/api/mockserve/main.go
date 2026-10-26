@@ -150,6 +150,8 @@ type mock struct {
 	battery lazyStore // scenario "battery" (devices.go)
 	noov    lazyStore // scenario "noov" (devices.go)
 	cpuonly lazyStore // scenario "cpuonly" (devices.go)
+	// scenario "transcribe_only" (v31_transcribe_only.go)
+	transcribeOnly lazyStore
 	// the power scenarios (power.go)
 	powerACDGPU           lazyStore
 	powerACIntel          lazyStore
@@ -251,6 +253,8 @@ func (m *mock) storeFor(r *http.Request) *store {
 		return m.noov.get(m, func(s *store) { s.dev.noOV = true })
 	case "cpuonly":
 		return m.cpuonly.get(m, setupCPUOnly)
+	case "transcribe_only":
+		return m.transcribeOnly.get(m, setupTranscribeOnly)
 	case "power_ac_dgpu":
 		return m.powerACDGPU.get(m, setupPowerACDGPU)
 	case "power_ac_intel":
@@ -442,7 +446,8 @@ func (m *mock) system(r *http.Request, s *store) (api.System, error) {
 	sys.Power = &p
 	sys.OpenVINO = s.openVINOInfo(now)
 	sys.Checks = s.withDeviceChecks(sys.Checks)
-	obDesktopChecks(r, &sys) // ob_desktop (v3_accfix.go)
+	obDesktopChecks(r, &sys)                // ob_desktop (v3_accfix.go)
+	sys.Config = mockConfigView(r, s, &sys) // 3.1.0 (v31_config.go)
 	return sys, nil
 }
 

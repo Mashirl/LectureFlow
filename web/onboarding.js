@@ -1,16 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
-// The onboarding (SPEC-v3 V4): seven steps, one screen each — a title, a
-// sentence or two, one main action; "skip" and "back" are always there. The
-// step and the choices are saved on the server (PUT /api/onboarding, kv
-// onboarding.state) every time a step is entered, so closing the app and
-// opening it again continues where the user was. Nothing is changed
-// locally: every screen shows what the server returned.
+// The onboarding (SPEC-v3 V4; 3.1.0: .claude/v31-brief.md §1): one screen
+// per step — a title, a sentence or two, one main action; "skip" and "back"
+// are always there. The step and the choices are saved on the server (PUT
+// /api/onboarding, kv onboarding.state) every time a step is entered, so
+// closing the app and opening it again continues where the user was.
+// Nothing is changed locally: every screen shows what the server returned.
 //
-// Steps 3-6 live in their own modules (onboarding_computer.js,
-// onboarding_providers.js, onboarding_download.js); this file is the
-// shell, steps 1 (welcome, language, importing old data), 2 (privacy) and
-// 7 (the first course).
+// Two steps are not always there: "data folder" only in the desktop app
+// when the folder can be moved (GET /api/app mode desktop and GET
+// /api/app/data-dir can_move), "test the devices" not when the user chose
+// the remote GPU. The step rail, the "step n of m" count, back, skip and
+// resuming all go by the steps shown; a saved step that is not shown (an
+// older state, another mode) continues with the next one that is.
+// Older saved states (3.0, without asr_mode) continue as before: their step
+// names all still exist, and no asr_mode means the local download.
+//
+// #/onboarding/{step}/{local|remote} opens a step directly with the
+// transcription mode chosen (the "cannot transcribe yet" notice of
+// asr_ready.js); the hash then goes back to #/onboarding.
+//
+// Steps 3-8 live in their own modules (onboarding_computer.js,
+// onboarding_mode.js, onboarding_storage.js, onboarding_providers.js,
+// onboarding_download.js, onboarding_remote.js); this file is the shell,
+// the welcome (language, importing old data), privacy and first-course steps.
 
 import { h, clear, btn, toast, preserveFocus, confirmDialog } from './dom.js';
 import { icon } from './icons.js';
@@ -21,13 +34,19 @@ import { obApi, setErrorHandler, desktop } from './onboarding_api.js';
 import { computerStep } from './onboarding_computer.js';
 import { providersStep } from './onboarding_providers.js';
 import { downloadStep, selftestStep } from './onboarding_download.js';
+import { asrModeStep } from './onboarding_mode.js';
+import { storageStep } from './onboarding_storage.js';
+import { remoteStep } from './onboarding_remote.js';
+import { asrNotice } from './asr_ready.js';
 
-export const STEPS = ['welcome', 'privacy', 'computer', 'providers', 'download', 'selftest', 'first_course'];
+export const STEPS = ['welcome', 'privacy', 'computer', 'asr_mode', 'storage', 'providers', 'download', 'selftest', 'first_course'];
 
 const STEP_ICONS = {
   welcome: 'audio-lines',
   privacy: 'shield-check',
   computer: 'cpu',
+  asr_mode: 'mic',
+  storage: 'hard-drive',
   providers: 'key-round',
   download: 'download',
   selftest: 'gauge',
@@ -38,17 +57,21 @@ const FACTORIES = {
   welcome: welcomeStep,
   privacy: privacyStep,
   computer: computerStep,
+  asr_mode: asrModeStep,
+  storage: storageStep,
   providers: providersStep,
-  download: downloadStep,
+  // the remote GPU: the gcloud tool and the Google sign-in instead
+  download: (env) => (env.data.asr_mode === 'remote' ? remoteStep(env) : downloadStep(env)),
   selftest: selftestStep,
   first_course: firstCourseStep,
 };
 
 /**
  * Mounts the onboarding page (#/onboarding). ctx is app.js's context
- * (newCourse opens the A8 wizard). Returns the view object.
+ * (newCourse opens the A8 wizard); route may name a step and a mode
+ * (#/onboarding/asr_mode/local). Returns the view object.
  */
-export function mountOnboarding(main, ctx) {
+export function mountOnboarding(main, ctx, route = {}) {
   let alive = true;
   const S = { step: null, done: false, data: {}, loading: true, loadError: null };
   let cur = null; // the current step object
@@ -74,9 +97,18 @@ export function mountOnboarding(main, ctx) {
     saveAt: (step) => save(step),
     // true when this page resumed the onboarding after a data import (step 3 says so)
     imported: false,
-    next: () => go(STEPS[STEPS.indexOf(S.step) + 1] || 'first_course'),
+    // the "data folder" step is shown (desktop app, the folder can be moved)
+    storageShown: false,
+    // the mode the "transcription mode" step starts with (a link of the notice)
+    modeHint: '',
+    next,
     back,
     goto: go,
+    // back to the "transcription mode" step with mode chosen
+    gotoMode(mode) {
+      env.modeHint = mode;
+      go('asr_mode');
+    },
     finish,
     setData(patch) {
       Object.assign(S.data, patch);
@@ -92,7 +124,7 @@ export function mountOnboarding(main, ctx) {
     render();
     let st;
     try {
-      st = await obApi.onboarding({ quiet: true });
+      [st, env.storageShown] = await Promise.all([obApi.onboarding({ quiet: true }), storageShown()]);
     } catch (e) {
       if (!alive) return;
       S.loading = false;
@@ -117,8 +149,51 @@ export function mountOnboarding(main, ctx) {
       step = 'computer';
       env.imported = true;
     }
+    // a link to a step (the "cannot transcribe yet" notice): that step, that mode
+    if (STEPS.includes(route.step)) {
+      step = route.step;
+      if (route.branch === 'local' || route.branch === 'remote') env.modeHint = route.branch;
+      route = {};
+      history.replaceState(null, '', '#/onboarding');
+    }
     if (!alive) return;
     go(step, { initial: true });
+  }
+
+  // The "data folder" step: desktop app, and the folder is not given by
+  // LECTUREFLOW_DATA_DIR (can_move). The status is kept for the step.
+  async function storageShown() {
+    try {
+      const app = await obApi.app({ quiet: true });
+      if (!app || app.mode !== 'desktop') return false;
+      const dd = await obApi.dataDir({ quiet: true });
+      cache.dataDir = dd;
+      return !!dd && dd.can_move === true;
+    } catch {
+      return false;
+    }
+  }
+
+  // The steps shown with the current choices.
+  function shown(step) {
+    if (step === 'storage') return env.storageShown;
+    if (step === 'selftest') return S.data.asr_mode !== 'remote';
+    return STEPS.includes(step);
+  }
+
+  function steps() {
+    return STEPS.filter(shown);
+  }
+
+  // step, or the first shown step after it
+  function resolve(step) {
+    for (let i = Math.max(0, STEPS.indexOf(step)); i < STEPS.length; i++) if (shown(STEPS[i])) return STEPS[i];
+    return 'first_course';
+  }
+
+  function next() {
+    const i = STEPS.indexOf(S.step);
+    go(i >= 0 && i + 1 < STEPS.length ? STEPS[i + 1] : 'first_course');
   }
 
   // An import of step 1 still copying (desktop mode): the page was mounted
@@ -153,6 +228,7 @@ export function mountOnboarding(main, ctx) {
 
   function go(step, { initial = false } = {}) {
     if (!alive || !STEPS.includes(step)) return;
+    step = resolve(step);
     if (cur && cur.destroy) cur.destroy();
     S.step = step;
     cur = FACTORIES[step](env);
@@ -164,15 +240,18 @@ export function mountOnboarding(main, ctx) {
   }
 
   function back() {
-    const i = STEPS.indexOf(S.step);
-    if (i > 0) go(STEPS[i - 1]);
+    const list = steps();
+    const i = list.indexOf(S.step);
+    if (i > 0) go(list[i - 1]);
   }
 
-  function skip() {
+  async function skip() {
     if (S.step === 'first_course') {
       finish('later');
       return;
     }
+    if (cur && cur.onSkip) await cur.onSkip();
+    if (!alive) return;
     if (!S.data.skipped.includes(S.step)) S.data.skipped.push(S.step);
     env.next();
   }
@@ -230,25 +309,27 @@ export function mountOnboarding(main, ctx) {
   }
 
   function topBar() {
-    const i = STEPS.indexOf(S.step);
+    const list = steps();
+    const i = list.indexOf(S.step);
     return h(
       'header',
       { class: 'ob-top' },
       h('span', { class: 'ob-brand' }, h('span', { class: 'brand-mark' }, icon('audio-lines', { size: 16, stroke: 2.4 })), h('span', { class: 'ob-brand-name' }, 'LectureFlow')),
-      i >= 0 ? h('span', { class: 'ob-count' }, t('onboarding.step_of', { n: i + 1, total: STEPS.length })) : null,
+      i >= 0 ? h('span', { class: 'ob-count' }, t('onboarding.step_of', { n: i + 1, total: list.length })) : null,
       h('button', { type: 'button', class: 'btn btn-ghost btn-sm ob-leave', dataset: { fkey: 'ob:leave' }, onclick: leave }, t('onboarding.leave')),
     );
   }
 
   function stepper() {
-    const i = STEPS.indexOf(S.step);
+    const list = steps();
+    const i = list.indexOf(S.step);
     return h(
       'nav',
       { class: 'ob-steps', 'aria-label': t('onboarding.steps_label') },
       h(
         'ol',
         null,
-        STEPS.map((s, k) =>
+        list.map((s, k) =>
           h(
             'li',
             { class: 'ob-step' + (k === i ? ' is-current' : k < i ? ' is-past' : '') },
@@ -266,7 +347,7 @@ export function mountOnboarding(main, ctx) {
 
   function card() {
     const step = S.step;
-    const i = STEPS.indexOf(step);
+    const i = steps().indexOf(step);
     const primary = cur.primary ? cur.primary() : null;
     const secondary = cur.secondary ? cur.secondary() : [];
     const last = step === 'first_course';
@@ -293,6 +374,10 @@ export function mountOnboarding(main, ctx) {
   }
 
   return {
+    // SSE "changed" (colab, settings, devices): the current step may follow it
+    onChanged(ev) {
+      if (cur && cur.onChanged) cur.onChanged(ev);
+    },
     destroy() {
       alive = false;
       if (cur && cur.destroy) cur.destroy();
@@ -477,10 +562,13 @@ function privacyStep(env) {
 
 function firstCourseStep(env) {
   const has = (env.ctx.courses() || []).length > 0;
+  // 3.1.0 M2: nothing to transcribe with yet — said here, before the end
+  const notice = asrNotice({ variant: 'onboarding', onLocal: () => env.gotoMode('local'), onRemote: () => env.gotoMode('remote') });
   return {
     title: () => t('onboarding.first_course.title'),
     desc: () => (has ? t('onboarding.first_course.desc_has') : t('onboarding.first_course.desc')),
-    body: () =>
+    body: () => [
+      notice.el,
       h(
         'ul',
         { class: 'ob-points' },
@@ -490,6 +578,9 @@ function firstCourseStep(env) {
           ['upload', 'recordings'],
         ].map(([ic, k]) => h('li', null, icon(ic, { size: 16 }), h('span', null, t(`onboarding.first_course.point.${k}`)))),
       ),
+    ],
     primary: () => ({ label: t('onboarding.first_course.add'), icon: 'plus', onclick: () => env.finish('course') }),
+    onChanged: (ev) => notice.onChanged(ev),
+    destroy: () => notice.destroy(),
   };
 }

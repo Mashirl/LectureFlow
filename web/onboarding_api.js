@@ -85,6 +85,16 @@ export const obApi = {
     const d = await get('/api/app/data-dir', o);
     return (d && (d.import || d.move || d)) || null;
   },
+  // 3.1.0 (.claude/v31-brief.md §2): the data folder, the Colab sign-in
+  dataDir: (o) => get('/api/app/data-dir', o), // DataDirStatus {data_dir, can_move, free_bytes, state, …}
+  checkDataDir: (path, o) => post('/api/app/data-dir/check', { path }, o), // {path, free_bytes, ok, error}
+  moveDataDir: (path, o) => post('/api/app/data-dir', { path }, o), // 202 DataDirStatus
+  health: (o) => get('/api/health', o),
+  colab: (o) => get('/api/colab', o), // ColabView {status, settings, adc, held}
+  colabSettings: (patch, o) => put('/api/colab/settings', patch, o), // ColabView
+  colabLogin: (o) => get('/api/colab/auth/login', o), // ColabLogin {state, url, started_at, error}
+  startColabLogin: (o) => post('/api/colab/auth/login', undefined, o), // 202 ColabLogin
+  cancelColabLogin: (o) => request('DELETE', '/api/colab/auth/login', undefined, o), // ColabLogin
   // existing endpoints, re-exported for the onboarding modules
   settings: api.settings,
   providers: api.providers,
@@ -113,4 +123,24 @@ export function openExternal(url) {
     return;
   }
   window.open(url, '_blank', 'noopener');
+}
+
+/** The recommendation's components, without the bundled core. */
+export function recommendedComponents(rec) {
+  return ((rec && rec.components) || []).filter((id) => id !== 'core');
+}
+
+const LOCAL_BACKENDS = ['asr-cuda', 'asr-openvino', 'asr-mlx'];
+
+/**
+ * Which transcription mode the hardware detection recommends (3.1.0):
+ * 'local' when it recommends a local back end other than the CPU fallback,
+ * 'remote' when this computer has only the CPU (or no back end at all),
+ * '' when nothing is known.
+ */
+export function recommendedMode(rec) {
+  if (!rec) return '';
+  const cpuOnly = (rec.reasons || []).some((r) => r && r.code === 'hw.reason.cpu_only');
+  const backend = (rec.components || []).some((id) => LOCAL_BACKENDS.includes(id));
+  return backend && !cpuOnly ? 'local' : 'remote';
 }

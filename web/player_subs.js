@@ -5,7 +5,7 @@
 // overlaid on it) and the CC settings panel. No <track> / ::cue: cues come
 // from GET /cues (P4) and are drawn into the DOM.
 
-import { h, clear } from './dom.js';
+import { h, clear, append } from './dom.js';
 import { t } from './i18n.js';
 import { pIcon } from './player_icons.js';
 import { zhLang } from './zh_display.js';
@@ -211,7 +211,10 @@ function segmented(label, options, value, onPick, hint) {
 // openSubsPanel(anchor, getSettings, onChange(patch), {onClose, isOverlay}) →
 // {el, close, refresh}. The panel sits above the CC button inside the
 // player (so it also shows in full screen); Esc or a click outside closes it.
-export function createSubsPanel({ getSettings, onChange, isOverlay, onClose }) {
+// englishOnly() true ("transcribe only", 3.1.0: the lecture has no Chinese
+// and gets none until a model provider is set up): the display choice is
+// English or off, and the Chinese-only rows (order, Chinese size) are left out.
+export function createSubsPanel({ getSettings, onChange, isOverlay, onClose, englishOnly = () => false }) {
   const body = h('div', { class: 'pl-cc-body' });
   const el = h('div', { class: 'pl-cc', role: 'dialog', 'aria-label': t('player.cc.title'), hidden: true, tabindex: '-1' }, h('div', { class: 'pl-cc-head' }, pIcon('captions', { size: 15 }), h('span', null, t('player.cc.title'))), body);
 
@@ -227,30 +230,34 @@ export function createSubsPanel({ getSettings, onChange, isOverlay, onClose }) {
 
   function render() {
     const s = getSettings();
-    clear(body);
-    body.append(
-      segmented(
-        t('player.cc.display'),
-        [
+    const enOnly = englishOnly();
+    const displays = enOnly
+      ? [
+          ['en', t('player.cc.display_en')],
+          ['off', t('player.cc.display_off')],
+        ]
+      : [
           ['both', t('player.cc.display_both')],
           ['zh', t('player.cc.display_zh')],
           ['en', t('player.cc.display_en')],
           ['off', t('player.cc.display_off')],
-        ],
-        s.display,
-        (v) => onChange({ display: v }),
-        'C',
-      ),
-      segmented(
-        t('player.cc.order'),
-        [
-          ['en', t('player.cc.order_en')],
-          ['zh', t('player.cc.order_zh')],
-        ],
-        s.order,
-        (v) => onChange({ order: v }),
-      ),
-      sizeRow(t('player.cc.size_zh'), 'sizeZh'),
+        ];
+    clear(body);
+    // dom.append: the rows left out for an English-only lecture are null
+    append(body, [
+      segmented(t('player.cc.display'), displays, enOnly && s.display !== 'off' ? 'en' : s.display, (v) => onChange({ display: v }), 'C'),
+      enOnly
+        ? null
+        : segmented(
+            t('player.cc.order'),
+            [
+              ['en', t('player.cc.order_en')],
+              ['zh', t('player.cc.order_zh')],
+            ],
+            s.order,
+            (v) => onChange({ order: v }),
+          ),
+      enOnly ? null : sizeRow(t('player.cc.size_zh'), 'sizeZh'),
       sizeRow(t('player.cc.size_en'), 'sizeEn'),
       segmented(
         t('player.cc.placement'),
@@ -279,7 +286,7 @@ export function createSubsPanel({ getSettings, onChange, isOverlay, onClose }) {
         h('p', { class: 'pl-cc-hint' }, isOverlay() ? t('player.cc.overlay_hint') : t('player.cc.opacity_band_hint')),
         s.overlayY != null && isOverlay() ? h('button', { type: 'button', class: 'btn btn-sm btn-ghost', onclick: () => onChange({ overlayY: null }) }, pIcon('rotate-ccw', { size: 13 }), h('span', { class: 'btn-label' }, t('player.cc.reset_position'))) : null,
       ),
-    );
+    ]);
   }
 
   // radio names change on every render: keep focus by position instead

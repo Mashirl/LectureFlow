@@ -9,6 +9,7 @@ package api
 //
 //   POST   /api/app/data-dir {"path"}   copy everything to path, verify, write
 //                                       location.json, restart (exit code 3)
+//   POST   /api/app/data-dir/check {"path"} the same checks, nothing moved (3.1.0)
 //   GET    /api/app/data-dir            DataDirStatus (also GET /api/app/import)
 //   POST   /api/app/import {"path"}     stage a development data directory,
 //                                       restart; applied before the database opens
@@ -35,6 +36,7 @@ func init() {
 	v3Routes = append(v3Routes, func(s *Server, h func(string, http.HandlerFunc)) {
 		h("GET /api/app/data-dir", s.getDataDirStatus)
 		h("POST /api/app/data-dir", s.postDataDir)
+		h("POST /api/app/data-dir/check", s.postDataDirCheck)
 		h("GET /api/app/import", s.getDataDirStatus)
 		h("POST /api/app/import", s.postImport)
 		h("GET /api/app/old-data-dir", s.getOldDataDir)
@@ -67,6 +69,21 @@ type DataDirStatus struct {
 	// CanMove is false when the data directory was given by
 	// LECTUREFLOW_DATA_DIR (no location.json to write).
 	CanMove bool `json:"can_move"`
+	// FreeBytes is the free space of the data directory's volume (-1 =
+	// unknown; 3.1.0, the setup guide's "数据存放位置" step).
+	FreeBytes int64 `json:"free_bytes"`
+}
+
+// DataDirCheck is POST /api/app/data-dir/check (3.1.0): whether
+// POST /api/app/data-dir would accept path now — the same checks and error
+// codes, nothing copied. Path is the cleaned absolute target (the input
+// when it is not a usable path); FreeBytes the free space of its volume
+// (-1 = unknown).
+type DataDirCheck struct {
+	Path      string           `json:"path"`
+	FreeBytes int64            `json:"free_bytes"`
+	OK        bool             `json:"ok"`
+	Error     *model.ErrorInfo `json:"error"`
 }
 
 // OldDataDir is GET /api/app/old-data-dir.
@@ -214,7 +231,31 @@ func (s *Server) dataDirStatus() DataDirStatus {
 	r.mu.Unlock()
 	st.DataDir = s.absDataDir()
 	st.CanMove = s.desktop != nil && s.desktop.LocationFile != ""
+	st.FreeBytes = s.volumeFree(st.DataDir)
 	return st
+}
+
+// volumeFree is the free space of the volume of dir or of its nearest
+// existing parent (-1 = unknown).
+func (s *Server) volumeFree(dir string) int64 {
+	if dir == "" || !filepath.IsAbs(dir) || s.freeSpace == nil {
+		return -1
+	}
+	dir = filepath.Clean(dir)
+	for {
+		if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return -1
+		}
+		dir = parent
+	}
+	if f, err := s.freeSpace(dir); err == nil {
+		return f
+	}
+	return -1
 }
 
 // GET /api/app/data-dir, GET /api/app/import.
@@ -381,6 +422,62 @@ func (s *Server) postDataDir(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	writeJSON(w, http.StatusAccepted, s.dataDirStatus())
+}
+
+// POST /api/app/data-dir/check {"path"} → 200 DataDirCheck: the refusals of
+// POST /api/app/data-dir (data_dir.env_override, data_dir.in_progress,
+// data_dir.busy {running, queued}, the checks of relocate.CheckMove) as
+// {ok: false, error}; nothing is copied or claimed. 404 in web mode, 400
+// request.bad_json.
+func (s *Server) postDataDirCheck(w http.ResponseWriter, r *http.Request) {
+	if !s.desktopOnly(w, r) {
+		return
+	}
+	var in pathBody
+	if err := decodeJSON(r, &in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	out := DataDirCheck{Path: in.Path, FreeBytes: -1}
+	if p := strings.TrimSpace(in.Path); p != "" && filepath.IsAbs(p) {
+		out.Path = filepath.Clean(p)
+		out.FreeBytes = s.volumeFree(out.Path)
+	}
+	refuse := func(err error) {
+		info := relocateInfo(err)
+		if relocateStatus(info.Code) == http.StatusInternalServerError {
+			slog.Error("data directory check", "path", out.Path, "err", err)
+		}
+		out.Error = &info
+		writeJSON(w, http.StatusOK, out)
+	}
+	if s.desktop.LocationFile == "" {
+		refuse(model.Errorf("data_dir.env_override", nil, nil))
+		return
+	}
+	ctx := r.Context()
+	run := s.dataDirRun()
+	run.mu.Lock()
+	busy := run.busy
+	run.mu.Unlock()
+	if busy {
+		refuse(model.Errorf("data_dir.in_progress", nil, nil))
+		return
+	}
+	if err := s.errIfBusy(ctx); err != nil {
+		refuse(err)
+		return
+	}
+	plan, err := relocate.CheckMove(ctx, s.absDataDir(), in.Path, s.desktop.LocationFile)
+	if err != nil {
+		refuse(err)
+		return
+	}
+	out.Path, out.OK = plan.Dst, true
+	if plan.FreeBytes > 0 {
+		out.FreeBytes = plan.FreeBytes
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) runMove(run *dataDirRun, hooks RelocateHooks, move func(context.Context, relocate.MoveOptions) error,

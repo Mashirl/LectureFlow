@@ -186,7 +186,8 @@ func TestColabEndpoints(t *testing.T) {
 	}
 	ce.noSecrets("import", b)
 	var auth colab.CredentialInfo
-	if err := json.Unmarshal(b, &auth); err != nil || !auth.Present || auth.Lifecycle != "3d" || auth.ExpiresAt == nil {
+	if err := json.Unmarshal(b, &auth); err != nil || !auth.Present || auth.Lifecycle != "3d" || auth.ExpiresAt == nil ||
+		auth.Source != colab.SourceGcloud {
 		t.Fatalf("import = %s (%v)", b, err)
 	}
 	if !ce.reg.Present(model.DeviceColab) {
@@ -206,7 +207,7 @@ func TestColabEndpoints(t *testing.T) {
 	}
 	res, b = ce.do("GET", "/api/colab", nil)
 	ce.noSecrets("GET /api/colab", b)
-	if err := json.Unmarshal(b, &v); err != nil || !v.Status.Configured || !v.Status.Auth.Present {
+	if err := json.Unmarshal(b, &v); err != nil || !v.Status.Configured || !v.Status.Auth.Present || v.Status.Auth.Source != colab.SourceGcloud {
 		t.Fatalf("view after import: %d %s", res.StatusCode, b)
 	}
 
@@ -260,7 +261,8 @@ func TestColabEndpoints(t *testing.T) {
 		t.Fatal("the queued lecture is still pinned to Colab after the shutdown")
 	}
 
-	// Disconnect: revoked at Google, deleted locally, the note about gcloud.
+	// Disconnect: revoked at Google, deleted locally, the note about gcloud
+	// (the credential was imported from the user's own gcloud).
 	var dv ColabDisconnectView
 	ce.call("DELETE", "/api/colab/auth", nil, http.StatusOK, &dv)
 	if !dv.Revoked || len(dv.Notes) != 1 || dv.Notes[0].Code != sched.CodeRemoteADCSignedOut || ce.revoked != 1 {

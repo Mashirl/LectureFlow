@@ -33,6 +33,11 @@ const (
 	// KindBinary: files in bin/ (unpacked when Unpack is set); Bundled
 	// binaries ship with the installer (core).
 	KindBinary = "binary"
+	// KindTool: a vendor's program (the Google Cloud CLI): one archive
+	// unpacked to tool/ (File.Strip drops its top-level directory),
+	// Build.Exe its executable relative to tool/, run once with CheckArgs
+	// as the post-install check. ToolPath and ToolEnv locate it.
+	KindTool = "tool"
 )
 
 // Platforms (V0).
@@ -49,6 +54,7 @@ const (
 	IDASRCUDA     = "asr-cuda"
 	IDASROpenVINO = "asr-openvino"
 	IDASRMLX      = "asr-mlx"
+	IDGcloud      = "gcloud" // the Google Cloud CLI (kind tool): Colab sign-in
 
 	BackendBase          = "base" // Python("base"): the python component's base venv (pypdf)
 	BackendFasterWhisper = "faster-whisper"
@@ -157,6 +163,16 @@ type Component struct {
 	// CheckImports are the modules the post-install check imports (venv and
 	// python components).
 	CheckImports []string `json:"check_imports,omitempty"`
+	// CheckArgs (tool components): the post-install check runs Build.Exe
+	// with these arguments; it must exit with status 0. It runs with the
+	// build's Env plus CheckEnv and replaces the update self-test (V8) for
+	// a tool.
+	CheckArgs []string `json:"check_args,omitempty"`
+	// CheckEnv (tool components): variables of the check only, on top of
+	// Build.Env; "{tmp}" is an empty directory removed after the check
+	// (gcloud's configuration directory, so the check leaves nothing in the
+	// user's own one).
+	CheckEnv map[string]string `json:"check_env,omitempty"`
 	// Platforms holds one build per platform; a component without a build
 	// for the current platform does not exist there.
 	Platforms map[string]*Build `json:"platforms"`
@@ -170,11 +186,22 @@ type Build struct {
 	InstalledSize      int64  `json:"installed_size"`
 	InstalledEstimated bool   `json:"installed_size_estimated,omitempty"`
 	Files              []File `json:"files,omitempty"`
-	// Exe is the interpreter inside the unpacked runtime (python-runtime).
-	Exe     string   `json:"exe,omitempty"`
-	Lock    *Lock    `json:"lock,omitempty"`
-	Offline *Offline `json:"offline,omitempty"`
-	MinOS   string   `json:"min_os,omitempty"`
+	// Exe is the interpreter inside the unpacked runtime (python-runtime)
+	// or the tool's executable relative to tool/ (tool).
+	Exe string `json:"exe,omitempty"`
+	// Depends are dependencies on this platform only, added to
+	// Component.Depends (DependsOn): gcloud needs the python component on
+	// macOS, where Google's archive has no Python.
+	Depends []string `json:"depends,omitempty"`
+	// Env (tool components) are the variables the tool runs with
+	// (ToolEnv). A value starting with "{dir}" (the tool's directory) or
+	// "{exe:ID}" (the executable of the installed component ID, which must
+	// be a dependency: a python runtime's interpreter or a tool) is a path:
+	// "/" in it becomes the platform's separator.
+	Env     map[string]string `json:"env,omitempty"`
+	Lock    *Lock             `json:"lock,omitempty"`
+	Offline *Offline          `json:"offline,omitempty"`
+	MinOS   string            `json:"min_os,omitempty"`
 	// MaxPath is the length (characters) of the longest file path inside
 	// the installed component, relative to its version directory
 	// (components/{dir}/{version}/): measured on an installation, because a
@@ -194,6 +221,15 @@ type File struct {
 	SHA256 string `json:"sha256"`
 	Size   int64  `json:"size"`
 	Unpack string `json:"unpack,omitempty"` // "tar.gz" | "zip" | ""
+	// Strip (archives) is the archive's top-level directory whose contents
+	// are unpacked (google-cloud-sdk); an entry outside it fails the unpack.
+	Strip string `json:"strip,omitempty"`
+	// Exclude (archives) are paths below the destination (after Strip)
+	// that are not unpacked: a directory with a trailing "/", else one
+	// file. gcloud on Windows leaves out the few API clients LectureFlow
+	// never calls whose paths exceed what the Windows path limit allows
+	// (pathlen.go; Build.MaxPath is measured without them).
+	Exclude []string `json:"exclude,omitempty"`
 }
 
 // Lock is a uv lock file (uv pip compile --generate-hashes).
@@ -219,6 +255,9 @@ var (
 	placeholderRe = regexp.MustCompile(`\{([a-z][a-z0-9_]*)\}`)
 	sha256Re      = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	idRe          = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]*$`)
+	envKeyRe      = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	// envTmplRe finds the templates of Build.Env and CheckEnv values.
+	envTmplRe = regexp.MustCompile(`\{[^{}]*\}`)
 )
 
 // ParseManifest parses and validates a manifest. dir is the directory lock
@@ -363,10 +402,14 @@ func (m *Manifest) Validate() error {
 			}
 		}
 		switch c.Kind {
-		case KindPythonRuntime, KindVenv, KindModel, KindBinary:
+		case KindPythonRuntime, KindVenv, KindModel, KindBinary, KindTool:
 		default:
 			add("%s: unknown kind %q", where, c.Kind)
 		}
+		if c.Kind != KindTool && (len(c.CheckArgs) > 0 || len(c.CheckEnv) > 0) {
+			add("%s: check_args and check_env are for tools", where)
+		}
+		checkEnv(add, where+" check_env", c.CheckEnv, true)
 		if b, n, p, ok := ParseModelID(c.ID); ok {
 			if c.Kind != KindModel || c.Backend != b || c.Model != n || c.Precision != p {
 				add("%s: a model id needs kind model and backend/model/precision %s/%s/%s", where, b, n, p)
@@ -406,6 +449,15 @@ func (m *Manifest) Validate() error {
 			if b.MaxPath < 0 || b.MaxPath > 4096 {
 				add("%s: max_path %d", pw, b.MaxPath)
 			}
+			for _, d := range b.Depends {
+				if d == "" || d == c.ID || contains(c.Depends, d) {
+					add("%s: depends %q is empty, the component itself or already a component dependency", pw, d)
+				}
+			}
+			if len(b.Env) > 0 && c.Kind != KindTool {
+				add("%s: env is for tools", pw)
+			}
+			checkEnv(add, pw+" env", b.Env, false)
 			names := map[string]bool{}
 			var sum int64
 			for _, f := range b.Files {
@@ -429,6 +481,14 @@ func (m *Manifest) Validate() error {
 				case "", "tar.gz", "zip":
 				default:
 					add("%s: unknown unpack %q", fw, f.Unpack)
+				}
+				if f.Strip != "" && (f.Unpack == "" || !safeRelPath(f.Strip) || strings.Contains(f.Strip, "/")) {
+					add("%s: strip %q needs an archive and one directory name", fw, f.Strip)
+				}
+				for _, x := range f.Exclude {
+					if f.Unpack == "" || !safeRelPath(strings.TrimSuffix(x, "/")) {
+						add("%s: exclude %q needs an archive and a relative path", fw, x)
+					}
 				}
 			}
 			if b.Lock != nil {
@@ -468,17 +528,42 @@ func (m *Manifest) Validate() error {
 				if len(b.Files) == 0 {
 					add("%s: a binary has files", pw)
 				}
+			case KindTool:
+				if len(b.Files) != 1 || b.Files[0].Unpack == "" || b.Exe == "" || !safeRelPath(b.Exe) || b.Lock != nil {
+					add("%s: a tool has one archive to unpack, an exe and no lock", pw)
+				}
+				if sum != b.DownloadSize {
+					add("%s: download_size %d != sum of file sizes %d", pw, b.DownloadSize, sum)
+				}
 			}
 		}
 	}
 	for _, c := range m.Components {
-		for _, d := range c.Depends {
+		for _, d := range c.allDepends() {
 			dc := byID[d]
 			switch {
 			case dc == nil:
 				add("component %s: depends on unknown %q", c.ID, d)
 			case dc.Kind == KindModel:
 				add("component %s: depends on a model", c.ID)
+			}
+		}
+		for plat, b := range c.Platforms {
+			if b == nil {
+				continue
+			}
+			deps := c.DependsOn(plat)
+			for _, v := range b.Env {
+				for _, tm := range envTmplRe.FindAllString(v, -1) {
+					id, ok := strings.CutPrefix(strings.Trim(tm, "{}"), "exe:")
+					if !ok {
+						continue
+					}
+					dc := byID[id]
+					if !contains(deps, id) || dc == nil || (dc.Kind != KindPythonRuntime && dc.Kind != KindTool) {
+						add("component %s %s: env %s names %q, which is not a %s dependency with an executable", c.ID, plat, tm, id, plat)
+					}
+				}
 			}
 		}
 		if c.Kind == KindVenv {
@@ -499,10 +584,68 @@ func (m *Manifest) Validate() error {
 	return nil
 }
 
+// checkEnv checks the names and templates of Build.Env or CheckEnv:
+// "{dir}" and "{exe:ID}" (only at the start of a value), "{tmp}" (only in
+// CheckEnv).
+func checkEnv(add func(string, ...any), where string, env map[string]string, check bool) {
+	for k, v := range env {
+		if !envKeyRe.MatchString(k) {
+			add("%s: invalid variable name %q", where, k)
+		}
+		for _, loc := range envTmplRe.FindAllStringIndex(v, -1) {
+			tm := v[loc[0]:loc[1]]
+			inner := strings.Trim(tm, "{}")
+			switch {
+			case inner == "tmp" && check:
+			case (inner == "dir" || (strings.HasPrefix(inner, "exe:") && idRe.MatchString(strings.TrimPrefix(inner, "exe:")))) && loc[0] == 0:
+			default:
+				add("%s: %s = %q: unknown template %s", where, k, v, tm)
+			}
+		}
+	}
+}
+
+// DependsOn returns the component's dependencies on a platform:
+// Component.Depends plus the build's own Depends.
+func (c *Component) DependsOn(platform string) []string {
+	b := c.Build(platform)
+	if b == nil || len(b.Depends) == 0 {
+		return c.Depends
+	}
+	out := append([]string(nil), c.Depends...)
+	for _, d := range b.Depends {
+		if !contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// allDepends is the union of the dependencies on every platform (manifest
+// checks: unknown ids, cycles).
+func (c *Component) allDepends() []string {
+	out := append([]string(nil), c.Depends...)
+	plats := make([]string, 0, len(c.Platforms))
+	for p := range c.Platforms {
+		plats = append(plats, p)
+	}
+	sort.Strings(plats)
+	for _, p := range plats {
+		if b := c.Platforms[p]; b != nil {
+			for _, d := range b.Depends {
+				if !contains(out, d) {
+					out = append(out, d)
+				}
+			}
+		}
+	}
+	return out
+}
+
 func findCycle(cs []Component) string {
 	deps := map[string][]string{}
-	for _, c := range cs {
-		deps[c.ID] = c.Depends
+	for i := range cs {
+		deps[cs[i].ID] = cs[i].allDepends()
 	}
 	state := map[string]int{} // 1 visiting, 2 done
 	var visit func(string) string

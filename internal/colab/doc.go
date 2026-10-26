@@ -58,6 +58,7 @@
 //	b.ShutdownNow(ctx)              // 立即关机 (running lecture → IsRequeue)
 //	b.Status(ctx)                   // resource bar / 工作台 line (no network)
 //	b.DetectADC(); b.ImportADC(ctx, lifecycle); b.Credential(ctx); b.Disconnect(ctx)
+//	l := b.Login(opts); l.Start(lifecycle); l.Status(); l.Cancel(wait) // in-app gcloud sign-in (login.go)
 //	b.Settings(); b.SetSettings(ctx, s)
 //
 // Event (onEvent) carries the hover card's step (wait_accelerator →

@@ -45,8 +45,14 @@ import (
 //     user to apply, edit or ignore.
 //
 // A rejected answer is asked again once, with the reasons appended to the
-// request (askJSONRetry, ctxbuild.FilenameRuleProblems); a second rejection
-// fails the task and the course keeps its rule (or none). Every file name sent to the model
+// request (askJSONRetry, ctxbuild.FilenameRuleProblems); after a second
+// rejection the built-in Panopto pattern is checked the same way
+// (fallbackRule, filename_fallback.go) and, if it passes, takes the
+// model's place; otherwise the task fails and the course keeps its rule
+// (or none). Without a model for the organizer role (3.1.0 "只转写") the
+// model is not asked: only the built-in pattern is tried, with the same
+// check and outcome, and when it does not fit the task fails with
+// filename_rule.not_configured. Every file name sent to the model
 // is added to kv filename_rule_samples, so the same names never trigger a
 // generation again (P13.3.2 trigger).
 type filenameRuleStage struct{ apiStage }
@@ -166,7 +172,10 @@ func (s *filenameRuleStage) Run(ctx context.Context, courseID string, progress f
 	if len(data.samples) == 0 {
 		return model.Errorf("filename_rule.no_samples", nil, errors.New("no lecture of the course has an original file name"))
 	}
-	d.recordPromptVersion(ctx, s.role, ctxbuild.FilenameRulePromptVersion)
+	noModel := !d.roleConfigured(s.role)
+	if !noModel {
+		d.recordPromptVersion(ctx, s.role, ctxbuild.FilenameRulePromptVersion)
+	}
 	req := ctxbuild.FilenameRuleRequest(data.in)
 	progress(0.1)
 
@@ -207,15 +216,37 @@ func (s *filenameRuleStage) Run(ctx context.Context, courseID string, progress f
 		parsed, matched, kindMap, kindNotes = p, m, km, notes
 		return nil
 	}
-	a, unusable, err := askJSONRetry(ctx, d.LLM, s.role, req.System, req.User, check)
-	if err != nil && !unusable {
-		return err
+	var (
+		a        filenameRuleAnswer
+		unusable bool
+	)
+	if noModel {
+		err = errNoFilenameModel
+	} else {
+		a, unusable, err = askJSONRetry(ctx, d.LLM, s.role, req.System, req.User, check)
+		if err != nil && !unusable {
+			return err
+		}
 	}
-	// The model was asked about these names: they do not trigger again,
-	// whatever the outcome (P13.3.2 “此前没有被用于生成过规则”).
+	// The model was asked about these names (without a model: the built-in
+	// pattern was tried on them): they do not trigger again, whatever the
+	// outcome (P13.3.2 “此前没有被用于生成过规则”).
 	names := make([]string, len(data.samples))
 	for i, sm := range data.samples {
 		names[i] = sm.Filename
+	}
+	if err != nil {
+		// both answers rejected or unusable: the built-in Panopto pattern
+		// (filename_fallback.go), checked the same way
+		if fa, p, m, ok := fallbackRule(data.samples, data.termStart); ok {
+			if noModel {
+				fa.Explanation = panoptoNoModelExplanation
+				slog.Info("filename rule: no model configured, built-in Panopto pattern used", "course", courseID)
+			} else {
+				slog.Info("filename rule: model's rule rejected, built-in Panopto pattern used", "course", courseID, "error", err)
+			}
+			a, parsed, matched, kindMap, kindNotes, err = fa, p, m, nil, nil, nil
+		}
 	}
 	if err != nil {
 		if mErr := d.Store.Tx(context.WithoutCancel(ctx), func(tx db.Store) error {
@@ -227,6 +258,11 @@ func (s *filenameRuleStage) Run(ctx context.Context, courseID string, progress f
 		var rj *ruleRejected
 		if errors.As(err, &rj) {
 			return model.Errorf("filename_rule.rejected", map[string]any{"matched": rj.matched, "total": rj.total}, err)
+		}
+		if errors.Is(err, errNoFilenameModel) {
+			// the names do not fit the built-in pattern and there is no
+			// model to ask: say how to get the recording times
+			return model.Errorf("filename_rule.not_configured", nil, err)
 		}
 		return model.Errorf("filename_rule.invalid_output", map[string]any{"attempts": auxAttempts}, err)
 	}

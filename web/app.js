@@ -677,7 +677,8 @@ export function parseRoute(hash) {
   if (parts[0] === 'settings') return { name: 'settings', section: parts[1] || null, device: parts[2] || null };
   if (parts[0] === 'system') return { name: 'system' };
   // SPEC-v3 V4: the onboarding and its privacy details page
-  if (parts[0] === 'onboarding') return { name: 'onboarding' };
+  // #/onboarding/{step}/{local|remote}: a step with the transcription mode chosen (3.1.0)
+  if (parts[0] === 'onboarding') return { name: 'onboarding', step: parts[1] || null, branch: parts[2] || null };
   if (parts[0] === 'privacy') return { name: 'privacy' };
   return { name: 'notfound' };
 }
@@ -710,7 +711,7 @@ function onRoute() {
   else if (route.name === 'play') state.view = mountPlayer(main, route, ctx);
   else if (route.name === 'settings') state.view = mountSettings(main, ctx, route);
   else if (route.name === 'system') state.view = mountSystem(main, ctx);
-  else if (route.name === 'onboarding') state.view = mountOnboarding(main, ctx);
+  else if (route.name === 'onboarding') state.view = mountOnboarding(main, ctx, route);
   else if (route.name === 'privacy') state.view = mountPrivacy(main, ctx, prevName);
   else {
     main.append(

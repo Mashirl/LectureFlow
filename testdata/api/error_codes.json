@@ -231,6 +231,10 @@
       "error"
     ]
   },
+  "check.fw_not_installed": {
+    "zh": "没有安装“NVIDIA 显卡转写”组件（faster-whisper）",
+    "params": []
+  },
   "check.gpu_fake": {
     "zh": "测试模式（asr.fake_result），不使用 GPU",
     "params": []
@@ -260,6 +264,10 @@
     "zh": "检查 config.toml 中的 data_dir 和该目录的权限",
     "params": []
   },
+  "check.hint_data_dir_desktop": {
+    "zh": "检查数据目录所在的磁盘是否已连接、是否可写，或在设置中把数据目录移到别处",
+    "params": []
+  },
   "check.hint_disk_error": {
     "zh": "剩余空间少于 2 GB，新的上传会被拒绝。请删除不需要的讲座或清理磁盘",
     "params": []
@@ -270,6 +278,33 @@
   },
   "check.hint_ffmpeg": {
     "zh": "安装 ffmpeg 并加入 PATH，或在 config.toml 中设置 ffmpeg 的完整路径",
+    "params": []
+  },
+  "check.hint_ffmpeg_desktop": {
+    "zh": "LectureFlow 自带的 ffmpeg 无法运行，请重新安装 LectureFlow",
+    "params": []
+  },
+  "check.hint_install_fw": {
+    "zh": "需要用 NVIDIA 显卡或 CPU 转写时，在设置的“组件”中安装或修复“NVIDIA 显卡转写”",
+    "params": []
+  },
+  "check.hint_install_mlx": {
+    "zh": "在设置的“组件”中安装或修复“Apple 芯片转写（MLX）”",
+    "params": []
+  },
+  "check.hint_install_mlx_model": {
+    "zh": "在设置的“组件”中安装“Whisper {model} 模型（{precision}）”",
+    "params": [
+      "model",
+      "precision"
+    ]
+  },
+  "check.hint_install_openvino": {
+    "zh": "需要用 Intel 核显或 NPU 转写时，在设置的“组件”中安装或修复“Intel 转写（OpenVINO）”，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_install_python": {
+    "zh": "在设置的“组件”中安装或修复“Python 运行环境”",
     "params": []
   },
   "check.hint_key_config": {
@@ -290,12 +325,26 @@
       "provider"
     ]
   },
+  "check.hint_mlx_model_dev": {
+    "zh": "把转换好的 MLX 模型（config.json 与 weights.safetensors）放到 {path}，或安装对应的模型组件",
+    "params": [
+      "path"
+    ]
+  },
+  "check.hint_mlx_venv": {
+    "zh": "按 worker/requirements-mlx.txt 在项目目录建立 .venv-mlx（或在 config.toml 中设置 python_mlx），然后点击“重新检查”",
+    "params": []
+  },
   "check.hint_npu_driver": {
     "zh": "NPU 驱动通过 Windows 更新或电脑厂商的驱动程序安装；本程序不会安装或升级驱动",
     "params": []
   },
   "check.hint_nvidia": {
     "zh": "确认已安装 NVIDIA 驱动，nvidia-smi 可以运行（也可在 config.toml 中设置 nvidia_smi 的路径）",
+    "params": []
+  },
+  "check.hint_nvidia_desktop": {
+    "zh": "确认已安装 NVIDIA 显卡驱动（装好后 nvidia-smi 可以运行），然后点击“重新检查”",
     "params": []
   },
   "check.hint_openvino_venv": {
@@ -322,6 +371,10 @@
   },
   "check.hint_selftest": {
     "zh": "确认 faster-whisper 与 CUDA 库已安装（worker/requirements.txt）；首次运行需要联网下载 tiny 模型",
+    "params": []
+  },
+  "check.hint_selftest_desktop": {
+    "zh": "在设置的“组件”中修复“NVIDIA 显卡转写”，并确认 NVIDIA 显卡驱动是最新的",
     "params": []
   },
   "check.import_failed": {
@@ -378,6 +431,24 @@
       "key"
     ]
   },
+  "check.mlx_model_missing": {
+    "zh": "没有找到 Whisper {model}（{precision}）的 MLX 模型文件",
+    "params": [
+      "model",
+      "precision"
+    ]
+  },
+  "check.mlx_model_ok": {
+    "zh": "模型文件齐全：Whisper {model}（{precision}）",
+    "params": [
+      "model",
+      "precision"
+    ]
+  },
+  "check.mlx_not_installed": {
+    "zh": "没有安装“Apple 芯片转写（MLX）”组件",
+    "params": []
+  },
   "check.not_run": {
     "zh": "尚未运行（点击“重新检查”运行）",
     "params": []
@@ -408,6 +479,10 @@
     "zh": "OpenVINO 没有识别到可用的 Intel 设备",
     "params": []
   },
+  "check.openvino_not_installed": {
+    "zh": "没有安装“Intel 转写（OpenVINO）”组件。Intel 核显与 NPU 不可用，不影响其他设备转写",
+    "params": []
+  },
   "check.openvino_venv_missing": {
     "zh": "没有找到 OpenVINO 环境（{path}）。Intel 核显与 NPU 不可用，不影响 CUDA 转写",
     "params": [
@@ -422,6 +497,10 @@
   },
   "check.provider_deleted": {
     "zh": "提供商已删除",
+    "params": []
+  },
+  "check.python_not_installed": {
+    "zh": "没有安装“Python 运行环境”组件",
     "params": []
   },
   "check.python_version_unknown": {

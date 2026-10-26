@@ -131,7 +131,7 @@ test('ffmpeg: both builds from the pinned FFmpeg tarball, corresponding source a
   }
   assert.deepEqual(checkConfigure(w.configure.join(' '), m.ffmpeg.forbidden_configure), []);
   for (const f of ['--disable-gpl', '--disable-nonfree', '--disable-version3', '--disable-autodetect', '--enable-shared']) assert.ok(w.configure.includes(f), f);
-  for (const f of w.configure.filter((a) => /^--enable-lib/.test(a))) assert.ok(['--enable-libvpl', '--enable-libopenh264'].includes(f), `unexpected external library ${f}`);
+  for (const f of w.configure.filter((a) => /^--enable-lib/.test(a))) assert.ok(['--enable-libvpl', '--enable-libopenh264', '--enable-libdav1d'].includes(f), `unexpected external library ${f}`);
   assert.ok(Object.keys(w.toolchain).length >= 2);
   for (const v of Object.values(w.toolchain)) assert.ok(win.bundled.some((l) => l.version.includes(v)), `toolchain ${v} declared in bundled`);
   for (const l of win.bundled) {
@@ -139,7 +139,17 @@ test('ffmpeg: both builds from the pinned FFmpeg tarball, corresponding source a
     assert.match(l.url, /^https:\/\//, l.name);
   }
   assert.deepEqual(gplComponents(bins), [], 'no GPL component in the distributed ffmpeg (SPEC-v3 V7)');
-  assert.deepEqual(mac.bundled, [], 'macOS: only system libraries');
+  // macOS: system libraries plus dav1d (AV1 software decoder), pinned like the Windows deps.
+  const md = m.ffmpeg['darwin-arm64'];
+  assert.deepEqual(md.deps.map((d) => d.name), ['dav1d']);
+  for (const d of md.deps) {
+    assert.deepEqual(d, w.deps.find((x) => x.name === d.name), `${d.name}: same pin as Windows`);
+    assert.ok(mac.source_code.includes(d.url), `${d.name} source listed`);
+    assert.ok(mac.bundled.some((l) => l.name.startsWith(d.name) && l.version.startsWith(d.version)), `${d.name} bundled`);
+  }
+  assert.equal(mac.bundled.length, md.deps.length, 'macOS: nothing else bundled');
+  for (const f of md.configure.filter((a) => /^--enable-lib/.test(a))) assert.ok(['--enable-libdav1d'].includes(f), `unexpected external library ${f}`);
+  for (const t of md.build_tools) assert.match(t.sha256, /^[0-9a-f]{64}$/, t.name);
 });
 
 test('GPL check of ffmpeg components and of ffmpeg -L', () => {

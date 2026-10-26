@@ -115,6 +115,12 @@ type Service struct {
 	sysErr     string
 	memErr     string
 	sysRetryAt time.Time
+	// platform names the upper area's readings this system cannot give and
+	// whether its memory is unified (System.Unsupported, UnifiedMemory;
+	// replaced in tests). appleErr (sampleMu) is the last ioreg failure
+	// logged (apple.go).
+	platform func() (unsupported []string, unified bool)
+	appleErr string
 
 	ctx     context.Context // cancelled by Stop (or Start's context)
 	cancel  context.CancelFunc
@@ -147,6 +153,10 @@ type Service struct {
 	engMem     map[string]*int
 	sys        System
 	memTotalMB *int
+	// appleUtil, appleMem (MB) and appleHist are the Apple GPU card's last
+	// ioreg reading and utilization history (mac-opti M6, apple.go).
+	appleUtil, appleMem *int
+	appleHist           []histPoint
 }
 
 type histPoint struct {
@@ -166,6 +176,7 @@ func New(d Deps) *Service {
 		newEngines: newEngineReader,
 		newSystem:  newSystemReader,
 		memStatus:  readMemStatus,
+		platform:   platformMarks,
 		wake:       make(chan struct{}, 1),
 		bal:        map[string]*balanceEntry{},
 		engHist:    map[string][]histPoint{},
@@ -333,6 +344,7 @@ func (s *Service) sampleLocked(ctx context.Context) {
 	if ctx.Err() == nil {
 		s.sampleEngines()
 		s.sampleSystem()
+		s.sampleApple(ctx)
 	}
 	s.kickBalances()
 }

@@ -1236,3 +1236,35 @@ func TestGlossaryReasonRefreshLimits(t *testing.T) {
 		}
 	}
 }
+
+// A lecture started in “只转写” (3.1.0: asr snapshot, the LLM jobs "{}") is
+// not a v1 lecture: the one-time backfill leaves it alone, so its LLM
+// snapshots are written with the current prompt versions when the roles
+// are configured (not as prompt version 1). A v1 lecture next to it is
+// still backfilled.
+func TestBackfillSnapshotsSkipsTranscribeOnly(t *testing.T) {
+	f := newFixture(t)
+	ctx := f.ctx
+	cur := launchSnaps()
+	only := f.lecture()
+	asr := asrSnap("large-v3-turbo")
+	if err := f.st.SetJobSnapshot(ctx, f.lj(only.ID, model.StageASR).ID, asr); err != nil {
+		t.Fatal(err)
+	}
+	v1 := f.lecture()
+	if _, err := BackfillSnapshots(ctx, f.st, cur); err != nil {
+		t.Fatal(err)
+	}
+	have := f.snapshots(only.ID)
+	if have[model.StageASR] != asr {
+		t.Fatalf("transcribe-only asr snapshot changed: %q", have[model.StageASR])
+	}
+	for _, s := range []string{model.StageSummary, model.StageRepair, model.StageTranslate} {
+		if !model.IsEmptySnapshot(have[s]) {
+			t.Fatalf("transcribe-only %s backfilled: %q", s, have[s])
+		}
+	}
+	if got := f.snapshots(v1.ID); !reflect.DeepEqual(got, mergeSnaps(cur)) {
+		t.Fatalf("v1 lecture not backfilled: %v", got)
+	}
+}

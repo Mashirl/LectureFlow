@@ -247,13 +247,14 @@ func TestImportADC(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !info.Present || info.Lifecycle != "7d" || info.ExpiresAt == nil || !info.ExpiresAt.Equal(clk.Now().Add(7*24*time.Hour)) ||
-		info.RemainingSec != 7*24*3600 {
+		info.RemainingSec != 7*24*3600 || info.Source != SourceGcloud {
 		t.Errorf("info %+v", info)
 	}
 	var c storedCredential
 	v, _, _ := kv.GetKV(ctx, KVCredential)
-	if err := json.Unmarshal([]byte(v), &c); err != nil || c.RefreshToken != testRefreshToken || c.Lifecycle.Days != 7 {
-		t.Errorf("stored %v", err)
+	if err := json.Unmarshal([]byte(v), &c); err != nil || c.RefreshToken != testRefreshToken || c.Lifecycle.Days != 7 ||
+		c.Source != SourceGcloud {
+		t.Errorf("stored %v (source %q)", err, c.Source)
 	}
 	// Nothing outward carries a secret: the info, the status, formatting.
 	ib, _ := json.Marshal(info)

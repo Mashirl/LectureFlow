@@ -14,8 +14,9 @@ package main
 //
 //	colab_off        switched off, not authorized; gcloud's credential file
 //	                 is "found" after the first 检测授权 (the guide's flow)
-//	colab_none       on and authorized, no session ("远端 GPU：未使用"); the
-//	                 first queued asr stage carries remote.back_to_local
+//	colab_none       on and authorized (by the in-app sign-in: source app), no
+//	                 session ("远端 GPU：未使用"); the first queued asr stage
+//	                 carries remote.back_to_local
 //	colab_queued     a session waiting for a T4 (排队等卡); the first running
 //	                 asr stage runs remotely at the step wait_accelerator
 //	colab_running    a session 1 h 47 min into its usage window; the first
@@ -100,6 +101,7 @@ type colabMock struct {
 	exhausted     bool
 	pinned        map[string]bool // lectures sent to Colab with use-colab
 	backToLocal   bool            // colab_none: the first queued asr carries remote.back_to_local
+	login         *colabLoginRun  // the Google sign-in of 3.1.0 (v31_onboarding.go)
 }
 
 var colabStates sync.Map // *mock + scenario → *colabMock
@@ -118,10 +120,13 @@ func (m *mock) colabState(r *http.Request) *colabMock {
 	return v.(*colabMock)
 }
 
-func colabAuth(lifecycle string, days int, now time.Time) *colab.CredentialInfo {
+// colabAuth is a credential imported at now; source is colab.SourceApp (the
+// in-app sign-in) or colab.SourceGcloud (导入授权 of the user's own gcloud).
+func colabAuth(lifecycle string, days int, now time.Time, source string) *colab.CredentialInfo {
 	imported := now
 	info := &colab.CredentialInfo{Present: true, Lifecycle: lifecycle, ImportedAt: &imported, RemainingSec: -1,
-		Scopes: []string{"openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/colaboratory"}}
+		Scopes: []string{"openid", "https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/colaboratory"},
+		Source: source}
 	if days > 0 {
 		exp := imported.Add(time.Duration(days) * 24 * time.Hour)
 		info.ExpiresAt = &exp
@@ -134,8 +139,8 @@ func newColabMock(sc string, now time.Time) *colabMock {
 	switch sc {
 	case "colab_none", "colab_queued", "colab_running", "colab_exhausted":
 		c.enabled, c.adcFound = true, true
-		// imported a few hours ago with the default 7 days
-		c.auth = colabAuth("7d", 7, now.Add(-4*time.Hour-12*time.Minute))
+		// signed in in the app a few hours ago with the default 7 days
+		c.auth = colabAuth("7d", 7, now.Add(-4*time.Hour-12*time.Minute), colab.SourceApp)
 	}
 	switch sc {
 	case "colab_none":
@@ -416,9 +421,9 @@ func (m *mock) colabImport(w http.ResponseWriter, r *http.Request, _ *store) {
 			codedError(w, http.StatusBadRequest, colab.CodeLifecycleInvalid, map[string]any{"value": req.Lifecycle})
 			return
 		}
-		c.auth = colabAuth(itoa(days)+"d", days, now)
+		c.auth = colabAuth(itoa(days)+"d", days, now, colab.SourceGcloud)
 	case colab.LifecycleSession, colab.LifecycleManual:
-		c.auth = colabAuth(req.Lifecycle, 0, now)
+		c.auth = colabAuth(req.Lifecycle, 0, now, colab.SourceGcloud)
 	default:
 		codedError(w, http.StatusBadRequest, colab.CodeLifecycleInvalid, map[string]any{"value": req.Lifecycle})
 		return
@@ -453,11 +458,17 @@ func (m *mock) colabDisconnect(w http.ResponseWriter, r *http.Request, _ *store)
 		v.Released = true
 	}
 	if c.auth != nil {
+		// as the real server: only a credential of the user's own gcloud
+		// signs gcloud's application-default login out (the same token);
+		// the in-app sign-in's was never in the user's gcloud
+		if c.auth.Source != colab.SourceApp {
+			v.Notes = append(v.Notes, model.ErrorInfo{Code: "remote.gcloud_signed_out"})
+			c.adcFound = false
+		}
 		c.auth = nil
 		v.Revoked = true
-		v.Notes = append(v.Notes, model.ErrorInfo{Code: "remote.gcloud_signed_out"})
 	}
-	c.adcFound = false // gcloud's application-default login used the same token
+	c.login = nil
 	m.storeFor(r).notify(api.ChangedEvent{Kind: "settings"})
 	writeJSON(w, http.StatusOK, v)
 }

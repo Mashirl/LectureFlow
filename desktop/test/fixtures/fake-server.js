@@ -62,10 +62,12 @@ function loadState() {
       unauthorized: 0,
       activity: { running: 0, queued: 0, transcribing: false, api_running: false },
       settings: { close_behavior: 'ask', prevent_sleep: true, update_channel: 'stable' },
+      ui: { locale: '', zh_display: '' },
     };
   }
 }
 const state = loadState();
+state.ui = state.ui || { locale: '', zh_display: '' };
 function save() {
   fs.mkdirSync(dataDir, { recursive: true });
   fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
@@ -146,6 +148,7 @@ async function handle(req, res) {
     if (p === '/api/health') return send(res, 200, { ok: true, version: opts['app-version'] || 'dev', mode: env.FAKE_BAD_MODE === '1' ? 'web' : 'desktop' });
     if (p === '/api/app/activity') return send(res, 200, state.activity);
     if (p === '/api/app/settings' && req.method === 'GET') return send(res, 200, state.settings);
+    if (p === '/api/settings/ui' && req.method === 'GET') return send(res, 200, state.ui);
     if (p === '/api/app/settings' && req.method === 'PATCH') {
       const patch = await readBody(req);
       if (!patch || (patch.close_behavior !== undefined && !['ask', 'background', 'quit'].includes(patch.close_behavior))) {
@@ -172,6 +175,7 @@ async function handle(req, res) {
     const body = await readBody(req);
     if (body && body.activity) Object.assign(state.activity, body.activity);
     if (body && body.settings) Object.assign(state.settings, body.settings);
+    if (body && body.ui) Object.assign(state.ui, body.ui);
     save();
     return send(res, 200, state);
   }

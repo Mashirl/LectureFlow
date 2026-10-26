@@ -67,6 +67,8 @@ func (m *Manager) runItem(ctx context.Context, t *task, it *item) error {
 		err = m.installVenv(ctx, t, it, c, b)
 	case KindPythonRuntime:
 		err = m.installPython(ctx, t, it, c, b)
+	case KindTool:
+		err = m.installTool(ctx, t, it, c, b)
 	default:
 		err = fmt.Errorf("unknown kind %q", c.Kind)
 	}
@@ -239,7 +241,7 @@ func (m *Manager) installFiles(ctx context.Context, t *task, it *item, c *Compon
 		}
 		if f.Unpack != "" {
 			m.setPhase(t, it, PhaseUnpacking)
-			if err := unpack(ctx, p, f.Unpack, filepath.Join(staging, sub)); err != nil {
+			if err := unpack(ctx, p, f.Unpack, fileLayout(f), filepath.Join(staging, sub)); err != nil {
 				return err
 			}
 			os.Remove(p)
@@ -277,8 +279,11 @@ func (m *Manager) venvComponentLocked(backend string) string {
 // directory to its version directory and switches state.json.
 func (m *Manager) finish(ctx context.Context, t *task, it *item, c *Component, staging string, rec Installed, req SelfTestRequest) error {
 	if it.update {
-		if err := m.runSelfTest(ctx, t, it, req); err != nil {
-			return err
+		// a tool's own check (installTool) is its self-test
+		if c.Kind != KindTool {
+			if err := m.runSelfTest(ctx, t, it, req); err != nil {
+				return err
+			}
 		}
 		if err := m.checkInUse(it.id); err != nil {
 			return err // the old version stays; the new one is removed with the staging directory
@@ -430,7 +435,7 @@ func (m *Manager) installPython(ctx context.Context, t *task, it *item, c *Compo
 			}
 			m.setPhase(t, it, PhaseUnpacking)
 			removeAllRetry(runtimeDir)
-			if err := unpack(ctx, p, f.Unpack, runtimeDir); err != nil {
+			if err := unpack(ctx, p, f.Unpack, fileLayout(f), runtimeDir); err != nil {
 				return err
 			}
 			if !fileExists(filepath.Join(runtimeDir, filepath.FromSlash(b.Exe))) {
