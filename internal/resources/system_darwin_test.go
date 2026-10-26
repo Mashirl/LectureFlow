@@ -113,15 +113,26 @@ func TestMacPlatformReadings(t *testing.T) {
 	}
 }
 
-// ioreg on this Mac gives the GPU's readings.
+// ioreg on this Mac gives the GPU's readings. A virtual machine (the
+// macos-14 CI runners) has a paravirtual GPU whose IOAccelerator reports
+// the memory but no "Device Utilization %"; the card then leaves the usage
+// tile out (TestAppleGPUCardUnreadable). Real Apple silicon gives both.
 func TestMacIOReg(t *testing.T) {
 	out, err := exec.Command(ioregExe, IORegArgs...).Output()
 	if err != nil {
 		t.Fatal(err)
 	}
 	util, mem := ParseIOAccelerator(string(out))
-	if runtime.GOARCH == "arm64" && (util == nil || mem == nil) {
+	vm := false
+	if v, err := exec.Command("/usr/sbin/sysctl", "-n", "kern.hv_vmm_present").Output(); err == nil {
+		vm = strings.TrimSpace(string(v)) == "1"
+	}
+	switch {
+	case runtime.GOARCH != "arm64":
+	case vm && mem == nil:
+		t.Fatalf("no GPU memory in ioreg (virtual machine): util %v mem %v", intOrNil(util), intOrNil(mem))
+	case !vm && (util == nil || mem == nil):
 		t.Fatalf("no GPU readings in ioreg: util %v mem %v", intOrNil(util), intOrNil(mem))
 	}
-	t.Logf("GPU %v %%, %v MB", intOrNil(util), intOrNil(mem))
+	t.Logf("GPU %v %%, %v MB (virtual machine: %v)", intOrNil(util), intOrNil(mem), vm)
 }
