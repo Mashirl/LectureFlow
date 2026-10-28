@@ -32,10 +32,51 @@ function cacheName(url) {
   return last.replace(/[^A-Za-z0-9._-]/g, '_');
 }
 
-async function download(url, dest, fetchImpl = fetch) {
+async function downloadOnce(url, dest, fetchImpl) {
   const res = await fetchImpl(url, { redirect: 'follow' });
   if (!res.ok || !res.body) throw new Error(`download ${url}: HTTP ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest));
+}
+
+// curl: the system's (Windows 10+, macOS, Linux runners), for the hosts that
+// Node's fetch cannot reach from some CI runners (gmplib.org and ftp.gnu.org
+// failed with "fetch failed" on GitHub's Windows runners, 2026-10-28, while
+// the same URLs worked elsewhere).
+function curlDownload(url, dest) {
+  const curl = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'curl.exe') : 'curl';
+  execFileSync(curl, ['-fsSL', '--proto', '=https', '--proto-redir', '=https', '--retry', '5', '--retry-all-errors', '--connect-timeout', '30', '-o', dest, url], { stdio: 'inherit' });
+}
+
+function why(err) {
+  const c = err && err.cause;
+  return [err && err.message, c && (c.code || c.message)].filter(Boolean).join(': ');
+}
+
+/**
+ * download(url, dest): Node's fetch, three tries; with the real fetch, curl
+ * after that. Tests pass their own fetchImpl and never reach the network.
+ */
+async function download(url, dest, fetchImpl = fetch, { log = console.log } = {}) {
+  let last;
+  for (let i = 0; i < 3; i++) {
+    try {
+      await downloadOnce(url, dest, fetchImpl);
+      return;
+    } catch (err) {
+      last = err;
+      fs.rmSync(dest, { force: true });
+      log(`download ${url} failed (${why(err)}), try ${i + 1} of 3`);
+      if (i < 2) await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  if (fetchImpl !== globalThis.fetch) throw last;
+  log(`downloading ${url} with curl`);
+  try {
+    curlDownload(url, dest);
+  } catch (err) {
+    fs.rmSync(dest, { force: true });
+    throw new Error(`download ${url}: fetch (${why(last)}) and curl (${why(err)}) both failed`);
+  }
 }
 
 /**
@@ -54,7 +95,7 @@ async function fetchPinned({ url, sha256 }, cacheDir, { fetchImpl = fetch, log =
   }
   const part = `${file}.part`;
   log(`downloading ${url}`);
-  await download(url, part, fetchImpl);
+  await download(url, part, fetchImpl, { log });
   const got = sha256File(part);
   if (got !== sha256) {
     fs.rmSync(part, { force: true });

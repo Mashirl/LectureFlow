@@ -307,7 +307,21 @@ def test_two_lectures_at_once_with_two_workers(base, monkeypatch):
     for r in (ra, rb):
         assert r["timing"]["transcribe_s"] < 1 and r["timing"]["load_s"] < 1
         r["timing"]["transcribe_s"] = r["timing"]["load_s"] = 0
+        _zero_measured_ms(r["timing"])  # e.g. the recase step's "ms" (2 vs 0 on a CI runner)
     assert ra == rb
+
+
+def _zero_measured_ms(x):
+    """Sets every measured "ms" below x to 0 (the counts beside them stay)."""
+    if isinstance(x, dict):
+        for k, v in x.items():
+            if k == "ms" and isinstance(v, (int, float)):
+                x[k] = 0
+            else:
+                _zero_measured_ms(v)
+    elif isinstance(x, list):
+        for v in x:
+            _zero_measured_ms(v)
 
 
 def test_uploaded_ahead_waits_for_its_job_json(base):

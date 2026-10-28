@@ -202,6 +202,32 @@ test('ffmpeg configure check: GPL and non-free flags fail the build', () => {
   for (const f of uploaded) assert.ok(WORKER_FILES.includes(f), `the Colab backend uploads ${f}, which is not in WORKER_FILES`);
 });
 
+test('pinned downloads: a failed fetch is tried again; an injected fetch never falls back to curl', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-fetch-retry-'));
+  try {
+    const body = Buffer.from('retried payload');
+    const sha = crypto.createHash('sha256').update(body).digest('hex');
+    let calls = 0;
+    const flaky = async () => {
+      calls++;
+      if (calls === 1) throw new TypeError('fetch failed', { cause: { code: 'ECONNRESET' } });
+      return new Response(body);
+    };
+    const lines = [];
+    const f = await fetchPinned({ url: 'https://example.com/r/tool.zip', sha256: sha }, dir, { fetchImpl: flaky, log: (l) => lines.push(l) });
+    assert.equal(sha256File(f), sha);
+    assert.equal(calls, 2);
+    assert.ok(lines.some((l) => /failed \(fetch failed: ECONNRESET\), try 1 of 3/.test(l)), lines.join('\n'));
+    const down = async () => {
+      throw new TypeError('fetch failed');
+    };
+    await assert.rejects(fetchPinned({ url: 'https://example.com/r/gone.zip', sha256: sha }, dir, { fetchImpl: down, log: () => {} }), /fetch failed/);
+    assert.deepEqual(fs.readdirSync(dir).filter((n) => n.includes('gone')), [], 'nothing kept from a failed download');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('pinned downloads: verified before use, cached by hash, mismatches rejected', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-fetch-'));
   try {
