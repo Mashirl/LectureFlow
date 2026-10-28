@@ -175,7 +175,7 @@ Corresponding source code / 对应源码:
 
 - https://github.com/ShouldBeQuincy/LectureFlow/releases
 - https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz
-- https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+- https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
 - https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2
 - https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz
 - https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz
@@ -188,7 +188,7 @@ Statically linked libraries / 静态链入的库:
 
 | Library | Version | License | Source | Note |
 |---|---|---|---|---|
-| GMP | 6.3.0 | LGPL-3.0-or-later OR GPL-2.0-or-later | https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz | Multi-precision arithmetic (BitTorrent key exchange). Statically linked by upstream's build. |
+| GMP | 6.3.0 | LGPL-3.0-or-later OR GPL-2.0-or-later | https://ftp.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz | Multi-precision arithmetic (BitTorrent key exchange). Statically linked by upstream's build. |
 | Expat | 2.5.0 | MIT | https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2 | XML parser (Metalink, XML-RPC). Statically linked by upstream's build. |
 | SQLite | 3.43.1 | blessing | https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz | Reads Firefox 3 / Chromium cookie files (--load-cookies); public-domain dedication, no license text required. Statically linked by upstream's build. |
 | zlib | 1.3 | Zlib | https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz | gzip content encoding. Statically linked by upstream's build. |

@@ -781,7 +781,7 @@ test('source attachments: pinned downloads into reproducible tars, nothing left 
     const bad = JSON.parse(JSON.stringify(m));
     bad.aria2c['windows-x64'].deps.find((d) => d.name === 'GMP').sha256 = 'a'.repeat(64);
     const outBad = path.join(tmp, 'out-bad');
-    await assert.rejects(sources.buildSources({ ...opts, manifest: bad, outDir: outBad, cacheDir: path.join(tmp, 'cache-bad') }), /SHA-256 mismatch for https:\/\/gmplib\.org/);
+    await assert.rejects(sources.buildSources({ ...opts, manifest: bad, outDir: outBad, cacheDir: path.join(tmp, 'cache-bad') }), /SHA-256 mismatch for https:\/\/ftp\.gnu\.org/);
     assert.deepEqual(fs.readdirSync(outBad).filter((f) => /aria2c-windows|\.partial$/.test(f)), []);
     // Inconsistent manifests fail before anything is downloaded.
     const unexplained = JSON.parse(JSON.stringify(m));
