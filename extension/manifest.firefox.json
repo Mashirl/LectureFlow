@@ -1,0 +1,21 @@
+{
+  "background": {
+    "scripts": [
+      "background/main.js"
+    ],
+    "type": "module"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lectureflow@qu1ncy.dev",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo",
+          "browsingActivity",
+          "websiteContent"
+        ]
+      }
+    }
+  }
+}

@@ -218,6 +218,8 @@ var errorCatalog = map[string]errDef{
 	"media.no_audio":             {"文件中没有音轨", nil},
 	"media.original_missing":     {"原始媒体文件已不在，无法生成播放文件", nil},
 	"media.no_h264_encoder":      {"没有可用的 H.264 编码器，视频无法转码，先以音频播放", []string{"tried"}}, // SPEC-v3 V7
+	"media.encoder_failed":       {"视频编码器在转码时出错（不是文件损坏），可以重试", []string{"tried"}},      // qsv-retry: every encoder failed itself
+	"media.format_rejected":      {"媒体文件的实际格式（{format}）不是支持的音视频格式，可能会读取其他文件。为安全起见不处理这个文件，请先转换为 MP4、MKV、MP3 等常见格式后重新上传", []string{"format"}},
 	"media.failed":               {"处理这个文件时出错", nil},
 	"chapters.not_configured":    {"还没有为“章节”角色选择模型，请先在设置中配置", nil},
 	"chapters.not_found":         {"还没有生成章节", nil}, // unused since GET .../chapters answers 200 (power-brief ruling 21); kept registered (lead ruling 9.4)

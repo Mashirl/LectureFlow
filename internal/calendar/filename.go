@@ -533,8 +533,22 @@ func atoi(s string) (int, bool) {
 }
 
 // cleanTitle tidies the title group for display: underscores become spaces,
-// runs of spaces collapse, and separators at either end are dropped.
+// runs of spaces collapse, separators at either end are dropped, and so are
+// bidirectional control characters (a file name may hold them; they can
+// make an export's file name show another extension; test-media I8).
 func cleanTitle(s string) string {
+	s = strings.Map(dropBidiControl, s)
 	s = strings.Join(strings.Fields(strings.ReplaceAll(s, "_", " ")), " ")
 	return strings.Trim(s, " -.")
+}
+
+// dropBidiControl is a strings.Map function that drops the Unicode
+// Bidi_Control characters (the set of media.StripBidi, which this package
+// does not import: it stays pure, P13.4).
+func dropBidiControl(r rune) rune {
+	switch {
+	case r == 0x061C, r == 0x200E, r == 0x200F, r >= 0x202A && r <= 0x202E, r >= 0x2066 && r <= 0x2069:
+		return -1
+	}
+	return r
 }

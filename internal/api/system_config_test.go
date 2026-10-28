@@ -143,8 +143,15 @@ func TestConfigViewWindowsReference(t *testing.T) {
 	if _, ok := asr["vram_per_job_mb"]; ok {
 		t.Errorf("VRAM settings without an NVIDIA GPU: %v", asr)
 	}
-	if len(deviceRows(t, cfg)) != 3 || len(pythonRows(t, cfg)) != 3 {
+	// ext-step1: and no faster-whisper interpreter that is not there (its
+	// component is named after NVIDIA; it would only run fw:cpu here)
+	if len(deviceRows(t, cfg)) != 3 || len(pythonRows(t, cfg)) != 2 {
 		t.Errorf("without NVIDIA: %v", cfg)
+	}
+	for _, r := range pythonRows(t, cfg) {
+		if r.Backend == model.BackendFasterWhisper {
+			t.Errorf("faster-whisper interpreter without NVIDIA: %+v", r)
+		}
 	}
 }
 

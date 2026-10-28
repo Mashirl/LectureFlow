@@ -26,6 +26,8 @@
 // "choose devices yourself" (ticked devices, never a CPU device; ticking a
 // second one on a laptop warns first; not used on battery); battery
 // awareness is retired and its switch hidden (the value is sent back as it is).
+// ext-step1: the Transcription block starts with "转写方式" (local / only Colab,
+// settings_asrmode.js; saved at once through PUT /api/asr-mode).
 
 import { api } from './api.js';
 import { h, clear, btn, iconBtn, skeleton, errorBlock, preserveFocus, openDialog, confirmDialog, toast } from './dom.js';
@@ -42,7 +44,10 @@ import { createDeviceList } from './asr_devices.js';
 import { createAppSection } from './settings_app.js';
 import { createAboutSection } from './settings_about.js';
 import { createComponentsSection } from './settings_components.js';
+import { createDownloadsSection } from './settings_downloads.js';
 import { createColabSection } from './settings_colab.js';
+import { createASRModeRow } from './settings_asrmode.js';
+import { MAX_CONCURRENCY, MAX_RPM, DEEPSEEK_LIMITS, hasOldLimits, sameOrigin, endpointParts } from './provider_rules.js';
 
 const typeName = (type) => (has(`settings.provider.type.${type}`) ? t(`settings.provider.type.${type}`) : type);
 const roleHint = (role) => (has(`settings.role_hint.${role}`) ? t(`settings.role_hint.${role}`) : '');
@@ -104,13 +109,15 @@ const BLOCKS = [
   ['kinds', 'tag', 'settings.kinds.title'],
   ['holidays', 'calendar', 'settings.holidays.title'],
   ['display', 'languages', 'i18n.block_title'],
+  // SPEC-ext (settings_downloads.js): the browser extension's recording downloads; own data
+  ['downloads', 'download', 'settings.downloads.title'],
   // SPEC-v3 V11 (settings_components.js, settings_app.js, settings_about.js): own data and loading
   ['components', 'layers', 'settings.comp.title'],
   ['app', 'settings', 'settings.app.title'],
   ['about', 'info', 'settings.about.title'],
 ];
 // Blocks that load their own data (not GET /api/settings).
-const SELF_LOADED = new Set(['components', 'app', 'about', 'colab']);
+const SELF_LOADED = new Set(['components', 'app', 'about', 'colab', 'downloads']);
 const blockTitle = (b) => t(b[2]);
 
 // Kept for the whole page session: unsaved edits, the last connection test
@@ -144,7 +151,8 @@ function hostOf(baseURL) {
 }
 
 function needsKey(p) {
-  return !p.key_hint && !isLocal(p.base_url);
+  // cred-enc: a saved key this computer cannot decrypt needs entering again
+  return p.key_unreadable || (!p.key_hint && !isLocal(p.base_url));
 }
 
 function reducedMotion() {
@@ -177,6 +185,8 @@ export function mountSettings(root, ctx, route) {
     },
     reload: () => loadSoon(),
   });
+  // ext-step1: "转写方式", the first row of the Transcription block
+  const modeUI = createASRModeRow({ formRow, segmented, rerender: () => renderASRGlobal() });
   let devKey = '';
   let restKey = '';
   let allPausedShown = !!(ctx.resources() && ctx.resources().gpu && ctx.resources().gpu.paused);
@@ -209,7 +219,8 @@ export function mountSettings(root, ctx, route) {
   const aboutUI = createAboutSection(sectionUI('about'));
   const compUI = createComponentsSection(sectionUI('components'));
   const colabUI = createColabSection(sectionUI('colab'));
-  const selfUI = { components: compUI, app: appUI, about: aboutUI, colab: colabUI };
+  const dlUI = createDownloadsSection(sectionUI('downloads'));
+  const selfUI = { components: compUI, app: appUI, about: aboutUI, colab: colabUI, downloads: dlUI };
 
   // ---- data ----
 
@@ -346,6 +357,8 @@ export function mountSettings(root, ctx, route) {
       ...deviceModeOf(a),
       multi_device: !!a.multi_device,
       battery_aware: !!a.battery_aware,
+      // "修复退化的转写窗口" (kv asr.redecode; a missing value means on)
+      redecode: data.asr_redecode !== false,
       vram_reserve_mb: String(a.vram_reserve_mb),
       mem_reserve_mb: String(a.mem_reserve_mb == null ? '' : a.mem_reserve_mb),
     };
@@ -360,6 +373,7 @@ export function mountSettings(root, ctx, route) {
       (a.device_mode !== MANUAL_MODE || a.manual_devices.join(' ') === b.manual_devices.join(' ')) &&
       a.multi_device === b.multi_device &&
       a.battery_aware === b.battery_aware &&
+      a.redecode === b.redecode &&
       num(a.vram_reserve_mb) === num(b.vram_reserve_mb) &&
       num(a.mem_reserve_mb) === num(b.mem_reserve_mb)
     );
@@ -672,6 +686,11 @@ export function mountSettings(root, ctx, route) {
     ];
   }
 
+  // the coded "以明文保存" of a provider (sec3 L2)
+  function keyProblem(p) {
+    return U.errorInfoText(p.key_error_info, '') || t('errors.settings.provider_key_unprotected', { provider: p.name });
+  }
+
   function fact(k, v, title, cls = '') {
     return h('span', { class: 'pv-fact ' + cls, title }, h('span', { class: 'pv-k' }, k), h('span', { class: 'pv-v' }, v));
   }
@@ -738,19 +757,23 @@ export function mountSettings(root, ctx, route) {
           { class: 'pv-title' },
           h('span', { class: 'pv-name' }, p.name),
           h('span', { class: 'chip chip-quiet' }, typeName(p.type)),
-          needsKey(p) ? h('span', { class: 'chip chip-warn' }, icon('key-round', { size: 11 }), t('settings.provider.no_key_chip')) : null,
+          needsKey(p) ? h('span', { class: 'chip chip-warn' }, icon('key-round', { size: 11 }), t(p.key_unreadable ? 'settings.provider.key_unreadable_chip' : 'settings.provider.no_key_chip')) : null,
+          // sec3 L2: saved while there was no data key
+          p.key_unprotected ? h('span', { class: 'chip chip-warn', title: keyProblem(p) }, icon('lock-open', { size: 11 }), t('settings.provider.key_unprotected_chip')) : null,
         ),
         h('div', { class: 'pv-url mono', title: p.base_url }, p.base_url),
         h(
           'div',
           { class: 'pv-facts' },
-          fact(
-            t('settings.provider.key'),
-            p.key_hint ? h('span', { class: 'mono' }, p.key_hint) : h('span', { class: isLocal(p.base_url) ? 'dim' : 'tone-warn' }, isLocal(p.base_url) ? t('settings.provider.key_local') : t('settings.provider.key_unset')),
-            t('settings.provider.key_tip'),
-          ),
+          p.key_unreadable
+            ? fact(t('settings.provider.key'), h('span', { class: 'tone-warn' }, t('settings.provider.key_unreadable')), t('errors.settings.provider_key_unreadable', { provider: p.name }))
+            : fact(
+                t('settings.provider.key'),
+                p.key_hint ? h('span', { class: 'mono' + (p.key_unprotected ? ' tone-warn' : '') }, p.key_hint) : h('span', { class: isLocal(p.base_url) ? 'dim' : 'tone-warn' }, isLocal(p.base_url) ? t('settings.provider.key_local') : t('settings.provider.key_unset')),
+                p.key_unprotected ? keyProblem(p) : t('settings.provider.key_tip'),
+              ),
           fact(t('settings.provider.concurrency'), String(p.max_concurrency), t('settings.provider.concurrency_tip'), 'is-num'),
-          fact(t('settings.provider.rpm'), t('settings.provider.rpm_value', { n: p.rpm }), t('settings.provider.rpm_tip'), 'is-num'),
+          fact(t('settings.provider.rpm'), rpmText(p.rpm), t('settings.provider.rpm_tip'), 'is-num'),
           fact(t('settings.provider.price'), price || h('span', { class: 'dim' }, t('settings.not_configured')), price ? t('settings.provider.price_tip') : t('settings.provider.price_unset_tip'), 'is-num'),
           balanceFact(p),
           tariffFact(p),
@@ -765,11 +788,53 @@ export function mountSettings(root, ctx, route) {
         ),
         modelsLine(p),
         testLine(p, test),
+        limitsHint(p),
       ),
       actions,
     );
     bindContextMenu(row, () => providerItems(p));
     return row;
+  }
+
+  // rpm 0 = no per-minute limit (perf-llm)
+  function rpmText(rpm) {
+    return rpm > 0 ? t('settings.provider.rpm_value', { n: rpm }) : t('settings.provider.rpm_unlimited');
+  }
+
+  // perf-llm: a DeepSeek provider still on the old conservative limits is
+  // offered the preset's limits in one click (never changed by itself).
+  const applyingLimits = new Set();
+  function limitsHint(p) {
+    if (!hasOldLimits(p)) return null;
+    const busy = applyingLimits.has(p.id);
+    const limits = p.rpm > 0 ? t('system.api.limits', { max: p.max_concurrency, rpm: p.rpm }) : t('system.api.limits_unlimited', { max: p.max_concurrency });
+    return h(
+      'div',
+      { class: 'banner banner-info set-banner pv-limits', style: { margin: '8px 0 0', flexWrap: 'wrap' } },
+      icon('gauge', { size: 16 }),
+      h('span', { class: 'set-banner-text', style: { flex: '1 1 16rem' } }, t('settings.provider.limits_old', { limits, max: DEEPSEEK_LIMITS.max_concurrency })),
+      btn(busy ? t('settings.provider.limits_applying') : t('settings.provider.limits_apply'), {
+        size: 'sm',
+        disabled: busy,
+        onclick: () => applyLimits(p),
+        fkey: `set:prov:${p.id}:limits`,
+      }),
+    );
+  }
+
+  async function applyLimits(p) {
+    if (applyingLimits.has(p.id)) return;
+    applyingLimits.add(p.id);
+    renderBlock('providers');
+    try {
+      await api.patchProvider(p.id, { max_concurrency: DEEPSEEK_LIMITS.max_concurrency, rpm: DEEPSEEK_LIMITS.rpm });
+      toast(t('settings.provider.limits_applied', { name: p.name }), 'success');
+    } catch {
+      // shown by the API layer
+    } finally {
+      applyingLimits.delete(p.id);
+      if (alive) load();
+    }
   }
 
   function modelsLine(p) {
@@ -905,10 +970,10 @@ export function mountSettings(root, ctx, route) {
           type: 'password',
           autocomplete: 'new-password',
           spellcheck: 'false',
-          placeholder: p ? (p.key_hint ? t('settings.provider.key_keep', { hint: p.key_hint }) : t('settings.provider.key_keep_none')) : 'sk-…',
+          placeholder: p ? (p.key_unreadable ? t('settings.provider.key_unreadable') : p.key_hint ? t('settings.provider.key_keep', { hint: p.key_hint }) : t('settings.provider.key_keep_none')) : 'sk-…',
         });
-        const conc = h('input', { class: 'input input-num', type: 'number', min: '1', max: '64', step: '1', value: String(p ? p.max_concurrency : 4) });
-        const rpm = h('input', { class: 'input input-num', type: 'number', min: '1', max: '10000', step: '1', value: String(p ? p.rpm : 60) });
+        const conc = h('input', { class: 'input input-num', type: 'number', min: '1', max: String(MAX_CONCURRENCY), step: '1', value: String(p ? p.max_concurrency : 4) });
+        const rpm = h('input', { class: 'input input-num', type: 'number', min: '0', max: String(MAX_RPM), step: '1', value: String(p ? p.rpm : 60) });
         const balance = h(
           'select',
           { class: 'select', value: p ? p.balance_api : 'none', onchange: () => (balanceTouched = true) },
@@ -937,14 +1002,29 @@ export function mountSettings(root, ctx, route) {
           autoBalance();
           syncKeyHint();
           trf.sync();
+          typeNote.replaceChildren(...endpointNote(type));
         });
+        key.addEventListener('input', () => syncKeyHint());
         const keyHint = h('span', { class: 'dlg-hint' });
+        // sec2-app L2: moving an existing provider to another host clears
+        // its stored key on save (the back end never sends it there)
+        const movedHint = h('span', { class: 'dlg-hint tone-warn', role: 'status' });
+        // sec3 L2: no data key now, so a key entered here is stored in the clear
+        const storeHint = data && data.credentials_error_info ? h('span', { class: 'dlg-hint tone-warn', role: 'status' }, icon('lock-open', { size: 12 }), ' ', U.errorInfoText(data.credentials_error_info)) : null;
         const syncKeyHint = () => {
           keyHint.textContent = isLocal(base.value.trim()) ? t('settings.provider.key_hint_local') : t('settings.provider.key_hint');
+          const moved = !!(p && p.key_hint && !key.value.trim() && !sameOrigin(p.base_url, base.value.trim()));
+          movedHint.hidden = !moved;
+          movedHint.textContent = moved ? t('settings.provider.key_moved_hint') : '';
         };
         syncKeyHint();
-        // {base_url} is shown as it is: the field's name
-        const endpointNote = (v) => t(v === 'anthropic' ? 'settings.provider.endpoint_anthropic' : 'settings.provider.endpoint_openai', { base_url: '{base_url}' });
+        // where the requests go: the address as typed, in code style
+        // (3.2.0 L18; it was the literal "{base_url}")
+        const endpointNote = (v) => {
+          const mark = '\uE000';
+          const [before, address, after] = endpointParts(t(v === 'anthropic' ? 'settings.provider.endpoint_anthropic' : 'settings.provider.endpoint_openai', { base_url: mark }), mark, base.value);
+          return address === undefined ? [before] : [before, h('code', { translate: 'no' }, address), after];
+        };
 
         const typeSeg = segmented(
           'dlg-ptype',
@@ -958,7 +1038,7 @@ export function mountSettings(root, ctx, route) {
             if (!now || now === prevDefault.replace(/\/+$/, '')) base.value = defaults[v] || '';
             autoBalance();
             syncKeyHint();
-            typeNote.textContent = endpointNote(v);
+            typeNote.replaceChildren(...endpointNote(v));
           },
           t('settings.provider.type_label'),
         );
@@ -984,8 +1064,8 @@ export function mountSettings(root, ctx, route) {
           const filled = prices.filter((v) => !isNaN(v)).length;
           if (!nm) return fail(t('errors.settings.provider_name_empty'), name);
           if (!/^https?:\/\/[^/\s]+/i.test(url)) return fail(t('errors.settings.base_url_invalid'), base);
-          if (!isInt(c) || c < 1 || c > 64) return fail(t('settings.provider.err.concurrency'), conc);
-          if (!isInt(r) || r < 1 || r > 10000) return fail(t('settings.provider.err.rpm'), rpm);
+          if (!isInt(c) || c < 1 || c > MAX_CONCURRENCY) return fail(t('errors.settings.max_concurrency_invalid', { min: 1, max: MAX_CONCURRENCY }), conc);
+          if (!isInt(r) || r < 0 || r > MAX_RPM) return fail(t('errors.settings.rpm_invalid', { min: 0, max: MAX_RPM }), rpm);
           if (prices.some((v) => v < 0)) return fail(t('errors.settings.price_invalid'), [pIn, pHit, pOut][prices.findIndex((v) => v < 0)]);
           if (filled && filled < 3) return fail(t('settings.provider.err.prices_partial'), [pIn, pHit, pOut][prices.findIndex((v) => isNaN(v))]);
           const tmsg = trf.validate();
@@ -1032,9 +1112,9 @@ export function mountSettings(root, ctx, route) {
           h(
             'div',
             { class: 'set-dlg-grid' },
-            h('label', { class: 'dlg-field span-2' }, h('span', { class: 'dlg-label' }, icon('key-round', { size: 13 }), ' ', t('settings.provider.key')), key, keyHint),
-            field(t('settings.provider.max_concurrency'), conc, '1–64'),
-            field(t('settings.provider.rpm_field'), rpm, '1–10000'),
+            h('label', { class: 'dlg-field span-2' }, h('span', { class: 'dlg-label' }, icon('key-round', { size: 13 }), ' ', t('settings.provider.key')), key, keyHint, movedHint, storeHint),
+            field(t('settings.provider.max_concurrency'), conc, `1–${MAX_CONCURRENCY}`),
+            field(t('settings.provider.rpm_field'), rpm, t('settings.provider.rpm_range_hint', { max: MAX_RPM })),
             field(t('settings.provider.balance_api'), balance, t('settings.provider.balance_api_hint'), 'span-2'),
           ),
           h(
@@ -1060,6 +1140,7 @@ export function mountSettings(root, ctx, route) {
       { wide: true, className: 'dlg-provider' },
     ).then((res) => {
       if (!res || !alive) return;
+      if (res.key_unprotected) toast(keyProblem(res), 'warn'); // sec3 L2
       if (isNew && res.id) {
         toast(t('settings.provider.created', { name: res.name }), 'success');
         load().then(() => {
@@ -1519,6 +1600,7 @@ export function mountSettings(root, ctx, route) {
     const a = asrVal();
     const fk = (x) => ({ fkey: `set:asr:${x}` });
     return [
+      modeUI.row(),
       formRow(
         t('settings.asr.language'),
         h(
@@ -1551,6 +1633,8 @@ export function mountSettings(root, ctx, route) {
         // a laptop: one device at a time in automatic mode (devices.Place)
         batteryMachine() ? t('settings.asr.multi_device_hint_battery') : t('settings.asr.multi_device_hint'),
       ),
+      // the second decode of degenerate windows (worker/asr.py, faster-whisper and Colab)
+      formRow(t('settings.asr.redecode'), switchBtn(a.redecode, t('settings.asr.redecode'), () => setASRDraft({ redecode: !a.redecode }, true), 'set:asr:redecode'), t('settings.asr.redecode_hint')),
       // battery awareness: retired by power management (hidden; kept as it is)
       formRow(
         t('settings.asr.vram_reserve'),
@@ -1582,13 +1666,13 @@ export function mountSettings(root, ctx, route) {
     if (!data || !asrGlobal.isConnected) return;
     preserveFocus(() => {
       clear(asrGlobal);
-      asrGlobal.append(...asrGlobalRows());
+      asrGlobal.append(...asrGlobalRows().filter(Boolean));
     });
   }
 
   function asrBlock(shell) {
     clear(asrGlobal);
-    asrGlobal.append(...asrGlobalRows());
+    asrGlobal.append(...asrGlobalRows().filter(Boolean));
     shell.append(head('mic', t('settings.block.asr')), asrGlobal, foot('asr', saveASR), h('div', { class: 'card-bd dev-sec-bd' }, devUI.render(data.devices || [])));
   }
 
@@ -1621,6 +1705,7 @@ export function mountSettings(root, ctx, route) {
         battery_aware: a.battery_aware,
         vram_reserve_mb: res,
         mem_reserve_mb: mem,
+        redecode: a.redecode,
       });
       drafts.asr = null;
       saving.delete('asr');
@@ -1679,8 +1764,13 @@ export function mountSettings(root, ctx, route) {
 
   function generalBlock(shell) {
     const g = generalVal();
-    const currencies = [...new Set(data.providers.filter((p) => p.price_input != null && p.currency).map((p) => p.currency))];
-    const priced = data.providers.some((p) => p.price_input != null && p.price_cache_hit != null && p.price_output != null);
+    // A provider is priced by its own prices or by its tariff's model prices
+    // (settings.HasAnyPrice, the backend's budget check; accept-320).
+    const tariffModels = (p) => Object.values((p.tariff && typeof p.tariff === 'object' && p.tariff.models) || {});
+    const currencies = [
+      ...new Set(data.providers.flatMap((p) => (p.price_input != null && p.currency ? [p.currency] : tariffModels(p).map((m) => m && m.currency).filter(Boolean)))),
+    ];
+    const priced = data.providers.some((p) => (p.price_input != null && p.price_cache_hit != null && p.price_output != null) || tariffModels(p).length > 0);
     const res = ctx.resources();
     const spent = {};
     for (const p of (res && res.providers) || []) if (p.cost_today != null) spent[p.currency || ''] = (spent[p.currency || ''] || 0) + p.cost_today;
@@ -2107,8 +2197,10 @@ export function mountSettings(root, ctx, route) {
   loadKinds();
   compUI.load();
   appUI.load();
+  dlUI.load();
   aboutUI.load();
   colabUI.load();
+  modeUI.load();
   return {
     refresh: () => (loadHolidays(), load()),
     onChanged(ev) {
@@ -2116,7 +2208,9 @@ export function mountSettings(root, ctx, route) {
         loadSoon();
         loadHolidays();
         appUI.onSettingsChanged();
+        dlUI.onSettingsChanged();
         colabUI.onSettingsChanged();
+        modeUI.load(); // ext-step1: the guide or another window may have changed it
       }
       if (ev.kind === 'devices') loadSoon(); // SPEC-v2 I6-I9: rows, pauses, tests, power
       appUI.onChanged(ev); // SPEC-v3 V8: "changed update" (the update status by the channel)
@@ -2159,8 +2253,10 @@ export function mountSettings(root, ctx, route) {
       devUI.destroy();
       compUI.destroy();
       appUI.destroy();
+      dlUI.destroy();
       aboutUI.destroy();
       colabUI.destroy();
+      modeUI.destroy();
       if (spy) spy.disconnect();
       window.removeEventListener('beforeunload', beforeUnload);
       window.removeEventListener('kindschange', onKinds);

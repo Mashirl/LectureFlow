@@ -1,0 +1,39 @@
+{
+  "_doc": "Third-party files shipped inside the browser extension (SPEC-ext): extension/src/vendor, which extension/scripts/build.mjs copies into dist/<target>/vendor and so into the store packages (the Tabler SVGs become ui/icons.js, with their licence). go run ./scripts/licaudit checks: every file under extension/src/vendor is the NOTICE, a package's license_file or one of its files; a single file is pinned by sha256 (CRLF normalised to LF, like media.json); a glob of files names a text every matched file contains ({stem} = file name without extension), because the icon set changes with the interface; each license_file is recognised as the declared license; extension/src/vendor/NOTICE names exactly these packages with the same version, license, license file, source (the npm tarball), integrity and file SHA-256. That directory is excluded from the SPDX header check. npm packages of extension/package-lock.json are judged as shipped unless they are devDependencies (Playwright, end-to-end tests only). Paths are relative to extension/src/vendor.",
+  "packages": [
+    {
+      "name": "webextension-polyfill",
+      "version": "0.12.0",
+      "license": "MPL-2.0",
+      "source": "https://registry.npmjs.org/webextension-polyfill/-/webextension-polyfill-0.12.0.tgz",
+      "repository": "https://github.com/mozilla/webextension-polyfill",
+      "integrity": "sha512-97TBmpoWJEE+3nFBQ4VocyCdLKfw54rFaJ6EVQYLBCXqCIpLSZkwGgASpv4oPt9gdKCJ80RJlcmNzNn008Ag6Q==",
+      "files": [
+        {
+          "path": "browser-polyfill.js",
+          "sha256": "cfc53c3525587467c783ef1c6fdefbaf1d60ed197ea2fe0d45899b18069cf496"
+        }
+      ],
+      "license_file": "LICENSE.webextension-polyfill",
+      "shipped_as": "vendor/browser-polyfill.js, unchanged",
+      "note": "dist/browser-polyfill.js of the npm package, copied unchanged; it keeps its MPL-2.0 header (Exhibit A). MPL-2.0 is a file-level copyleft: the file is its own source form, and the package carries the license text (MPL-2.0 sections 3.1, 3.3: the extension as a larger work may be under the AGPL)."
+    },
+    {
+      "name": "@tabler/icons",
+      "version": "3.49.0",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/@tabler/icons/-/icons-3.49.0.tgz",
+      "repository": "https://github.com/tabler/tabler-icons",
+      "integrity": "sha512-l+GnSkFETx0U26icxv1VUFnxxiTqXfCcVRiRAnyMwibupM2S2L/hSaZ9gmSgz01rkrsH/93NvLsxykqdanc6lw==",
+      "files": [
+        {
+          "glob": "tabler/*.svg",
+          "contains": "icons-tabler-outline icon-tabler-{stem}"
+        }
+      ],
+      "license_file": "tabler/LICENSE",
+      "shipped_as": "ui/icons.js (path data of the outline icons, with the MIT notice) and vendor/tabler/LICENSE",
+      "note": "icons/outline/*.svg of the npm package, unchanged in the repository; the build turns the path data into ui/icons.js."
+    }
+  ]
+}

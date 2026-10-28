@@ -81,8 +81,9 @@ func (l *cmdLog) list() []string {
 // The reference Windows machine (NVIDIA + Intel GPU and NPU): the same rows
 // in the same order as before mac-opti, startup and recheck, web mode.
 func TestDiagnosticsWindowsChecksUnchanged(t *testing.T) {
-	want := []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cuda",
-		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "api_key:deepseek", "api:deepseek", "disk"}
+	// ext-step1: plus cudnn after gpu
+	want := []string{"data_dir", "ffmpeg", "aria2c", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "cuda",
+		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 	de := newDevEnv(t, envConfig{})
 	de.srv.diag.waitStartup()
 	var sys System
@@ -98,7 +99,7 @@ func TestDiagnosticsWindowsChecksUnchanged(t *testing.T) {
 		t.Fatalf("checks after recheck %v, want %v", got, want)
 	}
 	by := checksByName(sys)
-	for _, n := range []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cuda"} {
+	for _, n := range []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "cuda"} {
 		if by[n].Status != statusOK {
 			t.Errorf("%s: %+v", n, by[n])
 		}
@@ -109,7 +110,10 @@ func TestDiagnosticsWindowsChecksUnchanged(t *testing.T) {
 
 // Windows without an NVIDIA GPU: no GPU and CUDA rows and no CUDA
 // self-test; they come back when the hardware detection of the setup guide
-// found an NVIDIA card (a missing driver) or a cuda:0 row exists.
+// found an NVIDIA card (a missing driver). ext-step1: no faster-whisper row
+// either (its text names NVIDIA) but the CPU self-test; a cuda:0 row no
+// longer counts; the rows of the new environment come from a rerun of the
+// checks.
 func TestDiagnosticsWindowsWithoutNVIDIA(t *testing.T) {
 	log := &cmdLog{}
 	de := newDevEnv(t, envConfig{server: func(s *Server) { s.runCmd = log.run }})
@@ -120,8 +124,8 @@ func TestDiagnosticsWindowsWithoutNVIDIA(t *testing.T) {
 	de.reg.detectDet = &det
 	de.reg.mu.Unlock()
 	cs, _ := diagNow(t, de.env, true)
-	want := []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf",
-		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "api_key:deepseek", "api:deepseek", "disk"}
+	want := []string{"data_dir", "ffmpeg", "aria2c", "python", "pypdf",
+		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "cpu_selftest", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 	if got := checkNames(cs); !slices.Equal(got, want) {
 		t.Fatalf("checks %v, want %v", got, want)
 	}
@@ -136,7 +140,15 @@ func TestDiagnosticsWindowsWithoutNVIDIA(t *testing.T) {
 	cs2.hwMu.Lock()
 	cs2.hw = &hwdetect.HW{OS: "windows", NVIDIA: []hwdetect.GPU{{Name: "NVIDIA GeForce RTX 4060", Source: "wmi"}}}
 	cs2.hwMu.Unlock()
-	if got := checkNames(de.srv.diag.snapshot()); !slices.Contains(got, "gpu") || !slices.Contains(got, "cuda") {
+	deadline := time.Now().Add(5 * time.Second)
+	var got []string
+	for time.Now().Before(deadline) {
+		if got = checkNames(de.srv.diag.snapshot()); slices.Contains(got, "gpu") && slices.Contains(got, "cuda") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if !slices.Contains(got, "gpu") || !slices.Contains(got, "cuda") || slices.Contains(got, "cpu_selftest") {
 		t.Fatalf("with the detected NVIDIA card: %v", got)
 	}
 }
@@ -154,7 +166,7 @@ func TestDiagnosticsWindowsWithoutIntel(t *testing.T) {
 	de.reg.detectDet = &det
 	de.reg.mu.Unlock()
 	cs, _ := diagNow(t, de.env, false)
-	want := []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cuda", "api_key:deepseek", "api:deepseek", "disk"}
+	want := []string{"data_dir", "ffmpeg", "aria2c", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "cuda", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 	if got := checkNames(cs); !slices.Equal(got, want) {
 		t.Fatalf("checks %v, want %v", got, want)
 	}
@@ -181,8 +193,8 @@ func TestDiagnosticsWindowsDesktopWithoutComponents(t *testing.T) {
 		s.desktop = &DesktopOptions{Token: "t", Port: 1}
 	}})
 	cs, by := diagNow(t, de.env, true)
-	want := []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cuda",
-		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "api_key:deepseek", "api:deepseek", "disk"}
+	want := []string{"data_dir", "ffmpeg", "aria2c", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "cuda",
+		"openvino_venv", "openvino", "openvino_devices", "npu_driver", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 	if got := checkNames(cs); !slices.Equal(got, want) {
 		t.Fatalf("checks %v, want %v", got, want)
 	}
@@ -190,8 +202,9 @@ func TestDiagnosticsWindowsDesktopWithoutComponents(t *testing.T) {
 	wantCheck(t, by["faster-whisper"], codeFWNotInstalled, codeHintInstallFW)
 	wantCheck(t, by["pypdf"], codePythonNotInstalled, codeHintInstallPython)
 	wantCheck(t, by["cuda"], codeFWNotInstalled, codeHintInstallFW)
+	wantCheck(t, by[checkCUDNN], codeFWNotInstalled, codeHintInstallFW)
 	wantCheck(t, by["openvino_venv"], codeOpenVINONotInstalled, codeHintInstallOpenVINO)
-	for _, n := range []string{"python", "faster-whisper", "pypdf", "cuda"} {
+	for _, n := range []string{"python", "faster-whisper", "pypdf", "cuda", checkCUDNN} {
 		if by[n].Status != statusError { // cuda:0 is enabled: it is what transcribes
 			t.Errorf("%s: %+v", n, by[n])
 		}
@@ -294,7 +307,8 @@ func macDevices(de *devEnv, mlx, colab bool) {
 	de.reg.detectDet = &det
 }
 
-var macChecks = []string{"data_dir", "ffmpeg", "python", "pypdf", "mlx_python", "mlx", "mlx_model", "api_key:deepseek", "api:deepseek", "disk"}
+// ext-step1: plus the MLX self-test after the model
+var macChecks = []string{"data_dir", "ffmpeg", "aria2c", "python", "pypdf", "mlx_python", "mlx", "mlx_model", "mlx_selftest", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 
 // macOS, desktop mode, nothing installed (the friend's Mac mini): no
 // NVIDIA, CUDA, OpenVINO or .venv rows; MLX rows that say what to install;

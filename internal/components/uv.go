@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/pyenv"
 )
 
 // run executes a program with the sanitized environment and returns its
@@ -33,13 +35,17 @@ func (m *Manager) run(ctx context.Context, prog string, args []string) (string, 
 	cmd.Stderr = &out
 	cmd.WaitDelay = 5 * time.Second
 	hideWindow(cmd)
-	err := cmd.Run()
+	// uv ends with LectureFlow, also on a crash: an orphaned install would
+	// go on writing into the component's directory (procutil.Tied;
+	// test-chaos 1).
+	err := procutil.Run(cmd, procutil.Tied)
 	return out.String(), err
 }
 
 // env is the process environment without variables that would redirect uv
 // or python (a user's UV_INDEX_URL, PYTHONPATH, an active virtualenv), plus
-// uv's cache and switches.
+// uv's cache and switches and pyenv's (no usage reporting: the check runs
+// the component's python).
 func (m *Manager) env() []string {
 	var env []string
 	for _, kv := range os.Environ() {
@@ -57,7 +63,7 @@ func (m *Manager) env() []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env,
+	return pyenv.Env(env,
 		"UV_CACHE_DIR="+m.uvCache(),
 		"UV_NO_PROGRESS=1",
 		"UV_PYTHON_DOWNLOADS=never",

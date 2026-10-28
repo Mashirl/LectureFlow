@@ -87,7 +87,7 @@ If you have ever felt anxious after missing a class, or kept dragging a progress
 
 - Picks an NVIDIA GPU, Intel integrated graphics or NPU, or Apple Silicon to transcribe.
 - Laptops use one transcription device at a time: the dedicated GPU when plugged in, the more efficient NPU on battery. Tasks that can't move are paused until you plug back in.
-- Optionally borrow a Google Colab GPU: LectureFlow starts it, transcribes, fetches the results, and shuts it down — not a penny wasted.
+- Optionally borrow a Google Colab GPU: LectureFlow starts it, works through your waiting lectures on it, fetches the results, and shuts it down — not a penny wasted.
 
 **Calm, never pushy**
 
@@ -98,13 +98,16 @@ If you have ever felt anxious after missing a class, or kept dragging a progress
 **Works with your other tools**
 
 - Export bilingual transcripts, bilingual subtitles (VTT), and a JSON file with timestamped citations that other AI tools can use to make notes.
+- The browser extension Send to LectureFlow, for Chrome and Firefox (Edge installs it from the Chrome Web Store; see [docs/install.md](docs/install.md#browser-extension)), sends the recording you are watching on Panopto or another lecture-capture site to LectureFlow with one click and one confirmation. On Panopto you can also send from the page itself, a lecture or a whole page of a course at once. It reads only the media tracks, never your course information.
 
 ## Privacy
 
 - **Audio and transcription stay on your computer.** Nothing is uploaded.
 - Only if you set up a model provider is the transcribed text sent to **the provider you chose**, for correction, summaries, and translation. You can also choose "transcription only" and use no online service at all.
-- With the Google Colab backend, your recordings are uploaded to Google's servers; you'll be told clearly when you choose it.
+- With the Google Colab backend, your recordings are uploaded to Google's servers; you'll be told clearly when you choose it. LectureFlow also asks Google, with your own authorization, for your Colab account's compute-unit balance and the GPUs you may borrow, and, only while a runtime is in use, for that runtime's memory and GPU readings to show in the resources panel.
+- Saved API keys and your Colab authorization are stored encrypted, protected by your system account (DPAPI on Windows, the Keychain on macOS). If you move the data folder to another computer or user account, you enter them again.
 - LectureFlow collects no usage data. No telemetry, no accounts.
+- The browser extension talks only to LectureFlow on your computer, and reads the recording site's cookies only when you send a lecture: see its [privacy policy](docs/extension/privacy.md).
 
 ## Transcription backends
 
@@ -141,7 +144,7 @@ Status notes: \* may also support doing transcription and translation fully on-d
 
 ## Getting started
 
-1. Download the installer for your system from [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases): `LectureFlow-Setup-3.1.0-x64.exe` (or the portable build) for Windows, `LectureFlow-3.1.0-arm64.dmg` for Apple Silicon Macs.
+1. Download the installer for your system from [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases): `LectureFlow-Setup-3.2.0-x64.exe` (or the portable build) for Windows, `LectureFlow-3.2.0-arm64.dmg` for Apple Silicon Macs. What's new: [release notes](docs/release-notes/3.2.0.md).
 2. The installers are not code-signed yet, so your system will show a security warning. See [docs/install.md](docs/install.md) for how to continue.
 3. Open LectureFlow and follow the short setup guide: choose a language, check your computer, choose a plan, download components. You can skip any step and come back later.
 4. Add a course: give it a name and a start date, and optionally paste the course outline and upload slides (not required, but they noticeably improve accuracy on technical terms).
@@ -159,7 +162,9 @@ Apart from Simplified Chinese, the interface text was translated by AI and revie
 
 - **So far it has only been tested by computer science students**, with lectures in English translated into Simplified Chinese. Medicine, law, the humanities and other subjects use different terminology and teaching styles, so results may differ. Please tell us how it goes.
 - On macOS it has been tested on a Mac mini (Apple M6, macOS 27) only; MacBooks running on battery have not been tried yet.
-- Whisper's large-v3 models (including large-v3-turbo, the default on Macs) often leave out punctuation and capital letters; large-v2 does not. This will be addressed in a later version.
+- Whisper's large-v3 models (including large-v3-turbo, the default on Macs) often leave out punctuation and capital letters; large-v2 does not. Since 3.2.0 LectureFlow repairs this in English lectures: with NVIDIA, the CPU or Colab such stretches are transcribed again, and on every backend punctuation and capitals are restored from the rest of the lecture. Lectures transcribed earlier can be repaired with "Fix sentence breaks". The repair is good, not perfect.
+- The browser extension knows Panopto best; other sites get generic track detection. It does not handle DRM-protected media, and does not work on Linux, ChromeOS or phones.
+- The browser extension and LectureFlow do not handle YouTube or online course platforms (MOOCs and paid courses such as Coursera, edX or Udemy): they are for the lecture recordings your own school gives you.
 - AMD ROCm is not supported yet; scheduling across multiple inference backends is not smart yet.
 - Automatic transcription, correction, and translation can all make mistakes. For anything important, check the original audio.
 - It is designed for **knowledge content with reference material**, not as a general video subtitle tool. For films, anime, or live streams, please use a better-suited tool.
@@ -209,7 +214,7 @@ This project serves the maintainer's own studies first, so some requests may not
 
 ## Licence
 
-LectureFlow is released under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later); see [LICENSE](LICENSE). If you modify LectureFlow and offer it to others over a network, you must make your modified source code available to them. An additional permission under section 7 of the licence allows combining LectureFlow with the libraries listed in [LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md). Licences for third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+LectureFlow is released under the GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later); see [LICENSE](LICENSE). If you modify LectureFlow and offer it to others over a network, you must make your modified source code available to them. An additional permission under section 7 of the licence ([LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md)) allows combining LectureFlow with the proprietary or otherwise AGPL-incompatible libraries listed there, such as NVIDIA CUDA, which the component manager downloads on your computer; it does not change the other conditions of the AGPL. Licences for third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Thanks
 

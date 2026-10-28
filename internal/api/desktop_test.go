@@ -163,10 +163,110 @@ func TestWebModeNeedsNoToken(t *testing.T) {
 	if !h.OK || h.Mode != "web" || h.Version != "dev" {
 		t.Fatalf("%+v", h)
 	}
-	// any Host is accepted in web mode (unchanged behaviour)
-	res, b := e.doWith("GET", "/api/courses", nil, "", "lectureflow.test:80")
+	res, b := e.doWith("GET", "/api/courses", nil, "", "")
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("%d %s", res.StatusCode, b)
+	}
+}
+
+// Web mode checks the Host header too (DNS rebinding; security review L6):
+// 127.0.0.1 or localhost with the port the request came in on.
+func TestWebModeHostCheck(t *testing.T) {
+	e := newEnv(t)
+	u, _ := url.Parse(e.ts.URL)
+	port := u.Port()
+	for _, h := range []string{"127.0.0.1:" + port, "localhost:" + port, "LOCALHOST:" + port} {
+		if res, b := e.doWith("GET", "/api/courses", nil, "", h); res.StatusCode != http.StatusOK {
+			t.Errorf("host %s: %d %s", h, res.StatusCode, b)
+		}
+	}
+	for _, h := range []string{"lectureflow.test:80", "evil.example:" + port, "127.0.0.1", "127.0.0.1:1", "localhost",
+		"[::1]:" + port, "127.0.0.1.evil.example:" + port, "localhost.evil.example:" + port} {
+		for _, p := range []string{"/api/courses", "/"} {
+			res, b := e.doWith("GET", p, nil, "", h)
+			if res.StatusCode != http.StatusForbidden || errCode(t, b) != "auth.bad_host" {
+				t.Errorf("host %s %s: %d %s", h, p, res.StatusCode, b)
+			}
+		}
+	}
+}
+
+// doHeaders sends a request with the given headers (no token).
+func (e *env) doHeaders(method, path string, body []byte, headers map[string]string) (*http.Response, []byte) {
+	e.t.Helper()
+	var rd io.Reader
+	if body != nil {
+		rd = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, e.ts.URL+path, rd)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return res, b
+}
+
+// Security review L6: every request that changes something is refused when
+// another site's page sent it, in both modes; reading is not.
+func TestCrossSiteWritesRefused(t *testing.T) {
+	e := newEnv(t)
+	own := e.ts.URL
+	refused := []map[string]string{
+		{"Sec-Fetch-Site": "cross-site"},
+		{"Sec-Fetch-Site": "same-site"}, // another port of localhost
+		{"Sec-Fetch-Site": "cross-site", "Origin": own},
+		{"Origin": "http://evil.example"}, // a browser without Fetch Metadata
+		{"Origin": "null"},
+		{"Origin": strings.Replace(own, "127.0.0.1", "localhost", 1)},
+	}
+	allowed := []map[string]string{
+		{"Sec-Fetch-Site": "same-origin"},
+		{"Sec-Fetch-Site": "none"},
+		{"Sec-Fetch-Site": "same-origin", "Origin": own},
+		{"Origin": own},
+		{}, // no browser (curl, the desktop shell's main process)
+	}
+	body := []byte(`{"prevent_sleep":true}`)
+	for _, m := range []string{"POST", "PUT", "PATCH", "DELETE"} {
+		for _, h := range refused {
+			res, b := e.doHeaders(m, "/api/app/settings", body, h)
+			if res.StatusCode != http.StatusForbidden || errCode(t, b) != "app.cross_site" {
+				t.Errorf("%s %v: %d %s", m, h, res.StatusCode, b)
+			}
+		}
+	}
+	for _, h := range allowed {
+		if res, b := e.doHeaders("PATCH", "/api/app/settings", body, h); res.StatusCode != http.StatusOK {
+			t.Errorf("PATCH %v: %d %s", h, res.StatusCode, b)
+		}
+	}
+	for _, h := range refused { // reading stays possible (the browser keeps the answer from the other site)
+		if res, b := e.doHeaders("GET", "/api/app/settings", nil, h); res.StatusCode != http.StatusOK {
+			t.Errorf("GET %v: %d %s", h, res.StatusCode, b)
+		}
+	}
+	// desktop mode: the same Fetch Metadata check besides the token
+	desk := newDesktopEnv(t, &DesktopOptions{Token: testToken})
+	for h, want := range map[string]int{"cross-site": http.StatusForbidden, "same-site": http.StatusForbidden,
+		"same-origin": http.StatusOK, "": http.StatusOK} {
+		hd := map[string]string{TokenHeader: testToken, "Origin": "http://evil.example"}
+		if h != "" {
+			hd["Sec-Fetch-Site"] = h
+		}
+		if res, b := desk.doHeaders("PATCH", "/api/app/settings", body, hd); res.StatusCode != want {
+			t.Errorf("desktop %q: %d %s", h, res.StatusCode, b)
+		}
 	}
 }
 
@@ -246,15 +346,15 @@ func TestAppSettings(t *testing.T) {
 	e := newEnv(t)
 	var s AppSettings
 	e.call("GET", "/api/app/settings", nil, http.StatusOK, &s)
-	if s != (AppSettings{CloseBehavior: "ask", PreventSleep: true, UpdateChannel: "stable"}) {
+	if s != (AppSettings{CloseBehavior: "ask", PreventSleep: true, UpdateChannel: "stable", DownloadConcurrency: 3, DownloadConnections: 4}) {
 		t.Fatalf("defaults %+v", s)
 	}
 	e.call("PATCH", "/api/app/settings", map[string]any{"close_behavior": "background"}, http.StatusOK, &s)
-	if s != (AppSettings{CloseBehavior: "background", PreventSleep: true, UpdateChannel: "stable"}) {
+	if s != (AppSettings{CloseBehavior: "background", PreventSleep: true, UpdateChannel: "stable", DownloadConcurrency: 3, DownloadConnections: 4}) {
 		t.Fatalf("%+v", s)
 	}
 	e.call("PATCH", "/api/app/settings", map[string]any{"prevent_sleep": false, "update_channel": "beta", "close_behavior": "quit"}, http.StatusOK, &s)
-	want := AppSettings{CloseBehavior: "quit", PreventSleep: false, UpdateChannel: "beta"}
+	want := AppSettings{CloseBehavior: "quit", PreventSleep: false, UpdateChannel: "beta", DownloadConcurrency: 3, DownloadConnections: 4}
 	if s != want {
 		t.Fatalf("%+v", s)
 	}
@@ -294,7 +394,7 @@ func TestAppSettings(t *testing.T) {
 	_ = e.st.SetKV(ctx, kvAppPreventSleep, "maybe")
 	_ = e.st.SetKV(ctx, kvAppUpdateChannel, "")
 	e.call("GET", "/api/app/settings", nil, http.StatusOK, &s)
-	if s != (AppSettings{CloseBehavior: "ask", PreventSleep: true, UpdateChannel: "stable"}) {
+	if s != (AppSettings{CloseBehavior: "ask", PreventSleep: true, UpdateChannel: "stable", DownloadConcurrency: 3, DownloadConnections: 4}) {
 		t.Fatalf("%+v", s)
 	}
 }

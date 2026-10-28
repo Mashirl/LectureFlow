@@ -234,9 +234,12 @@ func (s *Service) Stop() {
 	s.closeEngines()
 }
 
-// SetClients reports the number of connected SSE clients. 0 stops sampling
-// (A10: no sampling without a front end); a rise samples at once and then
-// every Interval.
+// SetClients reports the number of front ends looking at the data: the
+// connected SSE clients whose page is shown (perf-fix: a window hidden to
+// the tray or a background tab keeps its stream but does not count,
+// internal/api/visibility.go). 0 stops sampling (A10: no sampling without a
+// front end); a rise samples at once, so a page shown again gets a fresh
+// snapshot, and then every Interval.
 func (s *Service) SetClients(n int) {
 	if n < 0 {
 		n = 0
@@ -547,6 +550,7 @@ func (s *Service) build(ctx context.Context) Snapshot {
 		}
 	}
 	snap := Snapshot{GPU: g, Providers: make([]Provider, 0, len(ps)), Remote: remote}
+	snap.Remotes = remoteCards(remote, devIn)
 	if withDevices {
 		snap.Devices, snap.Power, snap.Policy = s.deviceCards(devIn, g, asr)
 	}

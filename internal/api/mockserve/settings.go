@@ -22,9 +22,11 @@ package main
 // current tariff_state (course_p2.go).
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"math"
 	"net/http"
 	"net/url"
@@ -179,6 +181,8 @@ func (st *store) settingsView() api.Settings {
 	if st.dev != nil { // SPEC-v2 I6: = GET /api/asr/devices (devices.go)
 		v.Devices = st.deviceViews(time.Now())
 	}
+	on := !st.redecodeOff // the real server always sends the switch
+	v.ASRRedecode = &on
 	return v
 }
 
@@ -322,10 +326,22 @@ func (m *mock) putASR(w http.ResponseWriter, r *http.Request, s *store) {
 	st.mu.Lock()
 	a := st.settings.ASR
 	st.mu.Unlock()
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeErr(w, errBad("无法读取请求体"))
+		return
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
 	if err := decodeBody(r, &a); err != nil {
 		writeErr(w, err)
 		return
 	}
+	// "redecode" (api.Settings.ASRRedecode), like the real handler: kept
+	// apart from settings.asr; absent = unchanged
+	var sw struct {
+		Redecode *bool `json:"redecode"`
+	}
+	_ = json.Unmarshal(body, &sw)
 	a.Model = strings.TrimSpace(a.Model)
 	a.Language = strings.TrimSpace(a.Language)
 	if a.DeviceMode = strings.TrimSpace(a.DeviceMode); a.DeviceMode == "" {
@@ -368,6 +384,9 @@ func (m *mock) putASR(w http.ResponseWriter, r *http.Request, s *store) {
 			a.VRAMPerJobMB = st.settings.ASR.VRAMPerJobMB
 		}
 		st.settings.ASR = a
+		if sw.Redecode != nil {
+			st.redecodeOff = !*sw.Redecode
+		}
 		st.settingsChanged()
 		return http.StatusOK, st.settingsView(), nil
 	})
@@ -628,13 +647,19 @@ func applyProviderInput(p *api.ProviderView, in api.ProviderInput) error {
 	if in.Type != nil {
 		p.Type = strings.TrimSpace(*in.Type)
 	}
+	oldBase := p.BaseURL
 	if in.BaseURL != nil {
 		p.BaseURL = strings.TrimRight(strings.TrimSpace(*in.BaseURL), "/")
 	}
+	newKey := false
 	if in.APIKey != nil {
 		if k := strings.TrimSpace(*in.APIKey); k != "" {
 			p.KeyHint = model.KeyHint(k) // the key itself is not kept
+			newKey = true
 		}
+	}
+	if oldBase != "" && !newKey && !settings.SameOrigin(oldBase, p.BaseURL) {
+		p.KeyHint = "" // settings.UpdateProvider: the key stays with its host (sec2-app L2)
 	}
 	if in.MaxConcurrency != nil {
 		p.MaxConcurrency = *in.MaxConcurrency
@@ -711,11 +736,11 @@ func validateProviderView(p api.ProviderView) error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return errBad("base_url 必须是 http:// 或 https:// 开头的完整地址")
 	}
-	if p.MaxConcurrency < 1 || p.MaxConcurrency > 64 {
-		return errBad("并发上限必须在 1 到 64 之间")
+	if p.MaxConcurrency < 1 || p.MaxConcurrency > settings.MaxConcurrencyLimit {
+		return errBad(fmt.Sprintf("并发上限必须在 1 到 %d 之间", settings.MaxConcurrencyLimit))
 	}
-	if p.RPM < 1 || p.RPM > 10000 {
-		return errBad("每分钟请求数必须在 1 到 10000 之间")
+	if p.RPM < 0 || p.RPM > settings.MaxRPM {
+		return errBad(fmt.Sprintf("每分钟请求数必须在 0 到 %d 之间（0 表示不限）", settings.MaxRPM))
 	}
 	if p.BalanceAPI != model.BalanceNone && p.BalanceAPI != model.BalanceDeepSeek {
 		return errBad("余额接口只能是 none 或 deepseek")

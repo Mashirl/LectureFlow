@@ -144,6 +144,9 @@ type Registry struct {
 	// remote.go). Its row stays in the database but List hides it while
 	// this is false.
 	remote bool
+	// ssh: the SSH inference servers (ssh:*) that are usable now
+	// (SetSSHPresent, remote.go; ssh-mvp). Never part of a detection.
+	ssh map[string]bool
 
 	// wmu serialises the writes (database write + cache reload) so a slower
 	// reload never stores an older state over a newer one; mu is never held
@@ -247,12 +250,16 @@ func (r *Registry) MigrateLegacy(ctx context.Context, a model.ASRSettings) (migr
 		return false, nil
 	}
 	// nvidia-smi runs before the transaction (never hold the database while
-	// a process runs).
+	// a process runs). A Mac has no NVIDIA GPU (mac-fix): nvidia-smi is not
+	// run there, so the migration logs nothing about it (test mode keeps
+	// the other systems' rules, platform.go).
 	cudaName := ""
-	if name, err := r.cudaName(ctx); err == nil {
-		cudaName = strings.TrimSpace(name)
-	} else {
-		slog.Info("asr devices: nvidia-smi did not answer during the migration", "err", err)
+	if r.goos != "darwin" || r.testMode() {
+		if name, err := r.cudaName(ctx); err == nil {
+			cudaName = strings.TrimSpace(name)
+		} else {
+			slog.Info("asr devices: nvidia-smi did not answer during the migration", "err", err)
+		}
 	}
 	mdl := strings.TrimSpace(a.Model)
 	if mdl == "" {
@@ -595,8 +602,8 @@ func (r *Registry) List() []model.ASRDevice {
 	defer r.mu.RUnlock()
 	out := make([]model.ASRDevice, 0, len(r.rows))
 	for _, d := range r.rows {
-		if isRemoteID(d.ID) && !r.remote {
-			continue // SPEC-v3 V14: in the table only while Colab is enabled and authorised
+		if r.remoteHiddenLocked(d.ID) {
+			continue // SPEC-v3 V14: in the table only while Colab is enabled and authorised; ssh-mvp: SSH rows only with the SSH servers on
 		}
 		if r.hiddenLocked(d.ID) {
 			continue // mac-opti M5: fw:cpu where faster-whisper cannot run
@@ -651,6 +658,9 @@ func (r *Registry) Present(id string) bool {
 }
 
 func (r *Registry) presentLocked(id string) bool {
+	if model.IsSSHDevice(id) {
+		return r.ssh[id] // ssh-mvp: connected and set up (SetSSHPresent), never detected
+	}
 	if id == model.DeviceFWCPU {
 		return r.fwCPU()
 	}
@@ -997,8 +1007,8 @@ func (r *Registry) CurrentASRSnapshot(a model.ASRSettings) (model.ASRSnapshot, b
 		if !d.Enabled || (a.DeviceMode == model.ASRDeviceModeManual && !slices.Contains(a.ManualDevices, d.ID)) {
 			continue
 		}
-		if (isRemoteID(d.ID) && !r.remote) || r.hiddenLocked(d.ID) {
-			continue // not in the table (SPEC-v3 V14; mac-opti M5)
+		if r.remoteHiddenLocked(d.ID) || r.hiddenLocked(d.ID) {
+			continue // not in the table (SPEC-v3 V14; ssh-mvp; mac-opti M5)
 		}
 		if r.presentLocked(d.ID) {
 			return model.ASRDeviceSnapshot(*d, a.Language, true), true

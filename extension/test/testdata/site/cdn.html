@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>CDN</title></head>
+<body>
+  <h1>Media on another origin (test page)</h1>
+  <video id="v" muted></video>
+  <script>
+    // Like a Panopto viewer: an MSE player fetching manifests from a CDN on
+    // another origin (here "localhost", which the test build has no
+    // permission for, so only resource timing and page fetches see it).
+    (async () => {
+      const cdn = `http://localhost:${location.port}/cdn/sessions/f0`;
+      await (await fetch(`${cdn}/p1-p2.hls/master.m3u8?Policy=abc&Signature=def`)).text();
+      await (await fetch(`${cdn}/p1-p2.hls/index_0.m3u8?Policy=abc&Signature=def`)).text();
+      await (await fetch(`${cdn}/s1.object.hls/master.m3u8`)).text();
+      const ms = new MediaSource();
+      document.getElementById('v').src = URL.createObjectURL(ms);
+      document.title = 'cdn-ready';
+    })().catch((e) => { document.title = 'cdn-failed: ' + e; });
+  </script>
+</body>
+</html>

@@ -16,6 +16,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -35,6 +36,25 @@ type Recorder struct {
 	vars     map[string]string
 	secrets  secretSet
 	n        int
+	// jobJSON is the name of the last job.json upload recorded: the cell's
+	// stdout that arrives after it waits for it in the replay (the cell
+	// runs while the audio uploads; colab-batch).
+	jobJSON string
+	// jobInFlight counts the job.json uploads sent and not yet recorded
+	// (the step is recorded with its answer); a stdout chunk read meanwhile
+	// — the worker may answer on the kernel channel before the PUT's answer
+	// arrives — waits for that upload too: its After is filled in when the
+	// step is recorded (pendingAfter; colab-obs-core: the recording used to
+	// miss the wait now and then, and its replay sent the lecture's events
+	// before job.json).
+	jobInFlight  int
+	pendingAfter []pendingAfter
+}
+
+// pendingAfter is an After action waiting for the name of a job.json step.
+type pendingAfter struct {
+	conn *recConn
+	idx  int
 }
 
 // NewRecorder records against these service URLs (the Backend's).
@@ -187,6 +207,17 @@ func (t *recTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.Body.Close()
 		req.Body = io.NopCloser(bytes.NewReader(body))
 	}
+	jobJSON := req.Method == http.MethodPut && strings.HasSuffix(req.URL.Path, "/job.json")
+	if jobJSON {
+		t.r.mu.Lock()
+		t.r.jobInFlight++
+		t.r.mu.Unlock()
+		defer func() {
+			t.r.mu.Lock()
+			t.r.jobInFlight--
+			t.r.mu.Unlock()
+		}()
+	}
 	resp, err := t.base.RoundTrip(req)
 	if err != nil {
 		return resp, err
@@ -216,7 +247,23 @@ func (r *Recorder) add(req *http.Request, body []byte, resp *http.Response, rb [
 		}
 	}
 	host, path := r.hostPath(req.URL)
-	st := ReplayStep{Name: req.Method + " " + host + " " + endpointLabel(path)}
+	st := ReplayStep{Name: fmt.Sprintf("%d %s %s %s", len(r.steps)+1, req.Method, host, endpointLabel(path))}
+	if host == "runtime" && strings.HasPrefix(path, "/api/contents/") {
+		switch {
+		case req.Method == http.MethodPut && strings.HasSuffix(path, "/job.json"):
+			defer func() {
+				r.jobJSON = st.Name
+				for _, p := range r.pendingAfter {
+					p.conn.ws.Script[p.idx].After = st.Name
+					p.conn.after = st.Name
+				}
+				r.pendingAfter = nil
+			}()
+		case req.Method == http.MethodDelete && strings.Count(path[strings.Index(path, "/jobs/")+1:], "/") == 2:
+			// a file of a job directory: the deletions run at once
+			st.Group = "cleanup " + path[:strings.LastIndex(path, "/")]
+		}
+	}
 	rq := &ReplayRequest{Method: req.Method, Host: host, Path: r.redact(path)}
 	if len(q) > 0 {
 		rq.Query = map[string]string{}
@@ -314,17 +361,21 @@ func (r *Recorder) Dialer(base Dialer) Dialer {
 		if header.Get("X-Colab-Runtime-Proxy-Token") != "" {
 			ws.Headers["X-Colab-Runtime-Proxy-Token"] = "{{any}}"
 		}
-		r.steps = append(r.steps, ReplayStep{Name: "kernel channels", WebSocket: ws})
+		r.steps = append(r.steps, ReplayStep{Name: fmt.Sprintf("%d kernel channels", len(r.steps)+1), WebSocket: ws})
 		r.mu.Unlock()
 		return &recConn{r: r, ws: ws, MessageConn: conn}, nil
 	}
 }
+
+// pendingJobJSON stands for the name of a job.json step not recorded yet.
+const pendingJobJSON = "(job.json upload in flight)"
 
 type recConn struct {
 	MessageConn
 	r      *Recorder
 	ws     *ReplayWS
 	parent string
+	after  string // the job.json upload this script waits for already
 }
 
 func (c *recConn) WriteText(ctx context.Context, data []byte) error {
@@ -337,6 +388,7 @@ func (c *recConn) WriteText(ctx context.Context, data []byte) error {
 			if code, _ := content["code"].(string); strings.Contains(code, "colab_remote.py") {
 				exp.ContentContains = map[string]string{"code": "colab_remote.py"}
 			}
+			c.after = c.r.jobJSON // what was uploaded before this cell does not count
 		}
 		c.ws.Script = append(c.ws.Script, ReplayWSAction{Expect: exp})
 		c.r.mu.Unlock()
@@ -363,6 +415,15 @@ func (c *recConn) ReadMessage(ctx context.Context) (bool, []byte, error) {
 				text, _ := content["text"].(string)
 				raw := c.r.redact(text) // events only (the contract), redacted anyway
 				act.StdoutRaw = &raw
+				switch {
+				case c.r.jobInFlight > 0 && c.after != pendingJobJSON:
+					c.after = pendingJobJSON
+					c.r.pendingAfter = append(c.r.pendingAfter, pendingAfter{conn: c, idx: len(c.ws.Script)})
+					c.ws.Script = append(c.ws.Script, ReplayWSAction{After: pendingJobJSON})
+				case c.after != pendingJobJSON && c.r.jobJSON != c.after:
+					c.after = c.r.jobJSON
+					c.ws.Script = append(c.ws.Script, ReplayWSAction{After: c.after})
+				}
 			} else {
 				content = map[string]any{"name": name, "text": "(stderr)\n"}
 			}

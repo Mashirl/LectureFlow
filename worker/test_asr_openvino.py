@@ -111,7 +111,9 @@ def test_success_writes_result_with_timing(lecture, ovjob, capsys, tmp_path):
     assert result["sentences"] == SENTENCES
     timing = result["timing"]
     assert set(timing) == {"load_s", "transcribe_s", "audio_s", "first_compile",
-                           "peak_working_set_mb"}
+                           "peak_working_set_mb", "postprocess"}
+    # the text repair before the split (textrepair-int): no redecode in this worker
+    assert set(timing["postprocess"]) == {"textrepair"}
     assert timing["audio_s"] == 10.0
     assert timing["first_compile"] is True            # empty cache_dir on the GPU
     assert isinstance(timing["peak_working_set_mb"], int)

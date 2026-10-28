@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/remote"
 )
 
 // Options configure a Backend. Zero values take the defaults noted.
@@ -30,6 +31,10 @@ type Options struct {
 	// HTTPClient for the OAuth, tunnel and runtime requests (nil = a client
 	// without a global timeout; every request has its own).
 	HTTPClient *http.Client
+	// UploadClient carries the audio uploads to the runtime (nil: a client
+	// with a transport of its own when HTTPClient is nil too, else
+	// HTTPClient): small requests do not wait behind an upload.
+	UploadClient *http.Client
 	// Dial opens the kernel channels (nil = DialWebSocket(nil)).
 	Dial Dialer
 	// ColabURL, TokenURL, RevokeURL: the services (defaults: upstream's
@@ -56,15 +61,31 @@ type Options struct {
 	AllowHTTP bool
 	// ChunkSize of uploads (0 = 4 MiB).
 	ChunkSize int
-	// Backoff while waiting for an accelerator (0 = 30 s doubling to 10 min).
+	// Backoff while waiting for an accelerator (0 = 5 s doubling to 2 min:
+	// colab-prof R3, the user's "retrying is cheaper than waiting"; 412
+	// still backs off exponentially and the wait limit still holds).
 	Backoff Backoff
 	// BootTimeout for the runtime to answer after assignment (0 = 10 min).
 	BootTimeout time.Duration
 	// Defaults of the estimate (zero = DefaultEstimateDefaults()).
 	Defaults *EstimateDefaults
 	// RemoteBase is the runtime directory LectureFlow uses (Contents API
-	// path; "" = "content/lectureflow", i.e. /content/lectureflow).
+	// path; "" = "content/lectureflow", i.e. /content/lectureflow). In
+	// memory mode (kv colab.memory_mode) the memory probe picks a RAM disk
+	// instead (memory.go).
 	RemoteBase string
+	// MemoryExtraMB is added to the memory probe's estimate (experiments and
+	// tests: forces the fallback to the disk). 0 in the app.
+	MemoryExtraMB int
+	// MemoryNoShm makes the memory probe skip /dev/shm and mount its own
+	// tmpfs (experiments and tests). false in the app.
+	MemoryNoShm bool
+	// OnChange (may be nil) is told when what Status shows changed without
+	// a request (a background reading of the account: SSE changed colab).
+	OnChange func()
+	// Enabled (nil = always) says whether Colab is switched on: Run reads
+	// the account every five minutes only then.
+	Enabled func(ctx context.Context) bool
 }
 
 // Backoff is the exponential back-off of the accelerator queue.
@@ -76,9 +97,9 @@ type Backoff struct{ Initial, Max time.Duration }
 var RemoteRequirements = []string{"faster-whisper==1.2.1", "av==15.1.0", "ctranslate2==4.8.3"}
 
 // workerFiles are uploaded to RemoteBase (colab_remote.py imports asr.py,
-// which imports asr_common.py: the same transcription and sentence
-// splitting as the local faster-whisper worker).
-var workerFiles = []string{"colab_remote.py", "asr.py", "asr_common.py"}
+// which imports asr_common.py and textrepair.py: the same transcription,
+// text repair and sentence splitting as the local faster-whisper worker).
+var workerFiles = []string{"colab_remote.py", "asr.py", "asr_common.py", "textrepair.py"}
 
 // Steps of one lecture (V14.5 hover card: 等卡 → 上传音频 → 远端转写 →
 // 下载结果 → 校验).
@@ -120,6 +141,10 @@ type Job struct {
 	OutDir string
 	// WorkDir for the temporary FLAC ("" = OutDir).
 	WorkDir string
+	// NoRedecode: the switch "修复退化的转写窗口" is off (kv asr.redecode),
+	// so worker/asr.py does not decode degenerate windows again (job.json
+	// "redecode": false). The zero value keeps the default, on.
+	NoRedecode bool
 }
 
 // ReleaseInfo is the last release.
@@ -138,8 +163,10 @@ type LeftoverInfo struct {
 	Code        string    `json:"code"`
 }
 
-// Backend is the Colab remote transcription backend (V14). One lecture at
-// a time. See doc.go for the API overview.
+// Backend is the Colab remote transcription backend (V14): one runtime at
+// a time, one lecture at a time on it, or two on the larger GPUs, with the
+// next planned lectures uploaded ahead (batch.go). See doc.go for the API
+// overview.
 type Backend struct {
 	o       Options
 	auth    *authManager
@@ -152,7 +179,7 @@ type Backend struct {
 	mu            sync.Mutex
 	settings      Settings
 	sess          *liveSession
-	job           *jobState
+	jobs          []*jobState // running lectures, oldest first
 	queue         []float64
 	drained       bool
 	afterCurrent  bool
@@ -162,9 +189,41 @@ type Backend struct {
 	rates         map[string]Rate
 	cooldownUntil time.Time
 	lastErr       *model.ErrorInfo
+	lastErrAt     time.Time
+
+	// colab-obs-core (account.go, samples.go): the last attempt to read the
+	// account and its error; a background reading runs; the runtime's
+	// machine and readings (reset at every release); the number of front
+	// ends watching (SetViewers); a failing resources poll was logged.
+	ccuTry   time.Time
+	ccuErr   error
+	acctBusy bool
+	samples  remote.Samples
+	viewers  func() int
+	pollFail bool
+	// removalWG counts the background removals of finished lectures'
+	// files (removal.go; tests wait for them)
+	removalWG sync.WaitGroup
 
 	loginMu sync.Mutex
 	login   *Login // the in-app Google sign-in (login.go); nil until Login is first called
+
+	// lastMetrics: the measurements of the last lecture that finished
+	// (tests and the realcolab experiment).
+	lastMetrics *jobMetrics
+	// hookReady, when set (tests and the realcolab experiment only), runs
+	// once the runtime is ready for a lecture, before anything is uploaded.
+	hookReady func(ctx context.Context, s *liveSession)
+
+	// colab-batch (batch.go): the scheduler's plan, the planner's state,
+	// and the context of the background work (uploads ahead, deletions),
+	// cancelled by Close.
+	plan      []PlanEntry
+	planning  bool
+	planAgain bool
+	planIdle  chan struct{}
+	bg        context.Context
+	bgCancel  context.CancelFunc
 }
 
 type ccuSnapshot struct {
@@ -195,6 +254,14 @@ func New(o Options) (*Backend, error) {
 	}
 	if o.HTTPClient == nil {
 		o.HTTPClient = &http.Client{}
+		if o.UploadClient == nil {
+			if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+				o.UploadClient = &http.Client{Transport: tr.Clone()}
+			}
+		}
+	}
+	if o.UploadClient == nil {
+		o.UploadClient = o.HTTPClient
 	}
 	if o.Dial == nil {
 		o.Dial = DialWebSocket(nil)
@@ -235,10 +302,10 @@ func New(o Options) (*Backend, error) {
 		o.ChunkSize = defaultChunkSize
 	}
 	if o.Backoff.Initial <= 0 {
-		o.Backoff.Initial = 30 * time.Second
+		o.Backoff.Initial = 5 * time.Second
 	}
 	if o.Backoff.Max < o.Backoff.Initial {
-		o.Backoff.Max = max(o.Backoff.Initial, 10*time.Minute)
+		o.Backoff.Max = max(o.Backoff.Initial, 2*time.Minute)
 	}
 	if o.BootTimeout <= 0 {
 		o.BootTimeout = 10 * time.Minute
@@ -251,6 +318,7 @@ func New(o Options) (*Backend, error) {
 		o.RemoteBase = "content/lectureflow"
 	}
 	b := &Backend{o: o, secrets: &secretSet{}, log: o.Logger, settings: DefaultSettings(), rates: map[string]Rate{}}
+	b.bg, b.bgCancel = context.WithCancel(context.Background())
 	b.auth = &authManager{kv: o.KV, hc: o.HTTPClient, tokenURL: o.TokenURL, revokeURL: o.RevokeURL, now: o.Now,
 		runID: o.RunID, secrets: b.secrets, log: o.Logger}
 	b.tun = &tunnel{base: o.ColabURL, hc: o.HTTPClient, auth: b.auth, agent: o.ClientAgent, secrets: b.secrets, log: o.Logger}
@@ -290,16 +358,16 @@ func (b *Backend) Startup(ctx context.Context) error {
 	return nil
 }
 
-// Settings returns the current settings.
-func (b *Backend) Settings() Settings {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.settings
-}
+// Settings returns the settings in effect: Accelerator is what the next
+// borrowing asks for (the user's pick or the account level's default; T4
+// when the account does not allow it, Status.LockedReason) and Tier the
+// account's (account.go). The settings page shows UserSettings.
+func (b *Backend) Settings() Settings { return b.liveSettings() }
 
 // SetSettings validates, stores and applies settings (a running session
 // keeps its accelerator).
 func (b *Backend) SetSettings(ctx context.Context, s Settings) error {
+	s = s.normalized()
 	if err := SaveSettings(ctx, b.o.KV, s); err != nil {
 		return err
 	}
@@ -329,6 +397,7 @@ func (b *Backend) ImportADCFile(ctx context.Context, path string, lc Lifecycle, 
 	if err != nil {
 		return info, b.secrets.scrubErr(err)
 	}
+	b.forgetAccount() // perhaps another Google account: read it again (RefreshAccountSoon)
 	if rec, err := b.loadRecord(ctx); err == nil && rec != nil {
 		b.mu.Lock()
 		live := b.sess != nil
@@ -365,7 +434,7 @@ type DisconnectResult struct {
 // app's sign-in directory (wiped after the import).
 func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 	var res DisconnectResult
-	b.stopJob(errShutdownNow, 30*time.Second)
+	b.stopJobs(errShutdownNow, 30*time.Second)
 	b.mu.Lock()
 	had := b.sess != nil
 	b.mu.Unlock()
@@ -378,6 +447,7 @@ func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 	}
 	revoked, source, err := b.auth.revokeAndDelete(ctx)
 	res.Revoked, res.Source = revoked, source
+	b.forgetAccount()
 	if err != nil {
 		if Code(err) == "" {
 			return res, err // the database failed: the local copy may still be there
@@ -392,8 +462,9 @@ func (b *Backend) Disconnect(ctx context.Context) (DisconnectResult, error) {
 // lifecycle is deleted (its run ends).
 func (b *Backend) Close(ctx context.Context) error {
 	b.closeLogin() // a running gcloud sign-in ends with the app (login.go)
-	b.stopJob(errShutdownNow, 10*time.Second)
+	b.stopJobs(errShutdownNow, 10*time.Second)
 	err := b.release(ctx, ReleaseAppExit)
+	defer b.bgCancel()
 	if v, ok, _ := getKV(ctx, b.o.KV, KVCredential); ok {
 		var c storedCredential
 		if json.Unmarshal([]byte(v), &c) == nil && c.Lifecycle.Kind == LifecycleSession {
@@ -417,11 +488,15 @@ func (b *Backend) SetQueue(audioSecs []float64) {
 
 // QueueDrained says no more lectures are coming: the runtime is released
 // now, or after the running lecture (V14.3 step 5: "队列清空…立即释放").
+// The caller must not call it while it has a lecture on its way to
+// Transcribe (the scheduler waits until its Colab run has ended,
+// colabfix); a lecture that arrives while the release runs gets IsBusy.
 func (b *Backend) QueueDrained(ctx context.Context) error {
 	b.mu.Lock()
-	b.drained, b.queue = true, nil
-	busy := b.job != nil
+	b.drained, b.queue, b.plan = true, nil, nil
+	busy := len(b.jobs) > 0
 	b.mu.Unlock()
+	b.kickPlan() // lectures uploaded ahead go
 	if busy {
 		return nil
 	}
@@ -433,8 +508,9 @@ func (b *Backend) QueueDrained(ctx context.Context) error {
 func (b *Backend) ShutdownAfterCurrent(ctx context.Context) error {
 	b.mu.Lock()
 	b.afterCurrent = true
-	busy := b.job != nil
+	busy := len(b.jobs) > 0
 	b.mu.Unlock()
+	b.kickPlan() // lectures uploaded ahead go
 	if busy {
 		return nil
 	}
@@ -448,37 +524,51 @@ func (b *Backend) ShutdownAfterCurrent(ctx context.Context) error {
 // (Gate round 2: it may not have returned within the wait): the release
 // here is a no-op when the runtime is already gone.
 func (b *Backend) ShutdownNow(ctx context.Context) error {
-	b.stopJob(errShutdownNow, 30*time.Second)
+	b.stopJobs(errShutdownNow, 30*time.Second)
 	return b.secrets.scrubErr(b.release(ctx, ReleaseNow))
 }
 
-// stopJob cancels the running lecture with cause and waits up to wait for
-// Transcribe to return; false when no lecture was running.
-func (b *Backend) stopJob(cause error, wait time.Duration) bool {
+// stopJobs cancels the running lectures with cause and waits up to wait
+// for their Transcribe to return; false when no lecture was running.
+func (b *Backend) stopJobs(cause error, wait time.Duration) bool {
 	b.mu.Lock()
-	j := b.job
+	js := append([]*jobState(nil), b.jobs...)
 	b.mu.Unlock()
-	if j == nil {
+	if len(js) == 0 {
 		return false
 	}
-	j.cancel(cause)
-	select {
-	case <-j.done:
-	case <-time.After(wait):
+	for _, j := range js {
+		j.cancel(cause)
+	}
+	deadline := time.After(wait)
+	for _, j := range js {
+		select {
+		case <-j.done:
+		case <-deadline:
+			return true
+		}
 	}
 	return true
 }
 
-// Run calls Tick every 30 seconds until ctx ends.
+// Run calls Tick every 30 seconds until ctx ends; with it the account is
+// read every five minutes while Colab is on (account.go), and every 5 s the
+// runtime's own resources fill in for the worker's readings while a front
+// end watches (samples.go).
 func (b *Backend) Run(ctx context.Context) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
+	p := time.NewTicker(pollEvery)
+	defer p.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			b.Tick(ctx)
+			b.accountTick(ctx)
+		case <-p.C:
+			b.pollResources(ctx)
 		}
 	}
 }
@@ -489,7 +579,7 @@ func (b *Backend) Run(ctx context.Context) {
 // and retries a failed release.
 func (b *Backend) Tick(ctx context.Context) {
 	b.mu.Lock()
-	s, j := b.sess, b.job
+	s, js := b.sess, append([]*jobState(nil), b.jobs...)
 	set := b.settings
 	drained, after := b.drained && len(b.queue) == 0, b.afterCurrent
 	var state string
@@ -506,10 +596,12 @@ func (b *Backend) Tick(ctx context.Context) {
 	}
 	authLeft, authErr := b.auth.remaining(ctx)
 	authEnding := authErr != nil || authLeft >= 0 && authLeft < time.Duration(b.o.Defaults.AuthMarginSec)*time.Second
-	if j != nil {
+	if len(js) > 0 {
 		if authEnding {
 			b.log.Info("colab: the credential is about to end; stopping the lecture and releasing the runtime")
-			j.cancel(errAuthEnding)
+			for _, j := range js {
+				j.cancel(errAuthEnding)
+			}
 		}
 		return
 	}
@@ -547,9 +639,9 @@ func rateKey(accelerator, modelName, computeType string) string {
 func (b *Backend) dispatchInput(audioSec float64, authLeft time.Duration, authOK bool) DispatchInput {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	set := b.settings
+	set := b.liveSettingsLocked()
 	in := DispatchInput{
-		AudioSec: audioSec, WindowSec: FairWindow.Seconds(), Defaults: *b.o.Defaults, Paid: set.Tier == TierPaid,
+		AudioSec: audioSec, WindowSec: FairWindow.Seconds(), Paid: set.Tier == TierPaid,
 		AuthRemainingSec: -1,
 	}
 	acc := set.Accelerator
@@ -558,10 +650,14 @@ func (b *Backend) dispatchInput(audioSec float64, authLeft time.Duration, authOK
 		in.UsedSec = max(0, b.now().Sub(s.rec.RequestedAt).Seconds())
 		in.SetupDone = s.setupDone
 	}
+	in.Defaults = b.o.Defaults.For(acc)
 	in.Rate = b.rates[rateKey(acc, set.Model, set.ComputeType)]
 	in.CUPerHour = b.o.Defaults.CUPerHour[acc]
 	if b.ccu != nil {
 		in.BalanceKnown, in.BalanceCU = true, b.ccu.info.Balance
+		if q := b.ccu.info.FreeQuotaCU; q != nil && acc == "T4" {
+			in.BalanceCU += *q // the free quota is for a T4 (whichever Colab charges first)
+		}
 		if b.sess != nil && b.ccu.info.Assignments > 0 && b.ccu.info.RatePerHour > 0 {
 			in.CUPerHour = b.ccu.info.RatePerHour // the account's real rate while our runtime runs
 		}
@@ -574,37 +670,21 @@ func (b *Backend) dispatchInput(audioSec float64, authLeft time.Duration, authOK
 	return in
 }
 
-// refreshCCU reads ccu-info when the cached value is older than a minute.
-func (b *Backend) refreshCCU(ctx context.Context) error {
-	b.mu.Lock()
-	fresh := b.ccu != nil && b.now().Sub(b.ccu.at) < ccuMaxAge
-	b.mu.Unlock()
-	if fresh {
-		return nil
-	}
-	info, err := b.tun.ccuInfo(ctx)
-	if err != nil {
-		return err
-	}
-	b.mu.Lock()
-	b.ccu = &ccuSnapshot{info: info, at: b.now()}
-	b.mu.Unlock()
-	return nil
-}
-
 // CanDispatch reports whether a lecture of lectureDurationSec should go to
 // Colab now, and if not, the waiting_for value (model.WaitRemote*; "" when
-// the backend is simply busy or Colab cannot be asked). Paid tier: the
-// balance is read from Colab at most once a minute.
+// the backend is simply busy or Colab cannot be asked). The account is
+// read from Colab at most once a minute (every level: it says which
+// accelerator and, when paid, the balance); a transient failure to read it
+// does not stop the dispatch (account.go blockingRead).
 func (b *Backend) CanDispatch(ctx context.Context, lectureDurationSec float64) (bool, string) {
 	authLeft, err := b.auth.remaining(ctx)
 	if err != nil {
 		return false, model.WaitRemoteAuth
 	}
 	b.mu.Lock()
-	busy := b.job != nil || b.sess != nil && b.sess.rec.State != StateRunning
+	busy := len(b.jobs) >= b.slotsLocked() || len(b.jobs) > 0 && b.afterCurrent ||
+		b.sess != nil && b.sess.rec.State != StateRunning
 	cooling := b.sess == nil && b.now().Before(b.cooldownUntil)
-	paid := b.settings.Tier == TierPaid
 	b.mu.Unlock()
 	if busy {
 		return false, ""
@@ -612,16 +692,14 @@ func (b *Backend) CanDispatch(ctx context.Context, lectureDurationSec float64) (
 	if cooling {
 		return false, model.WaitRemoteWindow
 	}
-	if paid {
-		if err := b.refreshCCU(ctx); err != nil {
-			b.mu.Lock()
-			b.lastErr = infoOf(b.secrets.scrubErr(err))
-			b.mu.Unlock()
-			if WaitingFor(err) != "" {
-				return false, WaitingFor(err)
-			}
-			return false, ""
+	if err := b.refreshCCU(ctx); blockingRead(err) {
+		b.mu.Lock()
+		b.noteErrLocked(infoOf(b.secrets.scrubErr(err)))
+		b.mu.Unlock()
+		if WaitingFor(err) != "" {
+			return false, WaitingFor(err)
 		}
+		return false, ""
 	}
 	d := Decide(b.dispatchInput(lectureDurationSec, authLeft, true))
 	return d.Dispatch, d.WaitingFor
@@ -646,19 +724,46 @@ type Status struct {
 	// lectures of TypicalLectureSec).
 	LecturesLeft int `json:"lectures_left"`
 	// Planned lectures (SetQueue) and how many of them fit.
-	Planned        int      `json:"planned"`
-	PlannedFit     int      `json:"planned_fit"`
-	Current        *JobInfo `json:"current,omitempty"`
-	BalanceCU      *float64 `json:"balance_cu,omitempty"`
-	CUPerHour      float64  `json:"cu_per_hour"`
-	PlanCostCU     float64  `json:"plan_cost_cu"`     // "本次预计消耗"
-	SessionSpentCU float64  `json:"session_spent_cu"` // since assignment, at CUPerHour
-	ShutdownAfter  bool     `json:"shutdown_after_current"`
+	Planned    int      `json:"planned"`
+	PlannedFit int      `json:"planned_fit"`
+	Current    *JobInfo `json:"current,omitempty"`
+	// colab-batch: every running lecture (Current is the first), how many
+	// may run at once, and how many lectures' audio is on the runtime
+	// ahead of their turn.
+	Jobs           []JobInfo `json:"jobs,omitempty"`
+	Slots          int       `json:"slots"`
+	UploadedAhead  int       `json:"uploaded_ahead"`
+	BalanceCU      *float64  `json:"balance_cu,omitempty"`
+	CUPerHour      float64   `json:"cu_per_hour"`
+	PlanCostCU     float64   `json:"plan_cost_cu"`     // "本次预计消耗"
+	SessionSpentCU float64   `json:"session_spent_cu"` // since assignment, at CUPerHour
+	ShutdownAfter  bool      `json:"shutdown_after_current"`
 	// CooldownUntil: no new session before this (after a window release).
 	CooldownUntil *time.Time       `json:"cooldown_until,omitempty"`
 	LastRelease   *ReleaseInfo     `json:"last_release,omitempty"`
 	Leftover      *LeftoverInfo    `json:"leftover,omitempty"`
 	LastError     *model.ErrorInfo `json:"last_error,omitempty"`
+	LastErrorAt   *time.Time       `json:"last_error_at,omitempty"`
+
+	// colab-obs-core (account.go): the account (always present; level free
+	// until it was read), the accelerators it allows (T4 first), the one
+	// the next borrowing asks for and, when that is not the user's pick
+	// (or the level's default), why (LockAccountUnknown, LockNoBalance,
+	// LockIneligible). Accelerator is the session's while one runs, else
+	// EffectiveAccelerator.
+	Account                Account  `json:"account"`
+	SelectableAccelerators []string `json:"selectable_accelerators"`
+	// PreferredAccelerator: the user's pick on the settings page (or,
+	// never picked, the level's default); EffectiveAccelerator differs from
+	// it while LockedReason says why.
+	PreferredAccelerator string `json:"preferred_accelerator"`
+	EffectiveAccelerator string `json:"effective_accelerator"`
+	LockedReason         string `json:"locked_reason"` // "" = the pick (or default) is borrowed
+	// Machine and Usage: what the runtime reports about itself while a
+	// session runs (samples.go); absent otherwise, and before its first
+	// reading.
+	Machine *remote.Machine `json:"machine,omitempty"`
+	Usage   *remote.Usage   `json:"usage,omitempty"`
 }
 
 // JobInfo is the running lecture.
@@ -670,6 +775,10 @@ type JobInfo struct {
 	Overall   float64   `json:"overall"`
 	ETASec    float64   `json:"eta_sec"`
 	StartedAt time.Time `json:"started_at"`
+	// JobID is the scheduler's job id (Job.ID; ID is the remote
+	// directory's name); Split the parts of "极速模式" (0 = whole).
+	JobID string `json:"job_id,omitempty"`
+	Split int    `json:"split,omitempty"`
 }
 
 // Status returns the backend's state without contacting Colab (the balance
@@ -678,15 +787,27 @@ func (b *Backend) Status(ctx context.Context) Status {
 	auth := b.auth.info(ctx)
 	authLeft, authErr := b.auth.remaining(ctx)
 	in := b.dispatchInput(TypicalLectureSec, authLeft, authErr == nil)
-	// Before the balance was read once, "还能再处理约 N 节" counts the window
-	// and the credential only (the balance appears when known).
-	in.Paid = in.Paid && in.BalanceKnown
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	sel := b.selectionLocked()
+	// Before the balance was read once, "还能再处理约 N 节" counts the window
+	// and the credential only (the balance appears when known). A T4
+	// counts Colab's free quota too, at every level (account.go).
+	acc := sel.effective
+	if b.sess != nil {
+		acc = b.sess.rec.Accelerator
+	}
+	in.Paid = in.BalanceKnown && (in.Paid || acc == "T4" && sel.quotaCU >= 0)
 	st := Status{
-		Service: "colab", Configured: auth.Present, Auth: auth, Accelerator: b.settings.Accelerator, Tier: b.settings.Tier,
+		Service: "colab", Configured: auth.Present, Auth: auth, Accelerator: sel.effective, Tier: sel.tier(),
 		State: StateNone, WindowTotalSec: int64(FairWindow.Seconds()), CUPerHour: in.CUPerHour, ShutdownAfter: b.afterCurrent,
 		LastRelease: b.lastRelease, Leftover: b.leftover, LastError: b.lastErr, Planned: len(b.queue),
+		Slots: b.slotsLocked(), Account: b.accountLocked(), SelectableAccelerators: sel.selectable,
+		EffectiveAccelerator: sel.effective, LockedReason: sel.locked, PreferredAccelerator: sel.preferred,
+	}
+	if b.lastErr != nil && !b.lastErrAt.IsZero() {
+		t := b.lastErrAt.UTC()
+		st.LastErrorAt = &t
 	}
 	if b.lastRelease != nil {
 		st.State = StateReleased
@@ -694,9 +815,15 @@ func (b *Backend) Status(ctx context.Context) Status {
 	if s := b.sess; s != nil {
 		st.State, st.Accelerator = s.rec.State, s.rec.Accelerator
 		st.WindowUsedSec = int64(in.UsedSec)
+		for _, u := range s.uploads {
+			if u.ok {
+				st.UploadedAhead++
+			}
+		}
 		if !s.rec.AssignedAt.IsZero() {
 			st.SessionSpentCU = round2(b.now().Sub(s.rec.AssignedAt).Hours() * in.CUPerHour)
 		}
+		st.Machine, st.Usage = b.machineLocked(s), b.samples.Usage(b.now())
 	}
 	if b.ccu != nil {
 		v := round2(b.ccu.info.Balance)
@@ -712,11 +839,20 @@ func (b *Backend) Status(ctx context.Context) Status {
 	} else {
 		st.LecturesLeft = ApproxLectures(in, TypicalLectureSec)
 	}
-	if j := b.job; j != nil {
-		st.Current = &JobInfo{ID: j.id, Step: j.ev.Step, Stage: j.ev.Stage, Fraction: j.ev.Fraction, Overall: j.ev.Overall,
-			ETASec: j.ev.ETASec, StartedAt: j.started}
+	for _, j := range b.jobs {
+		st.Jobs = append(st.Jobs, JobInfo{ID: j.id, Step: j.ev.Step, Stage: j.ev.Stage, Fraction: j.ev.Fraction, Overall: j.ev.Overall,
+			ETASec: j.ev.ETASec, StartedAt: j.started, JobID: j.key, Split: j.split})
+	}
+	if len(st.Jobs) > 0 {
+		c := st.Jobs[0]
+		st.Current = &c
 	}
 	return st
+}
+
+// noteErrLocked records the last error (Status.LastError, LastErrorAt).
+func (b *Backend) noteErrLocked(info *model.ErrorInfo) {
+	b.lastErr, b.lastErrAt = info, b.now()
 }
 
 func infoOf(err error) *model.ErrorInfo {
@@ -750,7 +886,9 @@ func remoteJobID(id string) string {
 //
 // Errors: IsFallback (hand the lecture to the local devices; WaitingFor
 // tells why when it is a dispatch condition), IsRequeue ("立即关机": back
-// to the queue), a cancelled ctx (the runtime is released, the error wraps
+// to the queue), IsBusy (the runtime is being released or started, or
+// another lecture still runs on it: back to the queue, Colab may take it
+// later; nothing is released), a cancelled ctx (the runtime is released, the error wraps
 // context.Canceled), or a local problem (missing audio). Any failure on
 // the runtime releases it at once (V14.3 step 5).
 func (b *Backend) Transcribe(ctx context.Context, job Job, progress func(Event)) (string, error) {
@@ -785,40 +923,73 @@ func (b *Backend) transcribe(ctx context.Context, job Job, progress func(Event))
 	defer cancel(nil)
 	jp := &jobProgress{b: b, out: progress, est: -1}
 	b.mu.Lock()
-	if b.job != nil {
+	if len(b.jobs) >= b.slotsLocked() {
 		b.mu.Unlock()
-		return "", fallbackErr(CodeBusy, nil, errors.New("another lecture is running on the remote runtime"))
+		b.log.Info("colab: other lectures still run on the remote runtime; the lecture goes back to the queue")
+		return "", busyErr(errors.New("another lecture is running on the remote runtime"))
 	}
-	set := b.settings
-	j := &jobState{id: remoteJobID(job.ID), started: b.now(), cancel: cancel, done: make(chan struct{})}
-	b.job = j
+	set := b.liveSettingsLocked()
+	j := &jobState{id: remoteJobID(job.ID), key: job.ID, audio: job.AudioPath, durSec: job.DurationSec, started: b.now(),
+		cancel: cancel, done: make(chan struct{})}
+	b.jobs = append(b.jobs, j)
 	jp.j = j
+	ahead := false
+	if b.sess != nil {
+		for _, u := range b.sess.uploads {
+			ahead = ahead || u.key == job.ID || u.audio == job.AudioPath
+		}
+	}
 	b.mu.Unlock()
 	defer func() {
 		b.mu.Lock()
-		b.job = nil
+		for i, x := range b.jobs {
+			if x == j {
+				b.jobs = append(b.jobs[:i:i], b.jobs[i+1:]...)
+				break
+			}
+		}
 		b.mu.Unlock()
 		close(j.done)
+		b.kickPlan()
 	}()
+	// R3: the FLAC encoding overlaps the wait for the accelerator (not
+	// needed when the audio went up ahead of the lecture's turn).
+	var af *audioFuture
+	if !ahead {
+		af = b.startAudio(jctx, job)
+		defer af.discard()
+	}
 
-	// Balance before borrowing (paid tier).
-	if set.Tier == TierPaid {
-		if err := b.refreshCCU(jctx); err != nil {
+	// The account before borrowing: which accelerator it allows and, when
+	// paid, the balance (every level; a transient failure goes on, account.go).
+	b.mu.Lock()
+	hasSess := b.sess != nil
+	b.mu.Unlock()
+	if !hasSess {
+		if err := b.refreshCCU(jctx); blockingRead(err) {
 			return "", b.jobErr(ctx, jctx, err, false)
 		}
 	}
+	set = b.liveSettings()
 	if d := Decide(b.dispatchInput(job.DurationSec, authLeft, true)); !d.Dispatch {
 		return "", decisionErr(d)
 	}
-	jp.est = EstimateSec(job.DurationSec, b.currentRate(set), *b.o.Defaults, b.setupDone())
+	jp.est = EstimateSec(job.DurationSec, b.currentRate(set), b.defaultsFor(set), b.setupDone())
 	jp.step(StepWaitAccelerator, -1)
 	s, err := b.acquire(jctx, set, jp)
+	if IsBusy(err) {
+		// The runtime is being released (or started) by someone else: not
+		// a failure of this lecture, nothing to release or report
+		// (colabfix). The scheduler requeues it.
+		b.log.Info("colab: the remote runtime is being released or started; the lecture goes back to the queue")
+		return "", err
+	}
 	if err != nil {
 		return "", b.jobErr(ctx, jctx, err, false)
 	}
 	// With the real session: check again (queue wait and boot count).
 	if set.Tier == TierPaid {
-		if err := b.refreshCCU(jctx); err != nil {
+		if err := b.refreshCCU(jctx); blockingRead(err) {
 			return "", b.jobErr(ctx, jctx, err, true)
 		}
 	}
@@ -828,12 +999,89 @@ func (b *Backend) transcribe(ctx context.Context, job Job, progress func(Event))
 	if d := Decide(b.dispatchInput(job.DurationSec, authLeft, true)); !d.Dispatch {
 		return "", decisionErr(d) // the runtime stays for a lecture that fits; Tick releases it when idle
 	}
-	path, m, err := b.runJob(jctx, s, set, job, j.id, files, hash, jp)
-	if err != nil {
-		return "", b.jobErr(ctx, jctx, err, true)
+	if b.hookReady != nil {
+		b.hookReady(jctx, s)
 	}
-	b.finishJob(ctx, jctx, s, set, job, m)
+	path, m, out, err := b.runJob(jctx, s, set, job, j, files, hash, af, jp)
+	if err != nil {
+		return "", b.lectureFailed(ctx, jctx, s, j, out, err)
+	}
+	b.finishJob(ctx, jctx, s, set, job, j, m)
 	return path, nil
+}
+
+// jobOnlyFailure: the failure is the lecture's own (its audio or result,
+// a local problem), not the runtime's: other lectures may go on there.
+func jobOnlyFailure(err error) bool {
+	switch Code(err) {
+	case CodeHashMismatch, CodeDownloadFailed, CodeUploadFailed, CodeLocalWrite, CodeAudioMissing:
+		return true
+	case CodeRemoteFailed:
+		r, _ := codedParam(err, "reason")
+		switch r {
+		case "bad_job", "audio_missing", "audio_hash_mismatch", "audio_unreadable":
+			return true
+		}
+	}
+	return false
+}
+
+// keepFor reports whether the runtime stays after lecture j stopped or
+// failed on its own: other lectures run there, are uploaded ahead or are
+// planned to be (colab-batch: "卡租到了就该打满"). Without any, a failure or
+// a cancel releases it at once as before (V14.3 step 5).
+func (b *Backend) keepFor(s *liveSession, j *jobState) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.sess == s && s.rec.State == StateRunning && !b.afterCurrent && b.othersLocked(s, j) > 0
+}
+
+// lectureFailed handles a failure on the runtime (runJob): 立即关机 and an
+// ending credential release the runtime; a cancel or the lecture's own
+// failure deletes its remote files and keeps the runtime for the other
+// lectures (keepFor), else releases it; any other failure releases it.
+func (b *Backend) lectureFailed(ctx, jctx context.Context, s *liveSession, j *jobState, out runOutcome, err error) error {
+	cause := context.Cause(jctx)
+	stopped := errors.Is(cause, errShutdownNow) || errors.Is(cause, errAuthEnding)
+	if !stopped && (ctx.Err() != nil || jobOnlyFailure(err)) && b.keepFor(s, j) {
+		if out.jobDir != "" {
+			// retried (the runtime stays): a file that still cannot go
+			// releases the runtime once no other lecture runs on it
+			b.cleanupKept(context.WithoutCancel(jctx), s, out.jobDir)
+		}
+		if ctx.Err() != nil {
+			b.log.Info("colab: lecture cancelled; its files on the runtime were deleted, the runtime stays for the other lectures")
+			return newErr(CodeCancelled, nil, kindFallback, "", ctx.Err())
+		}
+		if Code(err) == "" {
+			err = fallbackErr(CodeUnavailable, map[string]any{"endpoint": "runtime"}, err)
+		}
+		b.mu.Lock()
+		b.noteErrLocked(infoOf(b.secrets.scrubErr(err)))
+		b.mu.Unlock()
+		b.log.Info("colab: lecture failed on Colab; back to the local devices (the runtime stays for the other lectures)",
+			"code", Code(err))
+		return err
+	}
+	if out.jobDir != "" && jctx.Err() == nil {
+		// The runtime is released next; its files go first all the same
+		// (one attempt each). A stopped lecture skips this: the release
+		// follows at once and removes everything faster.
+		b.cleanupRemote(jctx, s, out.jobDir, false)
+	}
+	return b.jobErr(ctx, jctx, err, true)
+}
+
+// defaultsFor is the estimate's defaults with the accelerator's own
+// measured speed (EstimateDefaults.SecPerAudioMinBy).
+func (b *Backend) defaultsFor(set Settings) EstimateDefaults {
+	b.mu.Lock()
+	acc := set.Accelerator
+	if b.sess != nil {
+		acc = b.sess.rec.Accelerator
+	}
+	b.mu.Unlock()
+	return b.o.Defaults.For(acc)
 }
 
 // decisionErr turns a negative decision into the error Transcribe returns.
@@ -876,7 +1124,7 @@ func (b *Backend) jobErr(ctx, jctx context.Context, err error, held bool) error 
 		reason = ReleaseReclaimed
 	}
 	b.mu.Lock()
-	b.lastErr = infoOf(b.secrets.scrubErr(err))
+	b.noteErrLocked(infoOf(b.secrets.scrubErr(err)))
 	hasSess := b.sess != nil
 	b.mu.Unlock()
 	if held || hasSess {

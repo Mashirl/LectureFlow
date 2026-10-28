@@ -1,0 +1,29 @@
+{
+  "name": "lectureflow-extension",
+  "version": "0.2.0",
+  "private": true,
+  "description": "LectureFlow browser extension: finds the media tracks of a lecture recording page and hands them to the local LectureFlow app.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs && node scripts/package.mjs",
+    "test": "node --test \"test/unit/*.test.mjs\"",
+    "test:e2e": "node scripts/build.mjs --target chrome --e2e && node --test --test-concurrency=1 \"test/e2e/*.test.mjs\"",
+    "test:firefox": "node scripts/build.mjs --target firefox --e2e && node --test --test-concurrency=1 \"test/firefox/*.test.mjs\"",
+    "firefox:prepare": "node test/firefox/provision.mjs",
+    "test:native": "node scripts/build.mjs --target chrome && node --test --test-concurrency=1 \"test/native/*.test.mjs\"",
+    "lint:firefox": "node scripts/build.mjs --target firefox && web-ext lint --source-dir dist/firefox --no-config-discovery --warnings-as-errors=false",
+    "extension-id": "node scripts/extension-id.mjs",
+    "fixtures": "node test/support/make-fixtures.mjs",
+    "store-shots": "node scripts/build.mjs --target chrome --e2e && node test/e2e/store-shots.mjs",
+    "amo-source": "node scripts/amo-source.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.1",
+    "web-ext": "10.8.0"
+  }
+}

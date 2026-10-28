@@ -11,7 +11,7 @@
   const q = new URLSearchParams(location.search);
   const get = (k) => (q.get(k) || '').slice(0, 4000);
   const $ = (id) => document.getElementById(id);
-  const states = ['starting', 'restarting', 'stopping', 'error'];
+  const states = ['starting', 'restarting', 'upgrading', 'stopping', 'error'];
   const state = states.includes(q.get('state')) ? q.get('state') : 'starting';
 
   document.documentElement.lang = get('lang') || 'en';

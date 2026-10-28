@@ -42,12 +42,24 @@ const (
 
 // runtimeClient talks to one runtime's Jupyter server.
 type runtimeClient struct {
-	hc    *http.Client
+	hc *http.Client
+	// up carries the audio uploads (nil = hc): a connection of its own, so
+	// that the megabytes queued for the uplink do not hold up the small
+	// requests behind them (deletions, job.json, the result; colab-batch
+	// real run: deletions stalled while an upload ran).
+	up    *http.Client
 	base  *url.URL
 	token string
 	agent string
 	dial  Dialer
+	// slow (may be nil) is told about a request that took slowRequest or
+	// longer: the method and the endpoint name only (colab-batch
+	// diagnostics: the runtime proxy sometimes stalls for tens of seconds).
+	slow func(method, endpoint string, took time.Duration)
 }
+
+// slowRequest: a runtime request this long is logged.
+const slowRequest = 3 * time.Second
 
 func (r *runtimeClient) url(path string, q url.Values) string {
 	u := *r.base
@@ -62,6 +74,24 @@ func (r *runtimeClient) url(path string, q url.Values) string {
 // request sends one request; status codes are the caller's business except
 // that transport failures become netError.
 func (r *runtimeClient) request(ctx context.Context, method, path string, q url.Values, hdr http.Header, body []byte, timeout time.Duration) (int, []byte, error) {
+	return r.requestWith(r.hc, ctx, method, path, q, hdr, body, timeout)
+}
+
+// bulkBody: a request body this large is an audio chunk (the upload client).
+const bulkBody = 1 << 20
+
+func (r *runtimeClient) requestWith(hc *http.Client, ctx context.Context, method, path string, q url.Values, hdr http.Header, body []byte, timeout time.Duration) (int, []byte, error) {
+	return r.requestLimit(hc, ctx, method, path, q, hdr, body, timeout, maxDownload*2)
+}
+
+// errAnswerTooLarge: an answer longer than requestLimit's limit (nothing of
+// it is used).
+var errAnswerTooLarge = errors.New("the answer is larger than allowed")
+
+// requestLimit is requestWith reading at most limit bytes of the answer;
+// a longer one is errAnswerTooLarge.
+func (r *runtimeClient) requestLimit(hc *http.Client, ctx context.Context, method, path string, q url.Values, hdr http.Header, body []byte,
+	timeout time.Duration, limit int64) (int, []byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var rd io.Reader
@@ -72,10 +102,18 @@ func (r *runtimeClient) request(ctx context.Context, method, path string, q url.
 	if err != nil {
 		return 0, nil, err
 	}
+	if r.slow != nil && len(body) < 64<<10 { // an audio chunk is as slow as the uplink
+		start := time.Now()
+		defer func() {
+			if took := time.Since(start); took >= slowRequest {
+				r.slow(method, endpointName(path), took)
+			}
+		}()
+	}
 	for k, vs := range hdr {
 		req.Header[k] = vs
 	}
-	resp, err := r.hc.Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		if c := context.Cause(ctx); errors.Is(c, context.Canceled) {
 			return 0, nil, c
@@ -83,9 +121,12 @@ func (r *runtimeClient) request(ctx context.Context, method, path string, q url.
 		return 0, nil, netError{text: fmt.Sprintf("%s %s: %s", method, endpointName(path), netErrText(err))}
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload*2))
+	b, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return 0, nil, netError{text: fmt.Sprintf("%s %s: reading the answer: %s", method, endpointName(path), netErrText(err))}
+	}
+	if int64(len(b)) > limit && limit < maxDownload*2 {
+		return resp.StatusCode, nil, fmt.Errorf("%s %s: %w (%d bytes)", method, endpointName(path), errAnswerTooLarge, limit)
 	}
 	return resp.StatusCode, b, nil
 }
@@ -245,7 +286,11 @@ func (r *runtimeClient) upload(ctx context.Context, path string, data []byte, ch
 			"name": name, "path": path, "type": "file", "format": "base64",
 			"content": base64.StdEncoding.EncodeToString(part), "chunk": chunk,
 		})
-		st, _, err := r.request(ctx, http.MethodPut, contentsPath(path), r.contentsQuery(nil), jsonHeader, body, 3*runtimeTimeout)
+		hc := r.hc
+		if r.up != nil && len(body) >= bulkBody {
+			hc = r.up
+		}
+		st, _, err := r.requestWith(hc, ctx, http.MethodPut, contentsPath(path), r.contentsQuery(nil), jsonHeader, body, 3*runtimeTimeout)
 		if err != nil {
 			return err
 		}
@@ -382,13 +427,14 @@ type execOutcome struct {
 }
 
 // kernelExec runs code in kernel kid and passes every stdout stream chunk
-// to onStdout. It returns when the execute_reply and the idle status for
-// the request have arrived. A connection that breaks is reopened with the
+// to onStdout. started (may be nil) is called once the request has been
+// sent (colab-batch R1: the audio uploads while the cell runs). It returns
+// when the execute_reply and the idle status for the request have arrived. A connection that breaks is reopened with the
 // same session id up to three times (the Jupyter server replays what it
 // buffered for the session). Outputs other than stdout and stderr streams
 // (display data, execute results) are CodeContractViolation: the cell
 // LectureFlow runs prints only through the worker's stdout.
-func (r *runtimeClient) kernelExec(ctx context.Context, kid, code string, onStdout func(string) error, sleep func(context.Context, time.Duration) error) (execOutcome, error) {
+func (r *runtimeClient) kernelExec(ctx context.Context, kid, code string, onStdout func(string) error, sleep func(context.Context, time.Duration) error, started func()) (execOutcome, error) {
 	session := newUUID()
 	dialOnce := func() (MessageConn, error) {
 		q := url.Values{"session_id": {session}, "token": {r.token}}
@@ -421,6 +467,9 @@ func (r *runtimeClient) kernelExec(ctx context.Context, kid, code string, onStdo
 			return execOutcome{}, ctx.Err()
 		}
 		return execOutcome{}, netError{text: "kernel channels: sending the request: " + netErrText(err)}
+	}
+	if started != nil {
+		started()
 	}
 	var out execOutcome
 	gotReply, gotIdle := false, false

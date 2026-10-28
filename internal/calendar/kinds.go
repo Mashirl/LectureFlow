@@ -78,13 +78,54 @@ func newCatalog(kinds []Kind) catalog {
 		}
 	}
 	for _, k := range BuiltinKinds() {
-		if k.ID == KindLecture || k.ID == KindPastLecture {
+		if k.ID == KindLecture || k.ID == KindPastLecture || k.ID == KindMaterial {
 			if _, ok := c[k.ID]; !ok {
 				c[k.ID] = k
 			}
 		}
 	}
 	return c
+}
+
+// Week overrides (user request 2026-10-27, course-ux; the values of
+// model.WeekOverride*): the user places a lecture in a teaching week its
+// recording time does not give.
+const (
+	// OverrideMakeup: the lecture is the content week N should have had
+	// ("补"). It is numbered in week N as a session, after the week's own
+	// lectures of its kind (their numbers do not move).
+	OverrideMakeup = "makeup"
+	// OverrideSupplement: a teaching material hung under week N. It keeps
+	// its material number (M1, P1) and takes no number among the week's
+	// sessions; KindN counts it with the week's materials of its kind.
+	OverrideSupplement = "supplement"
+)
+
+// overridden is the kind a lecture with the week override ov is numbered
+// as. A make-up is a session of week N: its stored kind when that is a
+// session kind of the catalog (the past-lecture rule does not apply: the
+// user put it in a week), else lecture. A supplement is a material: its
+// effective kind k when that is a material kind, else material. stored is
+// the stored kind.
+func (c catalog) overridden(ov string, k Kind, stored string) Kind {
+	switch ov {
+	case OverrideMakeup:
+		if s, ok := c[stored]; ok && s.Group == GroupSession {
+			return s
+		}
+		return c[KindLecture]
+	case OverrideSupplement:
+		if k.Group == GroupMaterial {
+			return k
+		}
+		return c[KindMaterial]
+	}
+	return k
+}
+
+// validOverride: a known override kind with a teaching week.
+func validOverride(ov string, week int) bool {
+	return (ov == OverrideMakeup || ov == OverrideSupplement) && week >= 1
 }
 
 // effective is EffectiveKind on a catalog.
@@ -178,10 +219,16 @@ type NumberOptions struct {
 //   - KindCount: lectures sharing that KindN counter; ShowN by the course's
 //     numbering: auto KindCount > 1, always KindN > 0, never false.
 //   - CiteLabel: CiteLabels over the whole result (W02T1, P1, W??-{id}).
+//   - week overrides (course-ux), applied when the term start is known
+//     (Override): Week is the override's week; the kind is
+//     catalog.overridden; a make-up is numbered after the lectures of its
+//     week and kind that are not make-ups (make-ups among themselves in
+//     list order), so adding one never renumbers the week's own lectures.
+//     Without a term start an override changes nothing.
 //
 // A course whose lectures are all of kind lecture (none recorded more than
-// MaxDaysBeforeTerm days before the term) gets exactly the Week, N, OK and
-// Label of P13.4.
+// MaxDaysBeforeTerm days before the term) and without week overrides gets
+// exactly the Week, N, OK and Label of P13.4.
 func LabelKinds(lectures []LectureTime, termStart *time.Time, skipWeeks []time.Time, opt NumberOptions) []Numbered {
 	cat := newCatalog(opt.Kinds)
 	out := make([]Numbered, len(lectures))
@@ -196,8 +243,16 @@ func LabelKinds(lectures []LectureTime, termStart *time.Time, skipWeeks []time.T
 	}
 	for i, l := range lectures {
 		k := cat.effective(l.Kind, l.KindSource, l.RecordedAt, termStart)
-		out[i] = Numbered{ID: l.ID, Label: Unknown, SameDayByName: byName[i], Kind: k.ID, Code: k.Code, Group: k.Group}
-		if tm != nil && dated(l.RecordedAt) {
+		ov := ""
+		if tm != nil && validOverride(l.Override, l.OverrideWeek) {
+			ov = l.Override
+			k = cat.overridden(ov, k, l.Kind)
+		}
+		out[i] = Numbered{ID: l.ID, Label: Unknown, SameDayByName: byName[i], Kind: k.ID, Code: k.Code, Group: k.Group, Override: ov}
+		switch {
+		case ov != "":
+			out[i].Week = l.OverrideWeek
+		case tm != nil && dated(l.RecordedAt):
 			if w, ok := tm.week(*l.RecordedAt); ok {
 				out[i].Week = w
 			}
@@ -212,7 +267,7 @@ func LabelKinds(lectures []LectureTime, termStart *time.Time, skipWeeks []time.T
 	inCourse := map[string]int{}
 	keyed := make([]bool, len(lectures))
 	keys := make([]counter, len(lectures))
-	for _, i := range order {
+	number := func(i int) {
 		n := &out[i]
 		switch {
 		case n.Group == GroupMaterial:
@@ -220,7 +275,7 @@ func LabelKinds(lectures []LectureTime, termStart *time.Time, skipWeeks []time.T
 			n.N, n.OK = inCourse[n.Kind], true
 		case n.Week > 0:
 		default:
-			continue // a session kind without a week: W??
+			return // a session kind without a week: W??
 		}
 		keys[i], keyed[i] = counter{n.Week, n.Kind}, true
 		counts[keys[i]]++
@@ -229,6 +284,18 @@ func LabelKinds(lectures []LectureTime, termStart *time.Time, skipWeeks []time.T
 			n.N, n.OK = n.KindN, true
 		}
 		n.Label = KindLabel(Kind{ID: n.Kind, Code: n.Code, Group: n.Group}, n.Week, n.N)
+	}
+	// make-ups after the rest (always session kinds: material counters keep
+	// the list order)
+	for _, i := range order {
+		if out[i].Override != OverrideMakeup {
+			number(i)
+		}
+	}
+	for _, i := range order {
+		if out[i].Override == OverrideMakeup {
+			number(i)
+		}
 	}
 	for i := range out {
 		if keyed[i] {

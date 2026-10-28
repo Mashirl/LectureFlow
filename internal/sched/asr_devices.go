@@ -304,6 +304,9 @@ type policyBase struct {
 	power     devices.Power
 	pausedAll bool            // the global switch
 	devPaused map[string]bool // the device switches
+	// workers caches devices.WorkerState per backend|model|precision for a
+	// scan (fresh-cuda, component_admit.go); filled by planDevices.
+	workers map[string]string
 }
 
 // readPolicyBase reads a policyBase now. Never call it with s.mu held.
@@ -416,7 +419,15 @@ func (s *Scheduler) planDevices(sc *scanState, j model.Job, record bool) deviceP
 	s.mu.Lock()
 	in := s.policyInputLocked(&sc.policyBase)
 	s.mu.Unlock()
+	// fresh-cuda (component_admit.go): a device whose components are
+	// missing is not a place for the job; the wait then names it.
+	masked := s.maskUnready(sc, &in, p)
 	pl := devices.Place(in, pj)
+	if len(pl.Devices) == 0 && len(masked) > 0 && noLocalDevice(pl.Wait) {
+		if w := componentWait(in, pj, masked); w != "" {
+			pl.Wait = w
+		}
+	}
 	if sc.switchHold != "" {
 		pl = devices.SwitchHold(in, sc.switchHold, pl)
 	}
@@ -437,7 +448,9 @@ func (s *Scheduler) planDevices(sc *scanState, j model.Job, record bool) deviceP
 		return p
 	}
 	p.resume = pl.Resume
-	p.multiBlocked = !sc.asr.MultiDevice && len(in.Running) > 0
+	// sc.multiFull: an earlier job of this scan waited for the running one
+	// (scanState: a run that ended meanwhile frees the turn for the next scan).
+	p.multiBlocked = !sc.asr.MultiDevice && (len(in.Running) > 0 || sc.multiFull)
 	return p
 }
 
@@ -494,7 +507,14 @@ func (s *Scheduler) deviceAdmit(ctx context.Context, sc *scanState, r *run) stri
 	if p.reason != "" {
 		if id := waitDevice(p.reason); id != "" {
 			// It waits for this one device (power_queue, a self-test there):
-			// a self-test of it yields and is preempted, as in 3b.
+			// a self-test of it yields and is preempted, as in 3b. The
+			// device is not given to a later job of this scan either, and
+			// with multi_device off (power_queue: some asr run exists) no
+			// device is (scanState).
+			sc.noSlot(id, p.reason)
+			if !sc.asr.MultiDevice && strings.HasPrefix(p.reason, model.WaitPowerQueuePrefix) {
+				sc.multiFull = true
+			}
 			if d, ok := sc.row(id); ok {
 				sc.want([]model.ASRDevice{d})
 				sc.wantOnly(id)
@@ -519,6 +539,9 @@ func (s *Scheduler) deviceAdmit(ctx context.Context, sc *scanState, r *run) stri
 		if first == "" {
 			first = reason
 		}
+	}
+	if p.multiBlocked {
+		sc.multiFull = true // multi_device off: no other job takes the turn in this scan
 	}
 	if budgetWait {
 		// No self-test takes a slot while a pipeline job waits for room in
@@ -598,12 +621,17 @@ func (s *Scheduler) admitOn(ctx context.Context, sc *scanState, r *run, d model.
 		}
 	}
 	s.mu.Unlock()
+	if why, full := sc.devFull[d.ID]; full {
+		return why, miss // no slot for an earlier job of this scan (scanState.devFull)
+	}
 	switch {
 	case testHolds:
+		sc.noSlot(d.ID, model.WaitDeviceSelfTest(d.ID))
 		return model.WaitDeviceSelfTest(d.ID), miss
 	case p.multiBlocked:
 		return model.WaitGPUSlot, miss
 	case n >= s.deviceSlots(d):
+		sc.noSlot(d.ID, model.WaitGPUSlot)
 		return model.WaitGPUSlot, miss
 	}
 	if s.fakeASR() {
@@ -656,6 +684,7 @@ func (s *Scheduler) admitOn(ctx context.Context, sc *scanState, r *run, d model.
 		if sc.gpuErr != nil {
 			// Reading failed: a single job on the card (SPEC §5).
 			if n > 0 {
+				sc.noSlot(d.ID, model.WaitGPUSlot)
 				return model.WaitGPUSlot, miss
 			}
 			return admit()
@@ -829,6 +858,18 @@ func (sc *scanState) wantOnly(id string) {
 		sc.wantedOnly = map[string]bool{}
 	}
 	sc.wantedOnly[id] = true
+}
+
+// noSlot records that device id had no free slot for a job of this scan,
+// reason being that job's waiting_for there: the device counts as full for
+// the rest of the scan (scanState.devFull). The first reason is kept.
+func (sc *scanState) noSlot(id, reason string) {
+	if sc.devFull == nil {
+		sc.devFull = map[string]string{}
+	}
+	if _, ok := sc.devFull[id]; !ok {
+		sc.devFull[id] = reason
+	}
 }
 
 // preemptDeviceTests cancels the running attempt of every self-test that
@@ -1165,7 +1206,7 @@ func (s *Scheduler) StartDeviceTest(ctx context.Context, id string) (DeviceTestS
 	if isRemote(id) {
 		// SPEC-v3 V14: Colab measures its speed on every lecture (colab.rates).
 		return DeviceTestState{DeviceID: id, State: DeviceTestIdle}, &model.CodedError{
-			Info: model.ErrorInfo{Code: CodeSelfTestRemote, Params: map[string]any{"device": deviceLabel(dev)}},
+			Info: model.ErrorInfo{Code: selfTestRemoteCode(id), Params: map[string]any{"device": deviceLabel(dev)}},
 			Err:  fmt.Errorf("%w: colab:remote has no device self-test", state.ErrConflict)}
 	}
 	b := s.readPolicyBase()

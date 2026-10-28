@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"tYpe\":\"enqueue\",\"sessionId\":\"plain\",\"trACks\":[{\"url\":\"A://0/0000000\"},{\"url\":\"/0000000\"}]}")

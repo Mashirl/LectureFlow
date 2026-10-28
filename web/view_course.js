@@ -34,8 +34,9 @@ import { zhQuery } from './zh_display.js';
 import { lectureLabel, lectureTagText, kindSearchText } from './kinds.js';
 import { bindOf, bindSelect, fromFileName, materialGroups, suggestedWeek, weekChoices } from './material_bind.js';
 import { asrNotice } from './asr_ready.js';
+import { downloadsSlot } from './downloads.js';
 
-const MEDIA_ACCEPT = 'audio/*,video/*';
+const MEDIA_ACCEPT = U.MEDIA_ACCEPT; // extensions only (util.js, security review 2 M3)
 // SYLLABUS.md top-level sections (A8.3) as shown on the syllabus card;
 // other headings are shown as written.
 const SECTION_KEYS = ['course information', 'learning outcomes', 'weekly topics', 'assessment', 'reading list', 'key terms'];
@@ -103,6 +104,8 @@ export function mountCourse(root, route, ctx) {
     },
     onCourseSettings: () => openSettings(), // the W?? hints (P13.4)
     onShowMaterial: (mid) => showMaterial(mid), // a week's slides (lecture kinds)
+    course: () => course, // course-ux: weeks for supplements and make-ups, the batch rerun
+    filtered: () => !!query.trim(), // course-ux: "select all" selects the shown lectures
   });
 
   const onLectureFiles = (files) => addLectureFiles(id, files);
@@ -113,6 +116,8 @@ export function mountCourse(root, route, ctx) {
   const fnNoticeEl = h('div', { class: 'fn-notice-slot' });
   // 3.1.0 M2: "cannot transcribe yet" above the lectures (asr_ready.js)
   const asrSlot = asrNotice({ variant: 'page' });
+  // SPEC-ext: recordings the browser extension sent, above the lectures (downloads.js)
+  const dlSlot = downloadsSlot({ ctx, courseId: id, onFinished: () => schedule('lectures', reloadLectures) });
   // P13.6: one search over titles (both languages), blurbs and numbers
   let query = '';
   const search = h('input', {
@@ -145,6 +150,7 @@ export function mountCourse(root, route, ctx) {
       h('div', { class: 'card-tools' }, search, h('span', { class: 'card-hint' }, t('course.lectures.drop_hint')), btn(t('course.lectures.add'), { size: 'sm', icon: 'upload', onclick: lecPicker.open, fkey: 'course:upload' }), lecPicker.input),
     ),
     fnNoticeEl,
+    dlSlot.el,
     lecUploads,
     lecBody,
   );
@@ -898,6 +904,7 @@ export function mountCourse(root, route, ctx) {
       alive = false;
       glossary.destroy();
       asrSlot.destroy();
+      dlSlot.destroy();
       clearInterval(tick);
       window.removeEventListener('titlelangchange', onTitleLang);
       window.removeEventListener('kindschange', onKinds);

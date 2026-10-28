@@ -1,0 +1,33 @@
+{
+ "_source": "依据 borrow_run_release.json 构造，非真实录制：连通性检查时 ccu-info 回 503（服务暂时不可用）。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Client.get_consumption_user_info"
+  ]
+ },
+ "recorded": false,
+ "extends": "borrow_run_release.json",
+ "until": "ccu-info",
+ "steps": [
+  {
+   "name": "ccu-info: unavailable",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/ccu-info",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1"
+    }
+   },
+   "response": {
+    "status": 503,
+    "body": "service unavailable"
+   }
+  }
+ ]
+}

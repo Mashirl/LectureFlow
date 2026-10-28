@@ -55,6 +55,22 @@ def write_wav(path, seconds, rate=16000, tone_hz=0.0):
     return str(path)
 
 
+def all_speech_vad(monkeypatch, asr_module):
+    """worker/asr.py's VAD step for fake models that answer with the lecture's times
+    (textrepair-int: asr.py runs the VAD itself, speech_audio + restore_times): the whole
+    audio is one speech chunk and the times stay as the fake gives them. Returns the list
+    of VAD calls (the sample count of each)."""
+    calls = []
+
+    def speech(audio):
+        calls.append(len(audio))
+        return [{"start": 0, "end": len(audio)}], audio
+
+    monkeypatch.setattr(asr_module, "speech_audio", speech)
+    monkeypatch.setattr(asr_module, "restore_times", lambda segments, chunks: segments)
+    return calls
+
+
 @pytest.fixture
 def wav_factory(tmp_path):
     def make(name="audio.wav", seconds=5.0, **kw):

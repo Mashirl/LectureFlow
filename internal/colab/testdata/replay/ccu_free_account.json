@@ -1,0 +1,77 @@
+{
+ "_source": "用 colab-obs-core 的免费账号探针于 2026-10-27 录制的真实只读交互（已脱敏）：刷新访问令牌、读取 ccu-info。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "(recorded against the live service; protocol as in google-colab-cli 0.7.5)"
+  ]
+ },
+ "recorded": true,
+ "steps": [
+  {
+   "name": "1 POST oauth /token",
+   "request": {
+    "method": "POST",
+    "host": "oauth",
+    "path": "/token",
+    "form": {
+     "client_id": "{{any}}",
+     "client_secret": "{{any}}",
+     "grant_type": "refresh_token",
+     "refresh_token": "{{any}}",
+     "scope": "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "access_token": "redacted-access_token",
+     "expires_in": 3599,
+     "id_token": "redacted-id_token",
+     "scope": "https://www.googleapis.com/auth/colaboratory https://www.googleapis.com/auth/userinfo.email openid",
+     "token_type": "Bearer"
+    }
+   }
+  },
+  {
+   "name": "2 GET colab /tun/m/ccu-info",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/ccu-info",
+    "query": {
+     "authuser": "0"
+    },
+    "headers": {
+     "Authorization": "Bearer {{any}}",
+     "X-Colab-Client-Agent": "lectureflow"
+    }
+   },
+   "response": {
+    "status": 200,
+    "json": {
+     "assignmentsCount": 0,
+     "consumptionRateHourly": 0,
+     "currentBalance": 0,
+     "eligibleGpus": [
+      "T4"
+     ],
+     "eligibleTpus": [
+      "V5E1"
+     ],
+     "ineligibleGpus": [
+      "H100",
+      "G4",
+      "A100",
+      "L4"
+     ],
+     "ineligibleTpus": [
+      "V6E1"
+     ]
+    },
+    "xssi": true
+   }
+  }
+ ]
+}

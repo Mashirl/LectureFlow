@@ -21,9 +21,9 @@
 // entries comes first, also on the empty workbench (asr_ready.js).
 
 import { api } from './api.js';
-import { h, clear, btn, skeleton, errorBlock, preserveFocus, confirmDialog, toast } from './dom.js';
+import { h, clear, btn, skeleton, errorBlock, preserveFocus, confirmDialog, toast, everySecond } from './dom.js';
 import { icon } from './icons.js';
-import { pipelineBar } from './pipeline.js';
+import { pipelineBar, streamProgress } from './pipeline.js';
 import { bindContextMenu, menuButton } from './menu.js';
 import { lectureMenuItems, exportItems, stageAction, modelChoiceDialog, batchError } from './actions.js';
 import { courseCard, addCourseCard } from './course_card.js';
@@ -35,6 +35,7 @@ import { lectureTagText, lectureLabel } from './kinds.js';
 import { createUpdateHint } from './update_hint.js';
 import * as C from './settings_colab.js';
 import { asrNotice } from './asr_ready.js';
+import { downloadsHint } from './downloads.js';
 
 const enc = encodeURIComponent;
 
@@ -55,6 +56,8 @@ export function mountDashboard(root, ctx) {
   const colabSlot = h('div', { class: 'dash-colab-slot', role: 'status' });
   // 3.1.0 M2: "cannot transcribe yet" (kept across renders, filled in place)
   const asrSlot = asrNotice({ variant: 'page' });
+  // SPEC-ext: "正在下载 2 节录播" while the browser extension's recordings download (downloads.js)
+  const dlHint = downloadsHint({ ctx });
 
   async function load() {
     try {
@@ -115,6 +118,7 @@ export function mountDashboard(root, ctx) {
         head(data),
         asrSlot.el,
         colabSlot,
+        dlHint.el,
         devicePrompt() || '',
         h(
           'div',
@@ -245,10 +249,25 @@ export function mountDashboard(root, ctx) {
   }
 
   function ipRow(lec) {
-    const bar = pipelineBar(lec.stages, { key: `dash:${lec.id}`, sys: ctx.system, res: ctx.resources, onAction: (stage, action) => stageAction(lec, stage, action, true).then((r) => r && load()) });
+    const bar = pipelineBar(lec.stages, {
+      key: `dash:${lec.id}`,
+      lecture: lec.id, // a remote asr's live steps (pipeline.js)
+      sys: ctx.system,
+      res: ctx.resources,
+      stream: lec.stream, // stream-parallel: the playback file with prep
+      onAction: (stage, action) => stageAction(lec, stage, action, true).then((r) => r && load()),
+    });
     const st = statusFor(lec);
     const statusEl = h('div', { class: `ip-status tone-${st.tone}`, title: st.text }, st.text); // truncated: full text on hover (P14.5)
     pipes.set(lec.id, { bar, lec, statusEl });
+    // a retry's countdown goes on by the second (3.2.0 L12)
+    if (U.backoffCounting(lec.stages))
+      everySecond(statusEl, () => {
+        const s = statusFor(lec);
+        statusEl.textContent = s.text;
+        statusEl.title = s.text;
+        return U.backoffCounting(lec.stages);
+      });
     const row = h(
       'div',
       { class: 'ip-row lgrid-row' },
@@ -654,9 +673,13 @@ export function mountDashboard(root, ctx) {
     if (ev.scope !== 'lecture') return;
     const ref = pipes.get(ev.scope_id);
     if (!ref) {
+      // the progress of a playback file made in the background (stream-parallel)
+      // shows nowhere here: no reload for each of its events
+      if (ev.stage === 'stream' && ev.status === 'running') return;
       schedule('load', load);
       return;
     }
+    if (streamProgress(ref.lec, ref.bar, ev)) return;
     const st = ref.lec.stages.find((s) => s.stage === ev.stage);
     if (st && st.status === ev.status) {
       ref.bar.setProgress(ev.stage, ev.progress);
@@ -699,6 +722,7 @@ export function mountDashboard(root, ctx) {
       alive = false;
       updateHint.destroy();
       asrSlot.destroy();
+      dlHint.destroy();
       clearInterval(tick);
       window.removeEventListener('kindschange', onKinds);
       for (const tm of timers.values()) clearTimeout(tm);

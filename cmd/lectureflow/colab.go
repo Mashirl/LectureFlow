@@ -44,8 +44,15 @@ func (c *colabRemote) CanDispatch(ctx context.Context, lectureSec float64) (bool
 // newColab builds the Colab backend of cfg (both modes): kv in the
 // database, the worker scripts and ffmpeg of cfg. nil (logged) when it
 // cannot be built; the service runs without it (the endpoints answer 503).
-func newColab(cfg *config.Config, st db.Store, adjust func(*colab.Options)) *colabRemote {
-	o := colab.Options{KV: st, WorkerDir: cfg.WorkerDir, FFmpeg: cfg.FFmpeg, Logger: slog.Default()}
+// onChange (SSE changed colab) hears about background account readings;
+// the five-minute reading of Run follows the scheduler's switch
+// (colab-obs-core).
+func newColab(cfg *config.Config, st db.Store, onChange func(), adjust func(*colab.Options)) *colabRemote {
+	o := colab.Options{KV: st, WorkerDir: cfg.WorkerDir, FFmpeg: cfg.FFmpeg, Logger: slog.Default(), OnChange: onChange,
+		Enabled: func(ctx context.Context) bool {
+			p, err := sched.ReadRemotePrefs(ctx, st)
+			return err == nil && p.Enabled
+		}}
 	if adjust != nil {
 		adjust(&o)
 	}

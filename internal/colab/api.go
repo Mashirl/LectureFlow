@@ -24,6 +24,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -91,6 +92,8 @@ type tunnel struct {
 	agent   string
 	secrets *secretSet
 	log     *slog.Logger
+	// unknownGPU: accelerator names of ccu-info already logged as unknown
+	unknownGPU sync.Map
 }
 
 // obj is a decoded JSON object with strict accessors: a missing or mistyped
@@ -246,11 +249,21 @@ func (t *tunnel) once(ctx context.Context, method, path, endpoint string, q url.
 
 // ---- endpoints ----
 
-// ccuInfo is GET /tun/m/ccu-info (upstream consumption.py CcuInfo).
+// ccuInfo is GET /tun/m/ccu-info (upstream consumption.py CcuInfo): the
+// three fields upstream requires, strictly; the newer ones leniently
+// (account.go: a missing or unknown value never makes it CodeAPIChanged).
 type ccuInfo struct {
-	Balance     float64 // currentBalance (compute units)
-	RatePerHour float64 // consumptionRateHourly
+	Balance     float64 // currentBalance (paid compute units)
+	RatePerHour float64 // consumptionRateHourly (the whole account)
 	Assignments int     // assignmentsCount
+	// EligibleGPUs / IneligibleGPUs: the supported accelerators of
+	// eligibleGpus / ineligibleGpus; EligibilityKnown: eligibleGpus was a
+	// list (proto3 JSON leaves an empty list out: absent = unknown).
+	EligibleGPUs, IneligibleGPUs []string
+	EligibilityKnown             bool
+	// FreeQuotaCU, FreeRefillAt: freeCcuQuotaInfo (nil when absent).
+	FreeQuotaCU  *float64
+	FreeRefillAt *time.Time
 }
 
 func (t *tunnel) ccuInfo(ctx context.Context) (ccuInfo, error) {
@@ -272,6 +285,11 @@ func (t *tunnel) ccuInfo(ctx context.Context) (ccuInfo, error) {
 	if c.Assignments, err = o.integer("assignmentsCount"); err != nil {
 		return ccuInfo{}, err
 	}
+	readCCUExtras(o, &c, func(name string) {
+		if _, seen := t.unknownGPU.LoadOrStore(name, true); !seen && t.log != nil {
+			t.log.Info("colab: ccu-info lists an accelerator LectureFlow does not know; ignored", "name", name)
+		}
+	})
 	return c, nil
 }
 

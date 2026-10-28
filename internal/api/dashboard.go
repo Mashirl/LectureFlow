@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"lectureflow/internal/calendar"
+	"lectureflow/internal/db"
 	"lectureflow/internal/model"
 	"lectureflow/internal/settings"
 	"lectureflow/internal/state"
@@ -73,6 +74,15 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	courseIDs := make([]string, len(courses))
+	for i, c := range courses {
+		courseIDs[i] = c.ID
+	}
+	termCounts, err := s.termCounts(ctx, courseIDs)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	var all []lecEntry
 	for _, c := range courses {
 		lecs, nums, err := s.courseLectures(ctx, c)
@@ -86,14 +96,9 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, err)
 			return
 		}
-		terms, err := s.st.ListTerms(ctx, c.ID)
-		if err != nil {
-			s.fail(w, r, err)
-			return
-		}
 		code := strOrNil(c.Code)
 		d.Courses = append(d.Courses, CourseCard{
-			ID: c.ID, Name: c.Name, Code: code, LectureCount: a.lectures, TermCount: len(terms),
+			ID: c.ID, Name: c.Name, Code: code, LectureCount: a.lectures, TermCount: termCounts[c.ID],
 			DraftCount: a.drafts, StaleCount: a.stale, RunningCount: a.running, PatchesPending: a.patchesPending,
 			LastActivityAt: a.lastActivity, CourseActions: a.actions(),
 		})
@@ -121,6 +126,7 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 	// Lecture.materials of the listed lectures only: the course's materials
 	// (with their pages) are read once per course, when a lecture of it is listed.
 	matsByCourse := map[string]map[string][]MaterialUse{}
+	var counts map[string]db.LectureCounts // the listed lectures', read at once (lecture_counts.go)
 	ref := func(e lecEntry) (LectureRef, error) {
 		mats, ok := matsByCourse[e.c.ID]
 		if !ok {
@@ -138,7 +144,8 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 			}
 			busyByCourse[e.c.ID] = busy
 		}
-		v, err := s.lectureViewJobs(ctx, e.l, lectureInfo{jobs: e.jobs, aux: e.aux, boundBusy: busy[e.l.ID], num: e.num, materials: mats[e.l.ID]})
+		v, err := s.lectureViewJobs(ctx, e.l, lectureInfo{jobs: e.jobs, aux: e.aux, boundBusy: busy[e.l.ID], num: e.num, materials: mats[e.l.ID],
+			counts: countsFor(counts, e.l.ID)})
 		return LectureRef{Lecture: v, CourseName: e.c.Name, CourseCode: strOrNil(e.c.Code)}, err
 	}
 	// 进行中: launched and not finished, oldest launch first. A lecture whose
@@ -181,6 +188,24 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 		return e.l.CreatedAt
 	}
 	sort.SliceStable(inprog, func(i, j int) bool { return launched(inprog[i]) < launched(inprog[j]) })
+	exportAt := func(e lecEntry) string {
+		if x, ok := findJob(e.jobs, model.StageExport); ok && x.FinishedAt != nil {
+			return *x.FinishedAt
+		}
+		return ""
+	}
+	sort.SliceStable(done, func(i, j int) bool { return exportAt(done[i]) > exportAt(done[j]) })
+	if len(done) > recentDoneMax {
+		done = done[:recentDoneMax]
+	}
+	listed := make([]string, 0, len(inprog)+len(done))
+	for _, e := range append(append([]lecEntry(nil), inprog...), done...) {
+		listed = append(listed, e.l.ID)
+	}
+	if counts, err = s.lectureCounts(ctx, listed); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	for _, e := range inprog {
 		v, err := ref(e)
 		if err != nil {
@@ -189,17 +214,7 @@ func (s *Server) getDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		d.InProgress = append(d.InProgress, v)
 	}
-	exportAt := func(e lecEntry) string {
-		if x, ok := findJob(e.jobs, model.StageExport); ok && x.FinishedAt != nil {
-			return *x.FinishedAt
-		}
-		return ""
-	}
-	sort.SliceStable(done, func(i, j int) bool { return exportAt(done[i]) > exportAt(done[j]) })
-	for i, e := range done {
-		if i == recentDoneMax {
-			break
-		}
+	for _, e := range done {
 		v, err := ref(e)
 		if err != nil {
 			s.fail(w, r, err)

@@ -11,7 +11,11 @@
 // when it recommends a local back end other than the CPU fallback, remote
 // when this computer has only the CPU. Each card says how much it
 // downloads (POST /api/components/plan). Saved as data.asr_mode
-// ("local" | "remote"; skipping saves ""). The recommended card (or the
+// ("local" | "remote"; skipping saves "") for the guide's later steps, and
+// (ext-step1) as the application's transcription mode, PUT /api/asr-mode,
+// which the settings page's switch shows and the diagnostics follow (a
+// failure there does not stop the guide: the server falls back to
+// data.asr_mode). The recommended card (or the
 // mode a link chose, env.modeHint) starts selected; nothing is saved until
 // "continue". Without the data folder step (web mode, or a folder given by
 // LECTUREFLOW_DATA_DIR) "continue" also starts the install in the
@@ -24,6 +28,7 @@ import { obApi, recommendedMode, recommendedComponents } from './onboarding_api.
 import { planSummary } from './components_ui.js';
 import { hwText } from './onboarding_computer.js';
 import { startChosenInstall } from './onboarding_download.js';
+import { saveASRMode } from './settings_asrmode.js';
 
 const MODES = [
   ['local', 'cpu'],
@@ -72,6 +77,7 @@ export function asrModeStep(env) {
       patch.custom = false;
     }
     await env.setData(patch);
+    await saveASRMode(choice).catch(() => {});
     if (!env.storageShown) await startChosenInstall(env);
     S.busy = false;
     if (alive) env.next();

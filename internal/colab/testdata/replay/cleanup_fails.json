@@ -1,5 +1,5 @@
 {
- "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/contents.py ContentsClient.rm 与 colab_cli/commands/run.py _teardown 构造，非真实录制：转写成功后删除远端 result.json 时运行时一再返回 5xx（重试 3 次仍失败），客户端随即释放运行时（运行时一释放，远端磁盘即回收）。",
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/contents.py ContentsClient.rm 与 colab_cli/commands/run.py _teardown 构造，非真实录制：转写成功后删除远端 result.json 时运行时一再返回 5xx（重试 3 次仍失败），客户端随即释放运行时（运行时一释放，远端磁盘即回收）。 3.2.0：先在内核里整体删除，单元格回报目录还在（LECTUREFLOW_LEFT），于是逐个 DELETE 并重试。",
  "upstream": {
   "package": "google-colab-cli",
   "version": "0.7.5",
@@ -10,8 +10,183 @@
  },
  "recorded": false,
  "extends": "borrow_run_release.json",
- "until": "cleanup: delete result.json",
+ "until": "cleanup: remove the job directory in the kernel",
  "steps": [
+  {
+   "name": "cleanup: the removal cell cannot confirm",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "_lf_dir = \"/content/lectureflow/jobs/lecture-1\""
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "stdout_raw": "LECTUREFLOW_LEFT\n"
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 2,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "name": "cleanup: delete audio.flac",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete audio.wav",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.wav",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete job.json",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete result.json.tmp",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json.tmp",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 404
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete stderr.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/stderr.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete events",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/events",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete job.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
   {
    "name": "cleanup: delete result.json fails (attempt 1 of 4)",
    "request": {
@@ -26,7 +201,8 @@
    "response": {
     "status": 500,
     "body": "Internal Server Error"
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json fails (attempt 2 of 4)",
@@ -42,7 +218,8 @@
    "response": {
     "status": 500,
     "body": "Internal Server Error"
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json fails (attempt 3 of 4)",
@@ -58,7 +235,8 @@
    "response": {
     "status": 503,
     "body": "Service Unavailable"
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json fails (attempt 4 of 4)",
@@ -74,7 +252,8 @@
    "response": {
     "status": 500,
     "body": "Internal Server Error"
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "release: shut the kernel down",

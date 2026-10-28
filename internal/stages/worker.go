@@ -23,6 +23,8 @@ import (
 	"lectureflow/internal/config"
 	"lectureflow/internal/devices"
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/pyenv"
 	"lectureflow/internal/sched"
 )
 
@@ -132,10 +134,19 @@ type workerCall struct {
 	// and params; code "" = unknown name (the generic {code}.worker_* error
 	// stays). nil = such lines are only logged.
 	errorCode func(name, raw string) (code string, params map[string]any)
+
+	// limits are the process's OS limits (procutil.Start; security review
+	// 2, M2: extract_pdf); zero = none. memoryErr, when set, is the error of
+	// a run that went over limits.MemoryBytes (failed: non-zero exit), or
+	// nil; it wins over the exit code and ERROR_CODE lines.
+	limits    procutil.Limits
+	memoryErr func(u procutil.Usage, failed bool) error
 }
 
 // runWorker runs {python} {worker_dir}/{name}.py --in {dir}/job.json
-// --out {dir}/{out}.tmp with the working directory dir (SPEC §6.0). Every
+// --out {dir}/{out}.tmp with the working directory dir (SPEC §6.0; another
+// free .tmp name when that one is still held: tmpFor). The process ends with
+// LectureFlow, however LectureFlow ends (procutil EndWithParent). Every
 // path is absolute, so nothing depends on the working directory. It parses
 // PROGRESS / STATUS lines, renames {out}.tmp to {out} on exit code 0 and
 // returns its content. Exit code 2 → sched.Permanent; other codes are
@@ -192,12 +203,17 @@ func (d Deps) runWorker(ctx context.Context, w workerCall) ([]byte, error) {
 		return nil, err
 	}
 	outPath := filepath.Join(dir, w.out)
-	tmpPath := outPath + ".tmp"
-	os.Remove(tmpPath)
+	// Never a .tmp another program still writes (a worker left running by a
+	// LectureFlow that was killed before workers were tied to it): tmpFor
+	// (test-chaos 1).
+	tmpPath, err := tmpFor(outPath)
+	if err != nil {
+		return nil, model.Errorf(w.code+workerError, nil, fmt.Errorf("%s的输出文件无法写入：%v", w.label, err))
+	}
 
 	cmd := exec.CommandContext(ctx, py, script, "--in", jobPath, "--out", tmpPath)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUNBUFFERED=1")
+	cmd.Env = pyenv.Environ("PYTHONIOENCODING=utf-8", "PYTHONUNBUFFERED=1") // no usage reporting (pyenv)
 	cmd.WaitDelay = 3 * time.Second
 	tail := &tailBuffer{n: stderrTailBytes}
 	cmd.Stderr = tail
@@ -205,9 +221,19 @@ func (d Deps) runWorker(ctx context.Context, w workerCall) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
+	// The worker ends with LectureFlow, also when LectureFlow crashes or is
+	// killed (test-chaos 1): an orphaned whisper kept the GPU busy and
+	// wrote its .tmp on.
+	limits := w.limits
+	limits.EndWithParent = true
+	proc, err := procutil.Start(cmd, limits)
+	if err != nil {
+		if ctx.Err() != nil { // killed while it was being put into its job
+			return nil, ctx.Err()
+		}
 		return nil, sched.Permanent(model.Errorf(w.code+workerStartFailed, nil, fmt.Errorf("无法启动%s（%s）：%v", w.label, py, err)))
 	}
+	defer proc.Close()
 	var errName, errRaw string // the last ERROR_CODE line
 	scanLines(stdout, func(line string) {
 		switch {
@@ -232,6 +258,12 @@ func (d Deps) runWorker(ctx context.Context, w workerCall) ([]byte, error) {
 	if ctx.Err() != nil {
 		os.Remove(tmpPath)
 		return nil, ctx.Err()
+	}
+	if w.memoryErr != nil {
+		if err := w.memoryErr(proc.Usage(), werr != nil); err != nil {
+			os.Remove(tmpPath)
+			return nil, err
+		}
 	}
 	if werr != nil {
 		os.Remove(tmpPath)

@@ -24,6 +24,8 @@ import (
 	"lectureflow/internal/devices"
 	"lectureflow/internal/llm"
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/pyenv"
 	"lectureflow/internal/resources"
 	"lectureflow/internal/sched"
 	"lectureflow/internal/settings"
@@ -77,6 +79,13 @@ type Deps struct {
 	// .claude/v3-brief.md §8; nil = the /api/colab endpoints answer 503).
 	// The same instance as sched.Options.Remote.
 	Colab *colab.Backend
+	// Downloads is the browser extension's download queue (SPEC-ext,
+	// internal/fetch; handlers_downloads.go). nil = /api/downloads answers
+	// 503; the download settings are still read and written.
+	Downloads DownloadQueue
+	// SelfUpdate is the in-app update of SPEC-ext (internal/selfupdate,
+	// handlers_selfupdate.go). nil = /api/selfupdate answers 503.
+	SelfUpdate SelfUpdater
 }
 
 // Server is the HTTP JSON API (SPEC §8, §17.1, SPEC-v1.1) plus the embedded front end.
@@ -103,6 +112,13 @@ type Server struct {
 	comps *components.Manager
 	// colab is Deps.Colab (nil = no Colab backend; handlers_colab.go).
 	colab *colab.Backend
+	// nm is the browser extension's Native Messaging service, set by cmd
+	// once it listens (SetNMHost; handlers_nmhost.go).
+	nm nmHostHolder
+	// dl is Deps.Downloads (nil = no download queue).
+	dl DownloadQueue
+	// su is Deps.SelfUpdate (nil = no in-app update; handlers_selfupdate.go).
+	su SelfUpdater
 
 	// Injected in tests.
 	maxUpload  int64                           // bytes per uploaded file (SPEC §17.4: 4 GB)
@@ -117,12 +133,20 @@ type Server struct {
 	// findClip is devices.FindClipSource, else the bundled sample (the
 	// self-test's audio, I9, SPEC-v3 V4.3); LectureID is empty for the sample.
 	findClip func(ctx context.Context) (devices.ClipSource, bool, error)
+	// colabReach is the diagnostics' Colab reachability call (reachColab,
+	// system_env.go). Per server, not a package variable: a test with two
+	// servers must not have one server's late check call the other's fake.
+	colabReach func(ctx context.Context) (supported bool, err error)
 
 	inval *invalidator
 	diag  *diagnostics
 
 	balMu   sync.Mutex
 	balSeen map[string]string // job id → "status|finished_at" already handled by jobEvent
+
+	// trOffers caches whether a lecture's asr stage offers "修复断句"
+	// (textrepair.go).
+	trOffers textRepairOffers
 }
 
 // New builds the server and starts the startup diagnostics run (SPEC §17.1,
@@ -146,6 +170,7 @@ func newServer(d Deps, tweak func(*Server)) *Server {
 		balSeen:   map[string]string{},
 	}
 	s.extractPDF = s.runExtractPDF
+	s.colabReach = s.reachColab
 	s.findClip = func(ctx context.Context) (devices.ClipSource, bool, error) {
 		src, ok, err := devices.FindClipSource(ctx, s.st, s.dataDir)
 		if err != nil || ok {
@@ -168,6 +193,8 @@ func newServer(d Deps, tweak func(*Server)) *Server {
 		s.dsc = d.Sched
 	}
 	s.colab = d.Colab
+	s.dl = d.Downloads
+	s.su = d.SelfUpdate
 	if s.hub == nil {
 		s.hub = NewHub()
 	}
@@ -187,6 +214,7 @@ func newServer(d Deps, tweak func(*Server)) *Server {
 		// resource watcher refetch.
 		s.set.OnChange(func() { s.hub.Changed("settings", "") })
 	}
+	s.wireSelfUpdate() // handlers_selfupdate.go
 	s.diag = newDiagnostics(s)
 	s.diag.start()
 	return s
@@ -325,6 +353,7 @@ func (s *Server) Handler() http.Handler {
 	h("POST /api/asr/devices/{id}/selftest/apply", s.applySelfTest)
 	h("POST /api/asr/devices/{id}/prompt/dismiss", s.dismissDevicePrompt)
 	mux.Handle("GET /api/events", s.hub)
+	h("POST /api/events/visibility", s.postEventsVisibility) // perf-fix: visible front ends only (visibility.go)
 
 	// the application (SPEC-v3 V1.1, V1.2, V4, V11; desktop.go)
 	h("GET /api/health", s.getHealth)
@@ -356,6 +385,7 @@ var staticTypes = map[string]string{
 
 func (s *Server) static() http.Handler {
 	fsrv := http.FileServerFS(s.staticFS)
+	etags := staticETags(s.staticFS) // static_etag.go
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			writeError(w, http.StatusMethodNotAllowed, "request.method_not_allowed", nil)
@@ -369,8 +399,13 @@ func (s *Server) static() http.Handler {
 			w.Header().Set("Content-Type", ct)
 		}
 		// The assets are embedded in the binary; revalidate so an upgrade
-		// is picked up without a hard reload.
+		// is picked up without a hard reload. The ETag (the content's hash)
+		// makes that revalidation a 304 (http.ServeContent checks
+		// If-None-Match against it).
 		w.Header().Set("Cache-Control", "no-cache")
+		if tag, ok := etags()[staticName(r.URL.Path)]; ok {
+			w.Header().Set("ETag", tag)
+		}
 		fsrv.ServeHTTP(w, r)
 	})
 }
@@ -574,14 +609,19 @@ func (s *Server) kick() {
 	}
 }
 
-// runCommand runs a short diagnostic command and returns its output.
+// runCommand runs a short diagnostic command and returns its output. The
+// Python checks and self-tests run through it, so it has pyenv's
+// environment (no usage reporting); so does the upload's ffprobe
+// (media.Check). Like every helper program it ends with LectureFlow, also
+// on a crash (procutil.Tied; test-chaos 1).
 func runCommand(ctx context.Context, name string, args ...string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Env = pyenv.Environ()
 	var out, errb strings.Builder
 	cmd.Stdout = &out
 	cmd.Stderr = &errb
 	cmd.WaitDelay = 2 * time.Second
-	err := cmd.Run()
+	err := procutil.Run(cmd, procutil.Tied)
 	return out.String(), errb.String(), err
 }
 

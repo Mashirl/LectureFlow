@@ -333,6 +333,10 @@ type ASRTiming struct {
 	AudioMS      int64 `json:"audio_ms"`      // audio duration
 	FirstCompile bool  `json:"first_compile,omitempty"`
 	PeakMemMB    int   `json:"peak_mem_mb,omitempty"` // worker peak working set
+	// Postprocess (redecode, 2026-10-27; added with the lead's leave): the
+	// counters of the worker's steps between decoding and the sentence
+	// split (result.json timing.postprocess); nil when it reported none.
+	Postprocess *ASRPostprocess `json:"postprocess,omitempty"`
 }
 
 // KV keys of phase 3b.

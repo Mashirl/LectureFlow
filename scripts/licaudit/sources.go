@@ -65,10 +65,37 @@ func repoURL(raw json.RawMessage) string {
 	return ""
 }
 
+// npmLock describes one package-lock.json the audit reads.
+type npmLock struct {
+	lock    string          // lock file, relative to the root
+	base    string          // directory holding node_modules, relative to the root
+	kind    string          // component kind of its runtime packages
+	group   string          // Group of its components
+	shipped map[string]bool // devDependencies that are shipped anyway
+	skipped string          // Skipped entry when the lock file is missing
+	devNote string          // warning about the devDependencies (%d)
+}
+
+var (
+	desktopNPM = npmLock{lock: npmLockFile, base: "desktop", kind: KindNPM, shipped: shippedDevPackages,
+		skipped: npmLockFile + " (not present yet; Electron dependencies not audited)",
+		devNote: "%d npm devDependencies not audited (build tools, not shipped)"}
+	// The browser extension: no runtime npm packages today (its build uses
+	// the Node standard library); a runtime dependency added later is judged
+	// as shipped in the extension's packages.
+	extensionNPM = npmLock{lock: extLockFile, base: "extension", kind: KindExtension, group: "npm runtime dependency",
+		skipped: extLockFile + " (not present)",
+		devNote: "%d npm devDependencies of extension/ not audited (test tools such as Playwright, not shipped in the extension)"}
+)
+
 func auditNPM(opt Options, r *Report, al *allowlist) error {
-	b, err := os.ReadFile(filepath.Join(opt.Root, npmLockFile))
+	return auditNPMLock(opt, r, al, desktopNPM)
+}
+
+func auditNPMLock(opt Options, r *Report, al *allowlist, spec npmLock) error {
+	b, err := os.ReadFile(filepath.Join(opt.Root, filepath.FromSlash(spec.lock)))
 	if os.IsNotExist(err) {
-		r.Skipped = append(r.Skipped, npmLockFile+" (not present yet; Electron dependencies not audited)")
+		r.Skipped = append(r.Skipped, spec.skipped)
 		return nil
 	}
 	if err != nil {
@@ -86,10 +113,10 @@ func auditNPM(opt Options, r *Report, al *allowlist) error {
 		} `json:"packages"`
 	}
 	if err := json.Unmarshal(b, &lock); err != nil {
-		return fmt.Errorf("%s: %w", npmLockFile, err)
+		return fmt.Errorf("%s: %w", spec.lock, err)
 	}
 	if lock.LockfileVersion < 2 || lock.Packages == nil {
-		r.fail(KindNPM, npmLockFile, "", "", fmt.Sprintf("lockfileVersion %d has no \"packages\" map (need v2 or v3)", lock.LockfileVersion))
+		r.fail(spec.kind, spec.lock, "", "", fmt.Sprintf("lockfileVersion %d has no \"packages\" map (need v2 or v3)", lock.LockfileVersion))
 		return nil
 	}
 	keys := make([]string, 0, len(lock.Packages))
@@ -105,18 +132,18 @@ func auditNPM(opt Options, r *Report, al *allowlist) error {
 			continue
 		}
 		name := k[i+len("node_modules/"):]
-		if (p.Dev || p.DevOptional) && !shippedDevPackages[name] {
+		if (p.Dev || p.DevOptional) && !spec.shipped[name] {
 			dev++
 			continue
 		}
-		c := Component{Kind: KindNPM, Name: name, Version: p.Version, License: npmLicense(p.License), Source: p.Resolved}
+		c := Component{Kind: spec.kind, Name: name, Version: p.Version, License: npmLicense(p.License), Source: p.Resolved, Group: spec.group}
 		if c.Source == "" {
 			c.Source = "https://www.npmjs.com/package/" + name
 		}
-		if shippedDevPackages[name] {
+		if spec.kind == KindNPM && shippedDevPackages[name] {
 			c.Note = "bundles Chromium; its notices ship with the app (LICENSES.chromium.html)"
 		}
-		dir := filepath.Join(opt.Root, "desktop", filepath.FromSlash(k))
+		dir := filepath.Join(opt.Root, filepath.FromSlash(spec.base), filepath.FromSlash(k))
 		if primary, notices, err := licenseFiles(dir); err == nil {
 			if primary != nil {
 				c.Texts = append(c.Texts, *primary)
@@ -126,7 +153,7 @@ func auditNPM(opt Options, r *Report, al *allowlist) error {
 		judge(r, al, c)
 	}
 	if dev > 0 {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("%d npm devDependencies not audited (build tools, not shipped)", dev))
+		r.Warnings = append(r.Warnings, fmt.Sprintf(spec.devNote, dev))
 	}
 	return nil
 }

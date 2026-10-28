@@ -166,8 +166,8 @@ func (s *Service) readDevices(ctx context.Context) deviceInput {
 	in := deviceInput{statuses: map[string]sched.DeviceStatus{}, titles: map[string]model.Lecture{}}
 	if s.d.ASRDevices != nil {
 		for _, d := range s.d.ASRDevices() {
-			if model.DeviceBackend(d.ID) == model.BackendColab {
-				continue // SPEC-v3 V14.5: Colab has its own area (Snapshot.Remote)
+			if model.IsRemoteDevice(d.ID) {
+				continue // SPEC-v3 V14.5: remote devices (Colab, SSH servers) have their own area (Snapshot.Remote, Remotes)
 			}
 			in.rows = append(in.rows, d)
 		}

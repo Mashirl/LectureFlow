@@ -24,35 +24,53 @@ import (
 
 // EstimateDefaults are the values used before anything was measured.
 type EstimateDefaults struct {
-	// SecPerAudioMin before the first measurement: 15 s per audio minute
-	// (RTF 0.25). Source: this machine's RTX 5070 Ti Laptop transcribes
-	// with the same settings (large-v3, beam 5, VAD) at RTF 0.052–0.056
-	// (docs/benchmarks/power-checkpoint.md §6); a T4 has roughly a quarter
-	// of its FP16 throughput and memory bandwidth, so about RTF 0.22,
-	// rounded up. Faster accelerators only make it more conservative.
+	// SecPerAudioMin before the first measurement on an accelerator that
+	// SecPerAudioMinBy does not list (the T4's, the slowest).
 	SecPerAudioMin float64 `json:"sec_per_audio_min"`
-	// OverheadSec per lecture before measurement: upload of a 60–90 MB
-	// FLAC at ~10 Mbit/s (~70 s), model load (~30 s), download and
-	// verification (~10 s), plus margin.
+	// SecPerAudioMinBy: remote transcription seconds per audio minute per
+	// accelerator, measured on Colab (colab-prof §9.1, 2026-10-27:
+	// large-v3 float16, beam 5, VAD, 12-minute CSC3631 excerpts, one
+	// lecture at a time): T4 4.2, L4 3.1, A100 2.3, G4 1.8. The second
+	// decode of degenerate windows comes on top (none to 60 % more); the
+	// first measured lecture replaces these (Rate).
+	SecPerAudioMinBy map[string]float64 `json:"sec_per_audio_min_by,omitempty"`
+	// OverheadSec per lecture before measurement: everything but the
+	// transcription — the upload of the lecture's FLAC (a 55-minute
+	// lecture is about 62 MB on the wire: 16 s at 30 Mbit/s, 70 s at
+	// 7 Mbit/s), the cell, decoding, download and verification (2–3 s
+	// after colab-prof R1–R3) — about twice the typical measurement.
 	OverheadSec float64 `json:"overhead_sec"`
-	// SetupSec once per runtime (its first lecture): pip install of
-	// faster-whisper and the model download (~3 GB), plus margin.
+	// SetupSec once per runtime (its first lecture): the borrow and boot
+	// (3.5–5 s), kernel, memory probe and scripts (about 6 s), and what of
+	// the resident worker's preparation (uv install, model download and
+	// load: about 15 s, in parallel with the upload) the upload does not
+	// hide — about twice the measurement without Colab's own hiccups.
 	SetupSec float64 `json:"setup_sec"`
 	// AuthMarginSec: the credential must outlive the lecture by this much
 	// so the runtime can still be released before it ends.
 	AuthMarginSec float64 `json:"auth_margin_sec"`
 	// CUPerHour per accelerator before the session reports its real rate
-	// (ccu-info consumptionRateHourly). Unofficial, deliberately high
-	// estimates; used only for the balance check of the first lecture.
+	// (ccu-info consumptionRateHourly): measured on the user's paid account
+	// (colab-prof §9.1); H100 (no entitlement, never measured) stays a
+	// deliberately high guess. Used for the balance check and "本次预计消耗".
 	CUPerHour map[string]float64 `json:"cu_per_hour"`
 }
 
 // DefaultEstimateDefaults returns the values documented on EstimateDefaults.
 func DefaultEstimateDefaults() EstimateDefaults {
 	return EstimateDefaults{
-		SecPerAudioMin: 15, OverheadSec: 180, SetupSec: 420, AuthMarginSec: 600,
-		CUPerHour: map[string]float64{"T4": 2.0, "L4": 5.0, "G4": 12.0, "A100": 13.0, "H100": 20.0},
+		SecPerAudioMin: 4.2, OverheadSec: 90, SetupSec: 60, AuthMarginSec: 600,
+		SecPerAudioMinBy: map[string]float64{"T4": 4.2, "L4": 3.1, "A100": 2.3, "G4": 1.8},
+		CUPerHour:        map[string]float64{"T4": 1.07, "L4": 1.54, "A100": 5.3, "G4": 8.9, "H100": 20.0},
 	}
+}
+
+// For returns d with the accelerator's own speed as SecPerAudioMin.
+func (d EstimateDefaults) For(accelerator string) EstimateDefaults {
+	if v := d.SecPerAudioMinBy[accelerator]; v > 0 {
+		d.SecPerAudioMin = v
+	}
+	return d
 }
 
 // Rate is the measured speed for one accelerator, model and precision.

@@ -1,0 +1,662 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lectureflow:schema:profile:1",
+  "title": "LectureFlow platform profile",
+  "description": "One recording platform: which pages it covers, where the session id and the few lecture fields are read, and how the tracks generic detection finds are named. Declarations only: selectors read text or an attribute, patterns are JavaScript regular expressions (compiled case-insensitive) applied to what was read, JSON pointers name single values of a JSON answer of the platform. Course names, course codes and folders have no field on purpose (SPEC-ext 范围与边界).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "version",
+    "name",
+    "maintainers",
+    "match",
+    "session",
+    "tracks"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "description": "Stable identifier; also the platform half of LectureFlow's dedup key. \"generic\" is reserved.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,39}$",
+      "not": {
+        "const": "generic"
+      }
+    },
+    "version": {
+      "description": "Semantic version of this profile, independent of the extension's.",
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "maintainers": {
+      "description": "GitHub handles.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "pattern": "^@[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"
+      }
+    },
+    "draft": {
+      "description": "A draft is validated but not packaged into the extension.",
+      "type": "boolean"
+    },
+    "match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hosts"
+      ],
+      "properties": {
+        "hosts": {
+          "description": "Page hosts; \"*.example.com\" covers example.com and its subdomains. Each becomes an optional host permission the user grants. A wildcard may not cover a whole registry or shared host (\"*.co.uk\", \"*.edu.au\", \"*.github.io\", \"*.cloudfront.net\"…): name the platform's own domain. Never a site LectureFlow does not handle (YouTube, MOOCs and online / paid course platforms; extension/src/lib/blocklist.js). On a host where only some paths are refused (linkedin.com/learning, bilibili.com/cheese) pathPattern must keep out of them: start with \"^/\" and a fixed first path segment other than the refused one.",
+          "$ref": "#/$defs/hostList"
+        },
+        "pathPattern": {
+          "description": "Regular expression tested against the page path (no query).",
+          "$ref": "#/$defs/regex"
+        },
+        "mediaHosts": {
+          "description": "Hosts serving the media when they differ from the page's and need the user's permission too (webRequest and cookies only work on granted hosts).",
+          "$ref": "#/$defs/hostList"
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "idFrom"
+      ],
+      "properties": {
+        "idFrom": {
+          "description": "Where the session id (the dedup key) comes from: a query parameter of the page, a capture group of the page path, or a selector.",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "query"
+              ],
+              "properties": {
+                "query": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.-]{1,40}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pathPattern"
+              ],
+              "properties": {
+                "pathPattern": {
+                  "$ref": "#/$defs/regex",
+                  "description": "Exactly one capture group."
+                }
+              }
+            },
+            {
+              "$ref": "#/$defs/read"
+            }
+          ]
+        }
+      }
+    },
+    "lecture": {
+      "description": "Only these three fields exist. Without durationSec the media element's duration is used. Each is read by selectors or from an observed value, tried in order.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/fieldReads"
+        },
+        "recordedAt": {
+          "$ref": "#/$defs/fieldReads"
+        },
+        "durationSec": {
+          "$ref": "#/$defs/fieldReads"
+        }
+      }
+    },
+    "tracks": {
+      "description": "Naming rules, in display order. A rule takes the generic tracks its urlPattern matches and/or the URLs its fromResponse names; a track goes to the first rule that wants it; a rule taking several tracks numbers them.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "label",
+          "detect"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "label": {
+            "$ref": "#/$defs/localized"
+          },
+          "hint": {
+            "$ref": "#/$defs/localized",
+            "description": "A few words under the label (\"picture and sound, one file\")."
+          },
+          "detect": {
+            "type": "object",
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "urlPattern"
+                ]
+              },
+              {
+                "required": [
+                  "fromResponse",
+                  "kind"
+                ]
+              }
+            ],
+            "properties": {
+              "urlPattern": {
+                "description": "Tested against the track URL without its query (scheme, host and path). With fromResponse it filters the named URLs too.",
+                "$ref": "#/$defs/regex"
+              },
+              "fromResponse": {
+                "description": "One or more names declared under observe[].pointers; their http(s) string values become tracks (the same URL generic detection found is that track). The extension requests nothing for them; their size stays unknown unless generic detection saw the URL.",
+                "oneOf": [
+                  {
+                    "$ref": "#/$defs/pointerName"
+                  },
+                  {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "uniqueItems": true,
+                    "items": {
+                      "$ref": "#/$defs/pointerName"
+                    }
+                  }
+                ]
+              },
+              "responseWhen": {
+                "description": "Takes the fromResponse URLs only when another observed value equals this (\"the primary stream is audio only\").",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "observed",
+                  "equals"
+                ],
+                "properties": {
+                  "observed": {
+                    "$ref": "#/$defs/pointerName"
+                  },
+                  "equals": {
+                    "type": [
+                      "boolean",
+                      "number",
+                      "string"
+                    ]
+                  }
+                }
+              },
+              "kind": {
+                "enum": [
+                  "audio",
+                  "video",
+                  "unknown"
+                ]
+              },
+              "format": {
+                "description": "Generic tracks: only this format. Named URLs: only those of this format (by extension: .m3u8 hls, .mpd dash, anything else file).",
+                "enum": [
+                  "file",
+                  "hls",
+                  "dash"
+                ]
+              }
+            }
+          },
+          "recommended": {
+            "type": "boolean"
+          },
+          "supersedes": {
+            "description": "Roles that lose their recommendation when this rule has a recommended track (one enqueue takes at most one audio track and two video tracks).",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/role"
+            }
+          }
+        }
+      }
+    },
+    "presets": {
+      "description": "The roles behind the three choices the cards offer instead of ticking tracks: 主要音视频 (the full track when there is one, else audio + the first picture), 双机位 (audio + two pictures), 仅音频. full: roles of a track that is picture and sound in one; audio: roles of the main audio track. Without presets, generic rules apply (the first audio track; video tracks in list order).",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "full": {
+          "$ref": "#/$defs/roles"
+        },
+        "audio": {
+          "$ref": "#/$defs/roles"
+        }
+      }
+    },
+    "observe": {
+      "description": "Requests the page itself makes whose JSON answer holds what the popup needs. On authorized sites that match this profile the extension wraps the page's fetch and XHR and, for a response whose URL matches, keeps only the values of the named JSON pointers; the rest of the response is never kept or forwarded, and the extension sends no request of its own for this.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "urlPattern",
+          "pointers"
+        ],
+        "properties": {
+          "urlPattern": {
+            "description": "Tested against the request URL without its query; the request must go to one of match.hosts.",
+            "$ref": "#/$defs/regex"
+          },
+          "pointers": {
+            "description": "name → JSON pointer (RFC 6901; a segment \"*\" takes every element of an array). Only strings (up to 2048 characters), numbers, booleans and null are taken; objects are never taken whole.",
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 8,
+            "additionalProperties": false,
+            "patternProperties": {
+              "^[a-z][A-Za-z0-9]{0,31}$": {
+                "$ref": "#/$defs/pointer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sessionInfo": {
+      "description": "The one request the extension may make itself, for a session listed on a page that does not load it (a folder list): only after the user clicks to send that session, only to the page's own origin (a page on one of match.hosts), at exactly this path, which must match the urlPattern of its observe entry, with this method and these form fields ({sessionId} is the only placeholder). Its JSON answer is read like the observe entry it names: only that entry's pointers are taken.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observe",
+        "method",
+        "path"
+      ],
+      "properties": {
+        "observe": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST"
+          ]
+        },
+        "path": {
+          "description": "An absolute path on the page's own origin: plain segments (letters, digits and . _ ~ ! $ & ' ( ) * + , ; = : @ -), no \".\" or \"..\" segment, no query or fragment. It must match the urlPattern of its observe entry; the extension checks again, on the real address, before every request.",
+          "type": "string",
+          "maxLength": 200,
+          "pattern": "^(?:/(?!\\.\\.?(?:/|$))[A-Za-z0-9._~!$&'()*+,;=:@-]+)+/?$"
+        },
+        "form": {
+          "type": "object",
+          "maxProperties": 16,
+          "additionalProperties": false,
+          "patternProperties": {
+            "^[A-Za-z][A-Za-z0-9_.-]{0,39}$": {
+              "type": "string",
+              "maxLength": 200,
+              "pattern": "^([^{}]|\\{sessionId\\})*$"
+            }
+          }
+        }
+      }
+    },
+    "inpage": {
+      "description": "Where the extension puts its own \"send to LectureFlow\" button on this platform's pages (authorized sites only; in a closed shadow DOM). player: on a page this profile matches. list: on a folder list, one button per session row, a check box per row and a button for the whole page.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "player": {
+          "$ref": "#/$defs/placements"
+        },
+        "list": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pathPattern",
+            "row",
+            "anchor"
+          ],
+          "properties": {
+            "pathPattern": {
+              "$ref": "#/$defs/regex",
+              "description": "The list page's path (no query), on match.hosts."
+            },
+            "row": {
+              "$ref": "#/$defs/selector",
+              "description": "One element per session."
+            },
+            "idAttr": {
+              "$ref": "#/$defs/attrName",
+              "description": "The row attribute holding the session id; default id."
+            },
+            "idPattern": {
+              "$ref": "#/$defs/regex",
+              "description": "Narrows the attribute to the id (first capture group, or the whole match)."
+            },
+            "anchor": {
+              "$ref": "#/$defs/selector",
+              "description": "Inside the row: the button goes after it, the check box before it."
+            },
+            "title": {
+              "$ref": "#/$defs/selector",
+              "description": "Inside the row: the session's name as listed (for LectureFlow's dedup by title); default the anchor."
+            },
+            "header": {
+              "$ref": "#/$defs/placements",
+              "description": "Where the button for the whole page goes."
+            }
+          }
+        }
+      }
+    },
+    "downloadPolicy": {
+      "description": "Leave out when the platform does not show the instructor's download switch: the popup then says nothing about it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disabledWhen"
+      ],
+      "properties": {
+        "disabledWhen": {
+          "$ref": "#/$defs/conditions"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sendReferer": {
+          "type": "boolean"
+        },
+        "cookieUrls": {
+          "description": "Only \"track\": the cookies of the track URL's own domain, read when the user sends the lecture.",
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "const": "track"
+          }
+        },
+        "maxConnectionsPerFile": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      }
+    },
+    "fixtures": {
+      "type": "string",
+      "pattern": "^fixtures/[a-z][a-z0-9-]{1,39}/$"
+    }
+  },
+  "$defs": {
+    "host": {
+      "type": "string",
+      "pattern": "^(\\*\\.)?([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$",
+      "not": {
+        "description": "Sites LectureFlow does not handle (extension/src/lib/blocklist.js): YouTube and its media hosts, MOOCs and online / paid course platforms. A host here, a subdomain of one, or a wildcard over one is refused; the extension’s check says which site it is.",
+        "pattern": "^(?:\\*\\.)?(?:[a-z0-9-]+\\.)*(?:youtube\\.com|youtu\\.be|youtube-nocookie\\.com|youtubekids\\.com|youtube\\.googleapis\\.com|googlevideo\\.com|udemy\\.com|udemycdn\\.com|coursera\\.org|edx\\.org|edx-video\\.net|udacity\\.com|skillshare\\.com|lynda\\.com|pluralsight\\.com|masterclass\\.com|domestika\\.org|futurelearn\\.com|khanacademy\\.org|datacamp\\.com|codecademy\\.com|brilliant\\.org|frontendmasters\\.com|egghead\\.io|educative\\.io|teamtreehouse\\.com|learning\\.oreilly\\.com|wondrium\\.com|thegreatcourses\\.com|thegreatcoursesplus\\.com|creativelive\\.com|teachable\\.com|thinkific\\.com|kajabi\\.com|mykajabi\\.com|podia\\.com|learnworlds\\.com|zerotomastery\\.io|scrimba\\.com|cbtnuggets\\.com|acloudguru\\.com|cloudacademy\\.com|laracasts\\.com|percipio\\.com|alison\\.com|kadenze\\.com|maven\\.com|fun-mooc\\.fr|miriadax\\.net|edraak\\.org|kmooc\\.kr|gacco\\.org|schoo\\.jp|mooc\\.fi|mitxonline\\.mit\\.edu|openhpi\\.de|openlearning\\.com|gumroad\\.com|skool\\.com|icourse163\\.org|icourses\\.cn|cnmooc\\.org|xuetangx\\.com|study\\.163\\.com|ke\\.qq\\.com|time\\.geekbang\\.org|dedao\\.cn|igetget\\.com|xiaoe-tech\\.com|xeknow\\.com|lizhiweike\\.com|qianliao\\.tv|cctalk\\.com|imooc\\.com|edu\\.51cto\\.com|koolearn\\.com|smartedu\\.cn|ximalaya\\.com|hahow\\.in|pressplay\\.cc|ewant\\.org|sharecourse\\.net|stepik\\.org|openedu\\.ru|lektorium\\.tv|universarium\\.org|skillbox\\.ru|netology\\.ru|geekbrains\\.ru|gb\\.ru|practicum\\.yandex\\.ru|skillfactory\\.ru|otus\\.ru|foxford\\.ru|htmlacademy\\.ru|swayam\\.gov\\.in|nptel\\.ac\\.in|unacademy\\.com|byjus\\.com|vedantu\\.com|pw\\.live|upgrad\\.com|simplilearn\\.com|mygreatlearning\\.com|edureka\\.co|scaler\\.com|codingninjas\\.com)$|^\\*\\.(?:googleapis\\.com|oreilly\\.com|mit\\.edu|163\\.com|qq\\.com|geekbang\\.org|51cto\\.com|yandex\\.ru|gov\\.in|ac\\.in)$"
+      }
+    },
+    "hostList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/host"
+      }
+    },
+    "regex": {
+      "description": "A JavaScript regular expression, matched case-insensitively against at most 2048 characters. No backreferences, no repeated group holding \"*\", \"+\", \"{n,}\" or \"|\", at most three unbounded quantifiers (the extension checks).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "attrName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_:][-A-Za-z0-9_:.]{0,63}$"
+    },
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+    },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/role"
+      }
+    },
+    "localized": {
+      "description": "By BCP 47 language tag; \"en\" is the fallback.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "required": [
+        "en"
+      ],
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        }
+      }
+    },
+    "placement": {
+      "description": "Where a button goes: next to the first element the anchor selector finds (optionally its ancestor, up levels above): before or after it, or at the start or end inside it. compact: an icon-only button with a tooltip (little room).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "position"
+      ],
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/selector"
+        },
+        "up": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "position": {
+          "enum": [
+            "before",
+            "after",
+            "prepend",
+            "append"
+          ]
+        },
+        "compact": {
+          "type": "boolean"
+        }
+      }
+    },
+    "read": {
+      "description": "A CSS selector; the first matching element's text (whitespace collapsed) or attribute, optionally narrowed by a pattern (its first capture group, or the whole match).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector"
+      ],
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "attr": {
+          "$ref": "#/$defs/attrName"
+        },
+        "pattern": {
+          "$ref": "#/$defs/regex"
+        }
+      }
+    },
+    "reads": {
+      "description": "One read, or several tried in order until one yields a value.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/read"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/read"
+          }
+        }
+      ]
+    },
+    "observedRead": {
+      "description": "A value observe took from a response (a name declared under observe[].pointers), optionally narrowed by a pattern.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed"
+      ],
+      "properties": {
+        "observed": {
+          "$ref": "#/$defs/pointerName"
+        },
+        "pattern": {
+          "$ref": "#/$defs/regex"
+        }
+      }
+    },
+    "fieldRead": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/read"
+        },
+        {
+          "$ref": "#/$defs/observedRead"
+        }
+      ]
+    },
+    "fieldReads": {
+      "description": "One read, or several tried in order until one yields a value.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/fieldRead"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/fieldRead"
+          }
+        }
+      ]
+    },
+    "pointerName": {
+      "type": "string",
+      "pattern": "^[a-z][A-Za-z0-9]{0,31}$"
+    },
+    "pointer": {
+      "description": "A JSON pointer with at least one segment and at most eight; \"*\" alone takes every element of an array.",
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^(/(\\*|([^/~*]|~[01])+))+$"
+    },
+    "observedCondition": {
+      "description": "Holds when the observed value is empty (missing, null, \"\", false, no elements) with \"empty\": true, or matches \"pattern\". Checked only once the response was seen.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed"
+      ],
+      "properties": {
+        "observed": {
+          "$ref": "#/$defs/pointerName"
+        },
+        "empty": {
+          "const": true
+        },
+        "pattern": {
+          "$ref": "#/$defs/regex"
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/read"
+        },
+        {
+          "$ref": "#/$defs/observedCondition"
+        }
+      ]
+    },
+    "conditions": {
+      "description": "One condition, or several: the switch is off when any holds. A selector condition holds when it matches (and its pattern, if any, matches the value).",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/condition"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      ]
+    },
+    "placements": {
+      "description": "Tried in order; the first whose anchor is on the page is used.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/placement"
+      }
+    }
+  }
+}

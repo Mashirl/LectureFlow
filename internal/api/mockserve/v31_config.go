@@ -59,6 +59,18 @@ func mockConfigView(r *http.Request, s *store, sys *api.System) any {
 		delete(asr, "vram_reserve_mb")
 		delete(asr, "vram_per_job_mb")
 	}
+	// ext-step1: without an NVIDIA card no faster-whisper interpreter unless
+	// it runs fw:cpu (cpuonly)
+	if py, ok := out["python"].([]any); ok && s.dev.noCUDA && !s.dev.cpuOnly {
+		kept := make([]any, 0, len(py))
+		for _, p := range py {
+			if m, ok := p.(map[string]any); ok && m["backend"] == model.BackendFasterWhisper {
+				continue
+			}
+			kept = append(kept, p)
+		}
+		out["python"] = kept
+	}
 	out["asr"] = asr
 	devs := make([]api.ConfigDevice, 0, len(sys.Devices))
 	views := append([]api.ASRDeviceView(nil), sys.Devices...)

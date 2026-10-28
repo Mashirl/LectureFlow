@@ -27,7 +27,7 @@ func TestDefaults(t *testing.T) {
 		}
 	}
 	p := c.LLM.Providers["deepseek"]
-	if p.BaseURL != "https://api.deepseek.com" || p.APIKeyEnv != "DEEPSEEK_API_KEY" || p.MaxConcurrency != 8 || p.RequestsPerMinute != 300 {
+	if p.BaseURL != "https://api.deepseek.com" || p.APIKeyEnv != "DEEPSEEK_API_KEY" || p.MaxConcurrency != 64 || p.RequestsPerMinute != 0 { // perf-llm: no per-minute limit
 		t.Fatalf("bad provider defaults: %+v", p)
 	}
 	if runtime.GOOS == "windows" && filepath.Ext(c.FFmpeg) != ".exe" {

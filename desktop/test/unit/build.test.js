@@ -7,6 +7,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { spawnSync } = require('node:child_process');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -15,7 +16,12 @@ const path = require('node:path');
 const { signingFrom, dropEmptySigning } = require('../../scripts/lib/signing');
 const { fetchPinned, sha256File, globFiles, cacheName } = require('../../scripts/lib/fetch');
 const { buildSizeReport, renderMarkdown, groupTopLevel, walk, BUDGET_BYTES } = require('../../scripts/lib/sizereport');
-const { checkConfigure, checkLicenseText, gplFree, gplComponents, targetKey, WORKER_FILES } = require('../../scripts/stage');
+const {
+  checkConfigure, checkLicenseText, gplFree, gplComponents, targetKey, WORKER_FILES,
+  checkAria2cVersion, aria2cSourceText, ffmpegSourceText, bundledFileProblems, GO_PROGRAMS,
+  machoSlices, machoVersion, compareVersions, macMinimumCheck,
+} = require('../../scripts/stage');
+const sources = require('../../scripts/sources');
 
 const DESKTOP = path.join(__dirname, '..', '..');
 const REPO = path.join(DESKTOP, '..');
@@ -58,6 +64,10 @@ test('electron-builder config: fuses, targets, per-user NSIS, no update feed by 
   assert.equal(c.publish, null, 'no LECTUREFLOW_UPDATE_REPO: explicitly no publish configuration');
   assert.equal(c.win.verifyUpdateCodeSignature, true);
   assert.equal(c.win.signtoolOptions, undefined);
+  // Signed builds leave the pinned upstream aria2c.exe unsigned; no positive
+  // entry, which would take precedence over the exclusion.
+  assert.deepEqual(c.win.signExts, ['!aria2c.exe']);
+  assert.deepEqual(loadConfig({ WIN_CSC_LINK: 'cert.pfx' }).win.signExts, ['!aria2c.exe'], 'the same with a certificate');
   assert.deepEqual(c.extraResources, [{ from: 'build/resources', to: '.', filter: ['**/*'] }]);
   assert.ok(!c.files.some((f) => /test|scripts|\.cache|build\//.test(f)), 'tests and build scripts stay out of app.asar');
   assert.ok(fs.existsSync(path.join(DESKTOP, c.mac.entitlements)));
@@ -173,6 +183,23 @@ test('ffmpeg configure check: GPL and non-free flags fail the build', () => {
   assert.throws(() => targetKey('linux'), /unsupported/);
   for (const f of WORKER_FILES) assert.ok(fs.existsSync(path.join(REPO, 'worker', f)), f);
   assert.ok(WORKER_FILES.every((f) => !/^test_|conftest/.test(f)));
+  // Every worker module a packaged worker imports is packaged too (a
+  // missing one fails every transcription at "import", e.g. textrepair.py).
+  const local = new Set(fs.readdirSync(path.join(REPO, 'worker')).filter((f) => f.endsWith('.py')).map((f) => f.slice(0, -3)));
+  for (const f of WORKER_FILES) {
+    const src = fs.readFileSync(path.join(REPO, 'worker', f), 'utf8');
+    for (const m of src.matchAll(/^\s*(?:import\s+([A-Za-z_]\w*)|from\s+([A-Za-z_]\w*)\s+import\b)/gm)) {
+      const mod = m[1] || m[2];
+      if (local.has(mod)) assert.ok(WORKER_FILES.includes(`${mod}.py`), `${f} imports ${mod}, which is not in WORKER_FILES`);
+    }
+  }
+  // The Colab backend uploads these from resources/worker (pack-dry 3.2.0:
+  // colab_remote.py was only an optional file of the stage).
+  const colab = /var workerFiles = \[\]string\{([^}]*)\}/.exec(fs.readFileSync(path.join(REPO, 'internal', 'colab', 'backend.go'), 'utf8'));
+  assert.ok(colab, 'internal/colab/backend.go: var workerFiles = []string{…}');
+  const uploaded = [...colab[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(uploaded.includes('colab_remote.py'), uploaded.join(', '));
+  for (const f of uploaded) assert.ok(WORKER_FILES.includes(f), `the Colab backend uploads ${f}, which is not in WORKER_FILES`);
 });
 
 test('pinned downloads: verified before use, cached by hash, mismatches rejected', async () => {
@@ -217,7 +244,7 @@ test('size report: budget, resources, ten largest files, Markdown', () => {
     ],
     asarBytes: 1.2 * MB,
     unpackedFiles: Array.from({ length: 15 }, (_, i) => ({ path: `f${i}`, bytes: i * MB })),
-    updates: 'Automatic updates: off (LECTUREFLOW_UPDATE_REPO is not set)',
+    updates: 'electron-updater feed: off (LECTUREFLOW_UPDATE_REPO is not set: no app-update.yml); in-app updates: on (minisign key 0102030405060708 built in)',
   });
   assert.equal(report.budgetBytes, BUDGET_BYTES);
   assert.equal(report.overBudget, true);
@@ -231,7 +258,7 @@ test('size report: budget, resources, ten largest files, Markdown', () => {
   assert.match(md, /\| big\.exe \| 260\.0 MB \| no \|/);
   assert.match(md, /Over budget\./);
   assert.match(md, /Ten largest files/);
-  assert.match(md, /Automatic updates: off \(LECTUREFLOW_UPDATE_REPO is not set\)\./);
+  assert.match(md, /electron-updater feed: off \(LECTUREFLOW_UPDATE_REPO is not set: no app-update\.yml\); in-app updates: on \(minisign key 0102030405060708 built in\)\./);
   assert.deepEqual(groupTopLevel([{ path: 'a/b', bytes: 1 }, { path: 'a/c', bytes: 2 }, { path: 'x', bytes: 5 }]), [
     { name: 'x', bytes: 5, files: 1 }, { name: 'a/', bytes: 3, files: 2 },
   ]);
@@ -262,8 +289,8 @@ test('update feed: Windows publisher name only for signed builds', () => {
 
 test('update feed check of a finished build', () => {
   const { checkUpdateFeed, updateBuildConfig } = require('../../scripts/lib/updaterepo');
-  assert.match(updateBuildConfig({}).summary, /Automatic updates: off .*LECTUREFLOW_UPDATE_REPO is not set/);
-  assert.match(updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }).summary, /Automatic updates: on .*o\/r/);
+  assert.equal(updateBuildConfig({}).summary, 'electron-updater feed: off (LECTUREFLOW_UPDATE_REPO is not set: no app-update.yml)');
+  assert.equal(updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }).summary, 'electron-updater feed: on (GitHub releases of o/r, app-update.yml)');
   assert.deepEqual(checkUpdateFeed({ repo: null, appUpdateYml: null, distFiles: ['LectureFlow-Setup-3.0.0-x64.exe', 'size-report.md'], platform: 'win32' }), []);
   assert.equal(checkUpdateFeed({ repo: null, appUpdateYml: 'provider: github\n', distFiles: [], platform: 'win32' }).length, 1);
   assert.equal(checkUpdateFeed({ repo: null, appUpdateYml: null, distFiles: ['latest.yml'], platform: 'win32' }).length, 1);
@@ -282,4 +309,547 @@ test('package.json names no repository that electron-builder could pick up', () 
   assert.equal(pkg.repository, undefined);
   assert.equal(pkg.homepage, undefined);
   assert.ok(!fs.existsSync(path.join(DESKTOP, 'dev-app-update.yml')));
+});
+
+// --- aria2c and the Native Messaging host (SPEC-ext, ext-brief §4, §6.1) ---
+
+const ARIA2C_WINDOWS_VERSION = `aria2 version 1.37.0
+Copyright (C) 2006, 2019 Tatsuhiro Tsujikawa
+
+** Configuration **
+Enabled Features: Async DNS, BitTorrent, Firefox3 Cookie, GZip, HTTPS, Message Digest, Metalink, XML-RPC, SFTP
+Hash Algorithms: sha-1, sha-224, sha-256, sha-384, sha-512, md5, adler32
+Libraries: zlib/1.3 expat/2.5.0 sqlite3/3.43.1 GMP/6.3.0 c-ares/1.19.1 libssh2/1.11.0
+Compiler: mingw-w64 8.0.0 (alpha) / gcc 10-win32 20220113
+`;
+const ARIA2C_MACOS_VERSION = `aria2 version 1.37.0
+Copyright (C) 2006, 2019 Tatsuhiro Tsujikawa
+
+** Configuration **
+Enabled Features: GZip, HTTPS, Message Digest
+Hash Algorithms: sha-1, sha-224, sha-256, sha-384, sha-512, md5, adler32
+Libraries: zlib/1.2.12 AppleTLS
+Compiler: Apple LLVM 21.0.0 (clang-2100.3.34.2)
+`;
+
+function readJSON(...p) {
+  return JSON.parse(fs.readFileSync(path.join(...p), 'utf8'));
+}
+
+test('aria2c: pinned Windows build, macOS source and build script, GPL source and licenses declared', () => {
+  const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+  const a = m.aria2c;
+  const w = a['windows-x64'];
+  const d = a['darwin-arm64'];
+  assert.equal(a.version, '1.37.0');
+  assert.equal(a.license, 'GPL-2.0-or-later', 'plain SPDX id: the OpenSSL permission is in license_note');
+  assert.match(a.license_note, /OpenSSL/);
+  // Every download pinned by an HTTPS URL and a SHA-256.
+  for (const p of [a.source, w, d, ...w.deps, ...w.license_texts]) {
+    assert.match(p.url, /^https:\/\//, p.url);
+    assert.match(p.sha256, /^[0-9a-f]{64}$/, p.url);
+  }
+  assert.equal(w.url, 'https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip');
+  assert.match(w.bin_sha256, /^[0-9a-f]{64}$/);
+  assert.ok(w.bin_size > 1e6 && w.size > 1e6);
+  assert.deepEqual([d.url, d.sha256, d.root], [a.source.url, a.source.sha256, a.source.root], 'macOS builds the release tarball');
+  // macOS: AppleTLS only, the libraries and features of the brief turned off, nothing forbidden.
+  for (const f of ['--with-appletls', '--without-openssl', '--without-gnutls', '--without-libxml2', '--without-libexpat', '--without-sqlite3',
+    '--without-libssh2', '--without-libcares', '--disable-bittorrent', '--disable-metalink', 'ARIA2_STATIC=no']) assert.ok(d.configure.includes(f), f);
+  assert.deepEqual(checkConfigure(d.configure.join(' '), d.forbidden_configure), []);
+  assert.ok(!d.configure.some((f) => /^--with-(openssl|gnutls|lib)/.test(f) && f !== '--with-libz'), 'only zlib (a macOS system library) is enabled');
+  assert.equal(d.deployment_target, undefined, 'the deployment target is macos.minimum_system_version, shared with ffmpeg and the app');
+  const script = fs.readFileSync(path.join(REPO, 'packaging', 'aria2c', 'build-aria2c-macos.sh'), 'utf8');
+  assert.match(script.split('\n').slice(0, 3).join('\n'), /SPDX-License-Identifier: AGPL-3\.0-or-later/);
+  for (const s of ["m.aria2c['darwin-arm64'].configure", 'otool -L', 'forbidden_configure', 'codesign', 'minos',
+    'm.macos.minimum_system_version', 'MACOSX_DEPLOYMENT_TARGET=$target', '-mmacosx-version-min=$target']) assert.ok(script.includes(s), s);
+  // binaries.json: both builds, the same source as third-party.json, everything linked in declared.
+  const bins = readJSON(REPO, 'packaging', 'licenses', 'binaries.json').binaries;
+  const win = bins.find((b) => b.name === 'aria2c (Windows build)');
+  const mac = bins.find((b) => b.name === 'aria2c (macOS build)');
+  for (const [entry, pin] of [[win, w], [mac, d]]) {
+    assert.ok(entry, 'binaries.json entry');
+    assert.equal(entry.license, 'GPL-2.0-or-later');
+    assert.match(entry.note, /OpenSSL/);
+    assert.equal(entry.component, 'core');
+    assert.deepEqual(entry.source_code, pin.source_code.map((s) => s.url), 'both manifests name the same source');
+    assert.ok(entry.source_code.includes(a.source.url), 'the aria2 source tarball');
+    assert.ok(entry.sha256.includes(pin.sha256));
+    assert.ok(entry.version.startsWith(a.version));
+    for (const l of entry.bundled) assert.ok(l.name && l.version && l.license && /^https:\/\//.test(l.url), JSON.stringify(l));
+    assert.ok(entry.bundled.some((l) => l.name === 'wslay'), 'wslay (deps/ of the aria2 source)');
+  }
+  assert.deepEqual(win.platforms, ['windows']);
+  assert.deepEqual(mac.platforms, ['darwin']);
+  assert.ok(win.sha256.includes(w.bin_sha256), 'the SHA-256 of aria2c.exe itself');
+  for (const dep of w.deps) {
+    assert.ok(win.source_code.includes(dep.url), `${dep.name} source listed`);
+    assert.ok(win.bundled.some((l) => l.name === dep.name && l.version === dep.version && l.license === dep.license), `${dep.name} bundled`);
+    for (const l of dep.licenses) assert.ok(!l.includes('..') && !path.isAbsolute(l), l);
+  }
+  for (const v of Object.values(w.toolchain)) assert.ok(win.bundled.some((l) => l.version === v), `toolchain ${v} declared in bundled`);
+  assert.equal(mac.configure, d.configure.join(' '));
+  assert.deepEqual(mac.bundled.map((l) => l.name), ['wslay'], 'macOS: nothing else linked in');
+  // The ffmpeg check stays about ffmpeg: aria2c is GPL, a separate program.
+  assert.deepEqual(gplComponents(bins), []);
+});
+
+test('aria2c: the core component records the official Windows binary, which stage checks', () => {
+  const w = readJSON(DESKTOP, 'packaging', 'third-party.json').aria2c['windows-x64'];
+  const expect = { name: 'bin/aria2c.exe', url: '', sha256: w.bin_sha256, size: w.bin_size };
+  for (const f of ['components.json', 'manifest.src.json']) {
+    const core = readJSON(REPO, 'packaging', 'components', f).components.find((c) => c.id === 'core');
+    assert.equal(core.bundled, true, f);
+    assert.match(core.upstream, /aria2 1\.37\.0/, f);
+    assert.deepEqual(core.platforms['windows-x64'].files, [expect], `${f}: in step with third-party.json`);
+    assert.equal(core.platforms['windows-x64'].download_size, 0, 'bundled: nothing to download');
+    assert.equal(core.platforms['darwin-arm64'], undefined, `${f}: no SHA-256 for the macOS build (built in CI, re-signed by electron-builder)`);
+  }
+  const shipped = readJSON(REPO, 'packaging', 'components', 'components.json');
+  const staged = { name: 'bin/aria2c.exe', sha256: w.bin_sha256, size: w.bin_size, required: true };
+  assert.deepEqual(bundledFileProblems(shipped, 'windows-x64', staged), []);
+  assert.match(bundledFileProblems(shipped, 'windows-x64', { ...staged, sha256: 'a'.repeat(64) })[0], /records bin\/aria2c\.exe for windows-x64 as be2099c2/);
+  assert.match(bundledFileProblems(shipped, 'windows-x64', { ...staged, size: 1 })[0], /\(1 bytes\)/);
+  assert.match(bundledFileProblems(shipped, 'windows-x64', { ...staged, name: 'bin/other.exe' })[0], /records no bin\/other\.exe/);
+  assert.deepEqual(bundledFileProblems(shipped, 'darwin-arm64', { name: 'bin/aria2c', sha256: 'b'.repeat(64), size: 1546192, required: false }), [], 'macOS: nothing recorded, nothing required');
+  const withURL = JSON.parse(JSON.stringify(shipped));
+  withURL.components.find((c) => c.id === 'core').platforms['windows-x64'].files[0].url = 'https://example.com/aria2c.exe';
+  assert.match(bundledFileProblems(withURL, 'windows-x64', staged)[0], /no download URL/);
+  assert.match(bundledFileProblems({ components: [{ id: 'core', platforms: {} }] }, 'windows-x64', staged)[0], /no bundled core/);
+});
+
+test('aria2c --version check', () => {
+  assert.deepEqual(checkAria2cVersion(ARIA2C_WINDOWS_VERSION, '1.37.0', 'windows-x64'), []);
+  assert.deepEqual(checkAria2cVersion(ARIA2C_MACOS_VERSION.replace(/\n/g, '\r\n'), '1.37.0', 'darwin-arm64'), []);
+  assert.match(checkAria2cVersion(ARIA2C_WINDOWS_VERSION, '1.37.1', 'windows-x64')[0], /expected "aria2 version 1\.37\.1"/);
+  assert.match(checkAria2cVersion(ARIA2C_WINDOWS_VERSION.replace(', HTTPS', ''), '1.37.0', 'windows-x64')[0], /HTTPS is not enabled/);
+  assert.match(checkAria2cVersion(ARIA2C_WINDOWS_VERSION.replace('zlib/1.3', 'zlib/1.3 OpenSSL/3.0.0'), '1.37.0', 'windows-x64')[0], /OpenSSL/);
+  // The Windows build's libraries and features would fail the macOS checks.
+  const asMac = checkAria2cVersion(ARIA2C_WINDOWS_VERSION, '1.37.0', 'darwin-arm64');
+  assert.match(asMac[0], /AppleTLS missing/);
+  assert.match(asMac[1], /turns off: expat\/2\.5\.0 sqlite3\/3\.43\.1 GMP\/6\.3\.0 c-ares\/1\.19\.1 libssh2\/1\.11\.0$/);
+  assert.match(asMac[2], /turns off: Async DNS, BitTorrent, Firefox3 Cookie, Metalink, XML-RPC, SFTP$/);
+  assert.match(checkAria2cVersion(ARIA2C_MACOS_VERSION.replace('AppleTLS', 'GnuTLS/3.8.0'), '1.37.0', 'darwin-arm64').join('\n'), /GnuTLS[\s\S]*AppleTLS missing/);
+  assert.equal(checkAria2cVersion('', '1.37.0', 'windows-x64').length, 2);
+});
+
+test('aria2c SOURCE.txt names the corresponding source (GPL): the release attachment first', () => {
+  const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+  const a = m.aria2c;
+  const repo = 'ShouldBeQuincy/LectureFlow';
+  const win = aria2cSourceText('windows-x64', '3.2.0', repo);
+  const mac = aria2cSourceText('darwin-arm64', '3.2.0', repo);
+  assert.ok(win.startsWith(`aria2 1.37.0: resources/bin/aria2c.exe is aria2's official Windows build, unchanged (SHA-256 ${a['windows-x64'].bin_sha256}).`));
+  assert.match(mac, /^aria2 1\.37\.0: resources\/bin\/aria2c is built from the aria2 source \(BUILDINFO\.txt\)/);
+  for (const [text, key] of [[win, 'windows-x64'], [mac, 'darwin-arm64']]) {
+    assert.match(text, /GPL-2\.0-or-later/);
+    for (const s of a[key].source_code) assert.ok(text.includes(s.url), `${key}: ${s.url}`);
+    const asset = `LectureFlow-3.2.0-source-aria2c-${key}.tar`;
+    assert.ok(text.includes(`as ${asset}\n  https://github.com/${repo}/releases/download/v3.2.0/${asset}\n`), `${key}: the release attachment and its address`);
+    assert.ok(text.includes(`https://github.com/${repo}/releases/tag/v3.2.0`));
+    assert.ok(text.indexOf(asset) < text.indexOf(a.source.url), 'the attachment comes before the upstream addresses');
+  }
+  for (const f of a['darwin-arm64'].configure) assert.ok(mac.includes(`  ${f}\n`), f);
+  assert.match(mac, /packaging\/aria2c\/build-aria2c-macos\.sh/);
+  assert.ok(mac.includes(`for macOS ${m.macos.minimum_system_version} or later`));
+  assert.match(win, /Dockerfile\.mingw/);
+  assert.match(win, /gcc-mingw-w64 10\.3\.0/);
+  assert.match(win, /Not attached \(no source obligation\):\n- MinGW-w64 runtime 8\.0\.0[^\n]*\n {2}The MinGW-w64 runtime is under the ZPL-2\.1/);
+  assert.match(win, /GCC Runtime Library Exception 3\.1/);
+  assert.doesNotMatch(mac, /Not attached/);
+  // A fork's release run names its own repository.
+  assert.ok(aria2cSourceText('darwin-arm64', '3.2.0', 'example-owner/lf').includes('https://github.com/example-owner/lf/releases/download/v3.2.0/LectureFlow-3.2.0-source-aria2c-darwin-arm64.tar'));
+});
+
+test('the Native Messaging host is built into resources/bin like the server', () => {
+  assert.deepEqual(GO_PROGRAMS, [
+    { name: 'lectureflow', pkg: './cmd/lectureflow' },
+    { name: 'lectureflow-nmhost', pkg: './cmd/lectureflow-nmhost' },
+  ]);
+  const src = fs.readFileSync(path.join(DESKTOP, 'scripts', 'stage.js'), 'utf8');
+  assert.match(src, /CGO_ENABLED: '0'/, 'pure Go, cross-compiled');
+  assert.match(src, /GO_PROGRAMS\.map\(\(p\) => goBuild\(platform, version, p\)\)/, 'stage builds every program');
+  for (const p of GO_PROGRAMS) assert.ok(fs.existsSync(path.join(REPO, ...p.pkg.split('/'), 'main.go')), `${p.pkg}/main.go`);
+});
+
+// --- minimum macOS (third-party.json macos) -------------------------------------------
+
+test('minimum macOS: one value for the app, ffmpeg and aria2c; re-checked when Electron or Go changes', () => {
+  const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+  const min = m.macos.minimum_system_version;
+  assert.match(min, /^\d+\.\d+$/);
+  assert.equal(loadConfig({}).mac.minimumSystemVersion, min, 'electron-builder writes it into LSMinimumSystemVersion');
+  // Electron 44 and Go 1.27 need macOS 13.0 (third-party.json macos._doc). A new Electron
+  // major or Go minor may need a newer macOS: look it up, then update macos.
+  const pkg = readJSON(DESKTOP, 'package.json');
+  assert.equal(pkg.devDependencies.electron.split('.')[0], m.macos.checked_with.electron,
+    `Electron ${pkg.devDependencies.electron}: check its minimum macOS (LSMinimumSystemVersion of Electron.app, LC_BUILD_VERSION minos of Electron Framework) and update third-party.json macos`);
+  const goVersion = /^go (\d+\.\d+)/m.exec(fs.readFileSync(path.join(REPO, 'go.mod'), 'utf8'))[1];
+  assert.equal(goVersion, m.macos.checked_with.go, `Go ${goVersion}: check the linker's default macOS (cmd/link/internal/ld/macho.go) and update third-party.json macos`);
+  assert.ok(compareVersions(min, '13.0') >= 0, 'Electron 44 and Go 1.27 need macOS 13.0');
+  // Both macOS builds compile for it, check the result and only then publish the build.
+  const ff = fs.readFileSync(path.join(DESKTOP, 'scripts', 'build-ffmpeg-macos.sh'), 'utf8');
+  for (const s of ['m.macos.minimum_system_version', 'export MACOSX_DEPLOYMENT_TARGET="$target"', 'libdav1d.a', '[ "$m" = "$target" ]',
+    'lipo -archs', 'DESTDIR="$destdir"', 'mv "$part" "$prefix"', 'BUILDINFO.txt']) assert.ok(ff.includes(s), s);
+  assert.ok(ff.indexOf('mv "$part" "$prefix"') > ff.lastIndexOf('exit 1'), 'renamed after the last check');
+  const ar = fs.readFileSync(path.join(REPO, 'packaging', 'aria2c', 'build-aria2c-macos.sh'), 'utf8');
+  assert.ok(ar.indexOf('mv "$part" "$out"') > ar.lastIndexOf('exit 1'), 'renamed after the last check');
+});
+
+const LC_BUILD_VERSION = 0x32;
+const ARM64 = 0x0100000c;
+const X86_64 = 0x01000007;
+
+function machVer(s) {
+  const [a, b = 0, c = 0] = s.split('.').map(Number);
+  return (a << 16) | (b << 8) | c;
+}
+function lcBuildVersion(minos, platform = 1) {
+  const b = Buffer.alloc(24);
+  b.writeUInt32LE(LC_BUILD_VERSION, 0);
+  b.writeUInt32LE(24, 4);
+  b.writeUInt32LE(platform, 8);
+  b.writeUInt32LE(machVer(minos), 12);
+  b.writeUInt32LE(machVer('26.5'), 16);
+  return b;
+}
+function lcVersionMinMacosx(v) {
+  const b = Buffer.alloc(16);
+  b.writeUInt32LE(0x24, 0);
+  b.writeUInt32LE(16, 4);
+  b.writeUInt32LE(machVer(v), 8);
+  b.writeUInt32LE(machVer('14.0'), 12);
+  return b;
+}
+function lcSegment() {
+  const b = Buffer.alloc(72); // LC_SEGMENT_64 without sections: a load command to skip
+  b.writeUInt32LE(0x19, 0);
+  b.writeUInt32LE(72, 4);
+  return b;
+}
+function machO({ cpu = ARM64, cmds = [] } = {}) {
+  const body = Buffer.concat(cmds);
+  const h = Buffer.alloc(32);
+  h.writeUInt32LE(0xfeedfacf, 0);
+  h.writeInt32LE(cpu, 4);
+  h.writeUInt32LE(2, 12); // MH_EXECUTE
+  h.writeUInt32LE(cmds.length, 16);
+  h.writeUInt32LE(body.length, 20);
+  return Buffer.concat([h, body, Buffer.alloc(64)]);
+}
+function fatMachO(slices) {
+  const header = Buffer.alloc(8 + 20 * slices.length);
+  header.writeUInt32BE(0xcafebabe, 0);
+  header.writeUInt32BE(slices.length, 4);
+  const parts = [];
+  let offset = 4096;
+  slices.forEach((s, i) => {
+    header.writeInt32BE(s.readInt32LE(4), 8 + i * 20);
+    header.writeUInt32BE(offset, 8 + i * 20 + 8);
+    header.writeUInt32BE(s.length, 8 + i * 20 + 12);
+    header.writeUInt32BE(12, 8 + i * 20 + 16);
+    parts.push({ offset, s });
+    offset += Math.ceil(s.length / 4096) * 4096;
+  });
+  const buf = Buffer.alloc(offset);
+  header.copy(buf, 0);
+  for (const p of parts) p.s.copy(buf, p.offset);
+  return buf;
+}
+const reader = (buf) => (off, len) => buf.subarray(off, off + len);
+
+test('Mach-O minimum macOS: LC_BUILD_VERSION, LC_VERSION_MIN_MACOSX, universal files, not Mach-O', () => {
+  assert.equal(machoVersion(0x000d0000), '13.0');
+  assert.equal(machoVersion(0x000c0601), '12.6.1');
+  assert.equal(machoVersion(machVer('27.0')), '27.0');
+  assert.equal(compareVersions('13.0', '12.6.1'), 1);
+  assert.equal(compareVersions('13.0', '13'), 0);
+  assert.equal(compareVersions('13.0.1', '13.0'), 1);
+  assert.equal(compareVersions('11.0', '13.0'), -1);
+  assert.equal(compareVersions('10.15', '10.9'), 1, 'numeric, not lexical');
+  assert.deepEqual(machoSlices(reader(machO({ cmds: [lcSegment(), lcBuildVersion('13.0'), lcSegment()] }))), [{ cpu: ARM64, platform: 1, minos: '13.0' }]);
+  assert.deepEqual(machoSlices(reader(machO({ cmds: [lcVersionMinMacosx('10.13')] }))), [{ cpu: ARM64, platform: 1, minos: '10.13' }]);
+  assert.deepEqual(machoSlices(reader(machO({ cmds: [lcSegment()] }))), [{ cpu: ARM64, platform: null, minos: null }]);
+  assert.deepEqual(machoSlices(reader(machO({ cmds: [lcBuildVersion('17.0', 2)] }))), [{ cpu: ARM64, platform: 2, minos: '17.0' }], 'iOS');
+  assert.deepEqual(machoSlices(reader(fatMachO([machO({ cmds: [lcBuildVersion('13.0')] }), machO({ cpu: X86_64, cmds: [lcBuildVersion('10.15')] })]))), [
+    { cpu: ARM64, platform: 1, minos: '13.0' }, { cpu: X86_64, platform: 1, minos: '10.15' },
+  ]);
+  const notMachO = [Buffer.from('#!/bin/sh\necho hi\n'), Buffer.from([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0]), Buffer.from([0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 0x34, 0, 0]), Buffer.alloc(3)];
+  for (const other of notMachO) assert.equal(machoSlices(reader(other)), null, other.toString('hex'));
+});
+
+test('stage check: every Mach-O file in resources/ runs on the declared minimum macOS', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-macho-'));
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-macho-empty-'));
+  try {
+    const put = (rel, data) => {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), data);
+    };
+    put('bin/lectureflow', machO({ cmds: [lcSegment(), lcBuildVersion('13.0')] }));
+    put('bin/uv', machO({ cmds: [lcBuildVersion('11.0')] }));
+    put('worker/asr.py', 'print("hi")\n');
+    put('licenses/aria2/COPYING', 'GNU GENERAL PUBLIC LICENSE');
+    let r = macMinimumCheck(dir, '13.0', 'darwin-arm64');
+    assert.deepEqual(r.problems, []);
+    assert.deepEqual(r.files, [{ path: 'bin/lectureflow', minos: '13.0' }, { path: 'bin/uv', minos: '11.0' }]);
+    // What the old ffmpeg build script produced: the build machine's macOS.
+    put('bin/ffmpeg', machO({ cmds: [lcBuildVersion('27.0')] }));
+    // otool cannot open names like this one; the check reads the file itself.
+    put('Helper (GPU)/bin', machO({ cpu: X86_64, cmds: [lcBuildVersion('12.0')] }));
+    put('bin/old', machO({ cmds: [lcSegment()] }));
+    put('bin/ios', machO({ cmds: [lcBuildVersion('13.0', 2)] }));
+    put('bin/universal', fatMachO([machO({ cmds: [lcBuildVersion('13.0')] }), machO({ cpu: X86_64, cmds: [lcBuildVersion('14.0')] })]));
+    r = macMinimumCheck(dir, '13.0', 'darwin-arm64');
+    const want = [
+      'Helper (GPU)/bin: no arm64 code',
+      'bin/ffmpeg needs macOS 27.0, the app declares 13.0 (build it with MACOSX_DEPLOYMENT_TARGET=13.0, or raise macos.minimum_system_version)',
+      'bin/ios: built for platform 2, not macOS',
+      'bin/old: records no minimum macOS (LC_BUILD_VERSION)',
+      'bin/universal needs macOS 14.0, the app declares 13.0 (build it with MACOSX_DEPLOYMENT_TARGET=13.0, or raise macos.minimum_system_version)',
+    ];
+    assert.deepEqual(r.problems.slice().sort(), want.slice().sort());
+    assert.deepEqual(macMinimumCheck(dir, '27.0', 'darwin-arm64').problems.filter((p) => /needs macOS/.test(p)), [], 'a higher declared minimum accepts them');
+    fs.writeFileSync(path.join(empty, 'ffmpeg.exe'), 'MZ');
+    assert.deepEqual(macMinimumCheck(empty, '13.0', 'windows-x64'), { files: [], problems: [] });
+    assert.match(macMinimumCheck(empty, '13.0', 'darwin-arm64').problems[0], /no Mach-O file found/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(empty, { recursive: true, force: true });
+  }
+});
+
+// --- corresponding source as release attachments (scripts/sources.js) -----------------------
+
+test('source attachments: every source_code entry is attached, the attachment itself, or explained', () => {
+  const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+  assert.deepEqual(sources.bundleProblems(), []);
+  const b = sources.bundles();
+  assert.deepEqual(b.map((x) => x.id), ['ffmpeg-windows-x64', 'ffmpeg-darwin-arm64', 'aria2c-windows-x64', 'aria2c-darwin-arm64']);
+  const files = Object.fromEntries(b.map((x) => [x.id, x.files.map((f) => f.archive)]));
+  assert.deepEqual(files, {
+    'ffmpeg-windows-x64': ['ffmpeg-9.0.2.tar.xz', 'zlib-v1.3.1.tar.gz', 'nv-codec-headers-n12.1.14.0.tar.gz', 'OpenH264-v2.6.0.tar.gz', 'libvpl-v2.16.0.tar.gz', 'dav1d-1.5.4.tar.xz'],
+    'ffmpeg-darwin-arm64': ['ffmpeg-9.0.2.tar.xz', 'dav1d-1.5.4.tar.xz'],
+    'aria2c-windows-x64': ['aria2-1.37.0.tar.xz', 'gmp-6.3.0.tar.xz', 'expat-2.5.0.tar.bz2', 'sqlite-autoconf-3430100.tar.gz', 'zlib-1.3.tar.gz', 'c-ares-1.19.1.tar.gz', 'libssh2-1.11.0.tar.bz2'],
+    'aria2c-darwin-arm64': ['aria2-1.37.0.tar.xz'],
+  }, 'wslay is inside the aria2 tarball: attached once');
+  assert.deepEqual(b.map((x) => x.scripts), [
+    ['desktop/scripts/build-ffmpeg-windows.sh', 'desktop/packaging/third-party.json'],
+    ['desktop/scripts/build-ffmpeg-macos.sh', 'desktop/packaging/third-party.json'],
+    ['desktop/packaging/third-party.json'],
+    ['packaging/aria2c/build-aria2c-macos.sh', 'desktop/packaging/third-party.json'],
+  ]);
+  // Only the toolchain runtimes stay out (GCC Runtime Library Exception, ZPL-2.1).
+  assert.deepEqual(b.flatMap((x) => x.notAttached.map((s) => s.url)), [
+    'https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1', 'https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1',
+    'https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1', 'https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3',
+  ]);
+  // The libraries binaries.json declares as linked in are attached, except those runtimes.
+  const bins = readJSON(REPO, 'packaging', 'licenses', 'binaries.json').binaries;
+  const pairs = [['ffmpeg / ffprobe (Windows build)', 'ffmpeg-windows-x64'], ['ffmpeg / ffprobe (macOS build)', 'ffmpeg-darwin-arm64'],
+    ['aria2c (Windows build)', 'aria2c-windows-x64'], ['aria2c (macOS build)', 'aria2c-darwin-arm64']];
+  for (const [name, id] of pairs) {
+    const entry = bins.find((x) => x.name === name);
+    const bundle = b.find((x) => x.id === id);
+    assert.equal(entry.source_code[0], `https://github.com/${m.release_sources.repository}/releases`, `${name}: the release attachment first`);
+    assert.ok(entry.note.includes(`LectureFlow-<version>-source-${id}.tar`), `${name}: the note names the attachment`);
+    for (const lib of entry.bundled) {
+      if (/runtime/i.test(lib.name)) continue;
+      assert.ok(bundle.files.some((f) => lib.name.startsWith(f.name) || (lib.name === 'wslay' && f.name === 'aria2')), `${name}: ${lib.name} attached`);
+    }
+  }
+  // The checks catch an unexplained or unlisted source.
+  const broken = (edit) => {
+    const c = JSON.parse(JSON.stringify(m));
+    edit(c);
+    return sources.bundleProblems(c).join('\n');
+  };
+  assert.match(broken((c) => delete c.aria2c['windows-x64'].source_code.find((s) => s.not_attached).not_attached), /neither attached \(no pinned tarball\) nor explained/);
+  assert.match(broken((c) => c.ffmpeg['windows-x64'].source_code.splice(2, 1)), /zlib.*attached but not listed in source_code/);
+  assert.match(broken((c) => c.ffmpeg['darwin-arm64'].source_code.shift()), /exactly one release_asset entry, has 0/);
+  assert.match(broken((c) => c.aria2c['darwin-arm64'].build_scripts.push('packaging/aria2c/missing.sh')), /build script packaging\/aria2c\/missing\.sh not found/);
+  assert.match(broken((c) => { c.aria2c['darwin-arm64'].source_code[0].what = 'somewhere'; }), /does not name its attachment/);
+  assert.equal(sources.assetName('3.1.0', 'ffmpeg-windows-x64'), 'LectureFlow-3.1.0-source-ffmpeg-windows-x64.tar');
+  assert.equal(sources.assetName('3.2.0-beta.1', 'aria2c-darwin-arm64'), 'LectureFlow-3.2.0-beta.1-source-aria2c-darwin-arm64.tar');
+  for (const bad of ['v3.1.0', '../3.1.0', '3.1', '']) assert.throws(() => sources.assetName(bad, 'x'), /bad version/);
+  assert.equal(sources.releaseRepo({}), 'ShouldBeQuincy/LectureFlow');
+  assert.equal(sources.releaseRepo({ GITHUB_REPOSITORY: 'example-owner/lf.fork' }), 'example-owner/lf.fork', 'a release run names its own repository');
+  assert.equal(sources.releaseRepo({ GITHUB_REPOSITORY: 'a/b/c' }), 'ShouldBeQuincy/LectureFlow');
+});
+
+test('ffmpeg SOURCE.txt names the release attachment (LGPL)', () => {
+  const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+  const repo = 'ShouldBeQuincy/LectureFlow';
+  for (const key of ['windows-x64', 'darwin-arm64']) {
+    const text = ffmpegSourceText(key, '3.2.0', repo);
+    const asset = `LectureFlow-3.2.0-source-ffmpeg-${key}.tar`;
+    assert.ok(text.includes(`as ${asset}\n  https://github.com/${repo}/releases/download/v3.2.0/${asset}\n`), key);
+    assert.match(text, /LGPL-2\.1-or-later/);
+    for (const s of m.ffmpeg[key].source_code) assert.ok(text.includes(s.url), `${key}: ${s.url}`);
+  }
+  assert.match(ffmpegSourceText('windows-x64', '3.2.0', repo), /DLLs can be replaced[\s\S]*Not attached \(no source obligation\)[\s\S]*GCC Runtime Library Exception/);
+  assert.ok(ffmpegSourceText('darwin-arm64', '3.2.0', repo).includes(`for macOS ${m.macos.minimum_system_version} or later`));
+});
+
+/** readTar(buf) → [{name, mode, mtime, data}], checking every header checksum. */
+function readTar(buf) {
+  const out = [];
+  for (let p = 0; p + 512 <= buf.length;) {
+    const h = buf.subarray(p, p + 512);
+    if (h.every((x) => x === 0)) break;
+    const field = (o, n) => h.subarray(o, o + n).toString('ascii').replace(/\0[\s\S]*$/, '');
+    let sum = 0;
+    for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : h[i];
+    assert.equal(parseInt(field(148, 8), 8), sum, 'header checksum');
+    assert.equal(field(257, 6), 'ustar');
+    const size = parseInt(field(124, 12), 8);
+    const prefix = field(345, 155);
+    out.push({ name: prefix ? `${prefix}/${field(0, 100)}` : field(0, 100), mode: parseInt(field(100, 8), 8), mtime: parseInt(field(136, 12), 8), data: buf.subarray(p + 512, p + 512 + size) });
+    p += 512 + Math.ceil(size / 512) * 512;
+  }
+  return out;
+}
+
+test('source attachments: pinned downloads into reproducible tars, nothing left behind on failure', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lf-sources-'));
+  try {
+    // A copy of the manifest whose every pinned file is a small fake served by fakeFetch.
+    const m = readJSON(DESKTOP, 'packaging', 'third-party.json');
+    const bodies = new Map();
+    const pin = (o) => {
+      if (o && typeof o === 'object') {
+        if (typeof o.url === 'string' && typeof o.sha256 === 'string') {
+          if (!bodies.has(o.url)) bodies.set(o.url, Buffer.from(`source tarball from ${o.url}\n`.repeat(50)));
+          o.sha256 = crypto.createHash('sha256').update(bodies.get(o.url)).digest('hex');
+        }
+        Object.values(o).forEach(pin);
+      }
+    };
+    pin(m);
+    const fetched = [];
+    const fakeFetch = async (url) => {
+      fetched.push(url);
+      return new Response(bodies.get(url));
+    };
+    const opts = { version: '3.2.0', repo: 'example-owner/lf', cacheDir: path.join(tmp, 'cache'), manifest: m, fetchImpl: fakeFetch, log: () => {}, mtime: 1790000000 };
+    const results = await sources.buildSources({ ...opts, outDir: path.join(tmp, 'out') });
+    assert.deepEqual(results.map((r) => r.asset), ['ffmpeg-windows-x64', 'ffmpeg-darwin-arm64', 'aria2c-windows-x64', 'aria2c-darwin-arm64'].map((id) => `LectureFlow-3.2.0-source-${id}.tar`));
+    const unique = new Set(sources.bundles(m).flatMap((b) => b.files.map((f) => f.url)));
+    assert.equal(fetched.length, unique.size, 'each tarball downloaded once (cache)');
+    assert.deepEqual(fs.readdirSync(path.join(tmp, 'out')).sort(), results.map((r) => r.asset).sort(), 'no .partial left');
+    const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+    for (const r of results) {
+      const buf = fs.readFileSync(path.join(tmp, 'out', r.asset));
+      assert.equal(buf.length, r.bytes);
+      const entries = readTar(buf);
+      const root = r.asset.replace(/\.tar$/, '');
+      const bundle = sources.bundles(m).find((b) => b.id === r.id);
+      assert.deepEqual(entries.map((e) => e.name), [
+        `${root}/README.txt`, `${root}/SHA256SUMS`, ...bundle.files.map((f) => `${root}/upstream/${f.archive}`), ...bundle.scripts.map((s) => `${root}/lectureflow/${s}`),
+      ]);
+      assert.ok(entries.every((e) => e.mtime === 1790000000));
+      const sums = entries[1].data.toString('utf8').trim().split('\n');
+      assert.equal(sums.length, entries.length - 2);
+      for (const line of sums) {
+        const [sha, rel] = line.split('  ');
+        const e = entries.find((x) => x.name === `${root}/${rel}`);
+        assert.equal(crypto.createHash('sha256').update(e.data).digest('hex'), sha, rel);
+      }
+      for (const f of bundle.files) assert.deepEqual(entries.find((e) => e.name.endsWith(`/upstream/${f.archive}`)).data, bodies.get(f.url), 'unchanged upstream file');
+      for (const s of bundle.scripts) {
+        const e = entries.find((x) => x.name === `${root}/lectureflow/${s}`);
+        assert.deepEqual(e.data, fs.readFileSync(path.join(REPO, ...s.split('/'))));
+        assert.equal(e.mode, s.endsWith('.sh') ? 0o755 : 0o644);
+      }
+      const readme = entries[0].data.toString('utf8');
+      assert.ok(readme.includes('https://github.com/example-owner/lf/releases/tag/v3.2.0'));
+      for (const f of bundle.files) assert.ok(readme.includes(f.url) && readme.includes(f.sha256), f.url);
+      // The system tar reads it too (bsdtar on Windows and macOS).
+      const x = path.join(tmp, 'x', r.id);
+      fs.mkdirSync(x, { recursive: true });
+      const t = spawnSync(tar, ['-xf', path.join(tmp, 'out', r.asset), '-C', x], { encoding: 'utf8' });
+      assert.equal(t.status, 0, t.stderr);
+      for (const e of entries) assert.deepEqual(fs.readFileSync(path.join(x, ...e.name.split('/'))), e.data, e.name);
+    }
+    // Same inputs, same bytes.
+    const again = await sources.buildSources({ ...opts, outDir: path.join(tmp, 'out2') });
+    for (const r of again) assert.ok(fs.readFileSync(path.join(tmp, 'out2', r.asset)).equals(fs.readFileSync(path.join(tmp, 'out', r.asset))), r.asset);
+    const notes = sources.renderNotes(results);
+    assert.match(notes, /^## Source code of the bundled ffmpeg and aria2c/);
+    assert.match(notes, /\| LectureFlow-3\.2\.0-source-aria2c-windows-x64\.tar \| aria2c\.exe in the Windows installers \(GPL-2\.0-or-later\) \| [\d.]+ MB \| aria2-1\.37\.0\.tar\.xz, gmp-6\.3\.0\.tar\.xz/);
+    // A tarball that does not match its pin fails the run and leaves no attachment for it.
+    const bad = JSON.parse(JSON.stringify(m));
+    bad.aria2c['windows-x64'].deps.find((d) => d.name === 'GMP').sha256 = 'a'.repeat(64);
+    const outBad = path.join(tmp, 'out-bad');
+    await assert.rejects(sources.buildSources({ ...opts, manifest: bad, outDir: outBad, cacheDir: path.join(tmp, 'cache-bad') }), /SHA-256 mismatch for https:\/\/gmplib\.org/);
+    assert.deepEqual(fs.readdirSync(outBad).filter((f) => /aria2c-windows|\.partial$/.test(f)), []);
+    // Inconsistent manifests fail before anything is downloaded.
+    const unexplained = JSON.parse(JSON.stringify(m));
+    delete unexplained.ffmpeg['windows-x64'].source_code.find((s) => s.not_attached).not_attached;
+    const n = fetched.length;
+    await assert.rejects(sources.buildSources({ ...opts, manifest: unexplained, outDir: path.join(tmp, 'out3') }), /neither attached/);
+    assert.equal(fetched.length, n);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('tar headers: long names split into prefix and name, bad names refused', () => {
+  const long = `${'d'.repeat(60)}/${'e'.repeat(60)}/file-with-a-long-name.tar.xz`;
+  const h = sources.tarHeader({ name: long, size: 5, mode: 0o644, mtime: 0 });
+  assert.equal(h.length, 512);
+  const [e] = readTar(Buffer.concat([h, Buffer.from('hello'), Buffer.alloc(507 + 1024)]));
+  assert.equal(e.name, long);
+  assert.equal(e.data.toString(), 'hello');
+  for (const bad of ['/abs/path', 'a/../b', 'caf\u00e9.txt', '', 'x'.repeat(101)]) assert.throws(() => sources.tarHeader({ name: bad, size: 0, mode: 0o644, mtime: 0 }), /tar: /, bad);
+});
+
+test('release workflow: source attachments next to the installers, macOS ffmpeg cached like aria2c', () => {
+  const rel = fs.readFileSync(path.join(REPO, '.github', 'workflows', 'release.yml'), 'utf8');
+  const ci = fs.readFileSync(path.join(REPO, '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.match(rel, /\n {2}sources:\n/);
+  assert.ok(rel.includes('node desktop/scripts/sources.js --out sources --version "${GITHUB_REF_NAME#v}" --notes sources/notes.md'));
+  assert.match(rel, /needs: \[build, sources\]/);
+  assert.match(rel, /gh release create[^\n]*\n?[^\n]*out\/\* sources\/\*\.tar/);
+  const key = "ffmpeg-macos-${{ hashFiles('desktop/scripts/build-ffmpeg-macos.sh', 'desktop/packaging/third-party.json') }}";
+  for (const [name, text] of [['release.yml', rel], ['ci.yml', ci]]) {
+    assert.ok(text.includes(`key: ${key}`), `${name}: the ffmpeg-macos cache key`);
+    assert.ok(text.includes('path: desktop/.cache/ffmpeg-macos-*'), `${name}: the ffmpeg-macos cache path`);
+  }
+  assert.match(ci, /\n {2}ffmpeg-macos:\n {4}runs-on: macos-14\n/);
+});
+
+test('update summary: the electron-updater feed and whether the in-app update key is built in (keys.go)', () => {
+  const { updateBuildConfig, builtinUpdateKey, minisignKeyId, KEYS_GO } = require('../../scripts/lib/updaterepo');
+  // The maintainer's key (internal/selfupdate/keys.go, update-key 2026-10-27): its id as minisign prints it.
+  assert.equal(minisignKeyId('RWRtYxdsG0+sD5yxDvxA4MOrUrK3WGrkwpejK2VfGHH3GibjDpES6nTX'), '0FAC4F1B6C17636D');
+  for (const bad of ['', 'RW', 'RWRtYxdsG0+sD5yxDvxA4MOrUrK3WGrkwpejK2VfGHH3GibjDpES6nT', 'x'.repeat(56), null]) assert.equal(minisignKeyId(bad), null, String(bad));
+  const key = Buffer.concat([Buffer.from('Ed'), Buffer.from('0807060504030201', 'hex'), Buffer.alloc(32, 7)]).toString('base64');
+  const read = (text) => (p) => {
+    assert.equal(p, path.join('/repo', KEYS_GO));
+    return text;
+  };
+  const withKey = builtinUpdateKey('/repo', read(`package selfupdate\n\n// PublicKey …\nconst PublicKey = "${key}"\n`));
+  assert.deepEqual(withKey, { key, id: '0102030405060708' });
+  const noKey = builtinUpdateKey('/repo', read('package selfupdate\n\nconst PublicKey = ""\n'));
+  assert.deepEqual(noKey, { key: '', id: null });
+  assert.throws(() => builtinUpdateKey('/repo', read('package selfupdate\n')), /no line const PublicKey/);
+  assert.throws(() => builtinUpdateKey('/repo', read('const PublicKey = "not a key"\n')), /not a minisign public key/);
+  assert.throws(() => builtinUpdateKey('/repo', () => { throw new Error('ENOENT'); }), /ENOENT/);
+  // The checkout itself parses (dist.js reads it before staging).
+  const own = builtinUpdateKey(REPO);
+  assert.ok(own.key === '' || /^[0-9A-F]{16}$/.test(own.id), JSON.stringify(own));
+
+  // The line goes into the build log, size-report.md and the release notes:
+  // it must not say "automatic updates: off" for a build that updates itself.
+  const offOn = updateBuildConfig({}, { inAppKey: withKey }).summary;
+  assert.equal(offOn, 'electron-updater feed: off (LECTUREFLOW_UPDATE_REPO is not set: no app-update.yml); in-app updates: on (minisign key 0102030405060708 built in; the shell does not load electron-updater)');
+  assert.doesNotMatch(offOn, /automatic updates: off/i);
+  assert.equal(updateBuildConfig({}, { inAppKey: noKey }).summary, 'electron-updater feed: off (LECTUREFLOW_UPDATE_REPO is not set: no app-update.yml); in-app updates: off (no minisign key built in)');
+  assert.equal(updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }, { inAppKey: withKey }).summary,
+    'electron-updater feed: on (GitHub releases of o/r, app-update.yml, unused while in-app updates are on); in-app updates: on (minisign key 0102030405060708 built in; the shell does not load electron-updater)');
+  assert.equal(updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }, { inAppKey: noKey }).summary, 'electron-updater feed: on (GitHub releases of o/r, app-update.yml); in-app updates: off (no minisign key built in)');
+  // The rest of the build configuration does not depend on the key.
+  assert.deepEqual(updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }, { inAppKey: withKey }).publish, updateBuildConfig({ LECTUREFLOW_UPDATE_REPO: 'o/r' }).publish);
+  assert.equal(updateBuildConfig({}, { inAppKey: withKey }).publish, null);
 });

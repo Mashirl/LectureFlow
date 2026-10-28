@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"lectureflow/internal/model"
@@ -74,10 +75,30 @@ type liveSession struct {
 	rec        sessionRecord
 	rt         *runtimeClient
 	proxyExp   time.Time
-	kernelID   string
+	kernelID   string // the first kernel (the memory probe's)
 	workerHash string
 	setupDone  bool
 	lastJobEnd time.Time
+
+	// colab-batch (job.go, batch.go)
+	// ready is closed when the borrowing that created the session ended
+	// (running, or given up): a second lecture of the larger GPUs waits for
+	// it instead of being sent back.
+	ready    chan struct{}
+	kernels  []string // every kernel started on the runtime: all are shut down at the release
+	idle     []string // kernels without a running cell
+	prep     *sessionPrep
+	workers  int        // the resident worker's --workers
+	upMu     sync.Mutex // one audio upload at a time: the uplink is the bottleneck (colab-prof §4.5)
+	uploads  map[string]*preUpload
+	upFailed map[string]bool
+	// leftFile: a file of a job that is gone (cancelled, left the plan,
+	// finished) could not be deleted: the runtime is released once no
+	// lecture runs.
+	leftFile string
+	// removals: finished lectures' directories being removed in the
+	// background (removal.go); a release waits for them.
+	removals []*removal
 }
 
 func (b *Backend) persist(ctx context.Context, rec sessionRecord) {
@@ -102,7 +123,10 @@ func (b *Backend) loadRecord(ctx context.Context) (*sessionRecord, error) {
 
 // newRuntime is the client of an assignment's runtime.
 func (b *Backend) newRuntime(p proxyInfo) *runtimeClient {
-	return &runtimeClient{hc: b.o.HTTPClient, base: p.URL, token: p.Token, agent: b.o.ClientAgent, dial: b.o.Dial}
+	return &runtimeClient{hc: b.o.HTTPClient, up: b.o.UploadClient, base: p.URL, token: p.Token, agent: b.o.ClientAgent, dial: b.o.Dial,
+		slow: func(method, endpoint string, took time.Duration) {
+			b.log.Info("colab: slow request to the runtime", "method", method, "endpoint", endpoint, "ms", took.Milliseconds())
+		}}
 }
 
 // acquire returns the running session, borrowing a runtime first when
@@ -112,11 +136,28 @@ func (b *Backend) newRuntime(p proxyInfo) *runtimeClient {
 func (b *Backend) acquire(ctx context.Context, set Settings, jp *jobProgress) (*liveSession, error) {
 	b.mu.Lock()
 	if s := b.sess; s != nil {
+		state, ready := s.rec.State, s.ready
 		b.mu.Unlock()
-		if s.rec.State == StateRunning {
+		if state == StateRunning {
 			return s, nil
 		}
-		return nil, fallbackErr(CodeBusy, nil, errors.New("the remote session is busy (starting or stopping)"))
+		if ready != nil && (state == StateQueued || state == StateBooting) {
+			// colab-batch: another lecture of this run is borrowing the
+			// runtime (two at once on the larger GPUs): wait for it.
+			jp.waiting("")
+			select {
+			case <-ready:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+			b.mu.Lock()
+			ok := b.sess == s && s.rec.State == StateRunning
+			b.mu.Unlock()
+			if ok {
+				return s, nil
+			}
+		}
+		return nil, busyErr(errors.New("the remote session is busy (starting or stopping)"))
 	}
 	if now := b.now(); now.Before(b.cooldownUntil) {
 		left := b.cooldownUntil.Sub(now)
@@ -127,9 +168,11 @@ func (b *Backend) acquire(ctx context.Context, set Settings, jp *jobProgress) (*
 	s := &liveSession{rec: sessionRecord{
 		Version: recordVersion, State: StateQueued, NotebookHash: newNotebookHash(), Accelerator: set.Accelerator,
 		Shape: set.shape(), RequestedAt: b.now(), RunID: b.o.RunID,
-	}}
+	}, ready: make(chan struct{})}
 	b.sess = s
+	b.samples.Reset()
 	b.mu.Unlock()
+	defer close(s.ready)
 	b.persist(ctx, s.rec)
 	b.log.Info("colab: requesting a runtime", "accelerator", set.Accelerator)
 
@@ -201,8 +244,9 @@ func (b *Backend) acquire(ctx context.Context, set Settings, jp *jobProgress) (*
 // Upstream connects right away (with three retries on timeouts); polling
 // covers a proxy that is not ready yet.
 func (b *Backend) boot(ctx context.Context, s *liveSession) error {
-	deadline := b.now().Add(b.o.BootTimeout)
-	delay := 3 * time.Second
+	started := b.now()
+	deadline := started.Add(b.o.BootTimeout)
+	delay := time.Second
 	refreshed := false
 	for {
 		rt, err := b.runtime(ctx, s)
@@ -236,7 +280,11 @@ func (b *Backend) boot(ctx context.Context, s *liveSession) error {
 		if err := b.o.Sleep(ctx, delay); err != nil {
 			return err
 		}
-		delay = min(2*delay, 30*time.Second)
+		// colab-prof R3: every second for the first minute (a slow boot is
+		// noticed at once), then doubling from 5 s to 30 s.
+		if b.now().Sub(started) >= time.Minute {
+			delay = min(max(2*delay, 5*time.Second), 30*time.Second)
+		}
 	}
 }
 
@@ -310,12 +358,24 @@ func (b *Backend) releaseWith(ctx context.Context, reason, file string) error {
 	defer cancel()
 	b.mu.Lock()
 	s := b.sess
+	b.mu.Unlock()
+	if s != nil {
+		b.awaitRemovals(s) // finished lectures' files go first (removal.go)
+	}
+	b.mu.Lock()
+	s = b.sess
 	if s == nil {
 		b.mu.Unlock()
 		return nil
 	}
 	s.rec.State = StateStopping
-	rec, rt, kid := s.rec, s.rt, s.kernelID
+	b.samples.Reset() // the runtime's readings go with it (the account stays)
+	rec, rt := s.rec, s.rt
+	kids := append([]string(nil), s.kernels...)
+	if len(kids) == 0 && s.kernelID != "" {
+		kids = []string{s.kernelID}
+	}
+	b.dropAllUploadsLocked(s)
 	b.mu.Unlock()
 	b.persist(ctx, rec)
 	if rec.Endpoint == "" {
@@ -323,12 +383,14 @@ func (b *Backend) releaseWith(ctx context.Context, reason, file string) error {
 		b.noteRelease(reason, file)
 		return nil
 	}
-	if rt != nil && kid != "" {
+	if rt != nil && len(kids) > 0 {
 		if rt2, err := b.runtime(ctx, s); err == nil {
 			rt = rt2
 		}
-		if err := rt.deleteKernel(ctx, kid); err != nil {
-			b.log.Info("colab: shutting down the kernel before release failed (ignored)", "code", Code(codedHTTP("api/kernels", err)))
+		for _, kid := range kids {
+			if err := rt.deleteKernel(ctx, kid); err != nil {
+				b.log.Info("colab: shutting down a kernel before release failed (ignored)", "code", Code(codedHTTP("api/kernels", err)))
+			}
 		}
 	}
 	err := b.unassignIfListed(ctx, rec.Endpoint)
@@ -342,14 +404,14 @@ func (b *Backend) releaseWith(ctx context.Context, reason, file string) error {
 			b.sess = nil
 		}
 		b.leftover = &LeftoverInfo{Accelerator: rec.Accelerator, Since: rec.RequestedAt, Code: CodeLeftoverSession}
-		b.lastErr = infoOf(err)
+		b.noteErrLocked(infoOf(err))
 		b.mu.Unlock()
 		return err
 	}
 	if err != nil {
 		b.log.Warn("colab: releasing the runtime failed; will retry", "reason", reason, "code", Code(err))
 		b.mu.Lock()
-		b.lastErr = infoOf(err)
+		b.noteErrLocked(infoOf(err))
 		b.mu.Unlock()
 		return err
 	}
@@ -484,6 +546,17 @@ func (t *tunnel) getAssign(ctx context.Context, nbh, accelerator, shape string, 
 	}
 	if xsrf == "" {
 		return assignment{}, "", false, apiChanged(ep, "field token empty")
+	}
+	// "p": Colab wants a reCAPTCHA before it assigns (colab-vscode's older
+	// schema; read leniently, the boolean only). LectureFlow cannot and
+	// does not answer one: the borrowing then fails as Colab decides; the
+	// log says why (colab-obs-core: false on the free and the paid account,
+	// 2026-10-27).
+	if raw, ok := o.m["p"]; ok {
+		var p bool
+		if json.Unmarshal(raw, &p) == nil && p {
+			t.log.Warn("colab: Colab asks for a reCAPTCHA before it assigns a runtime; if the borrowing fails, open Colab once in the browser with this Google account")
+		}
 	}
 	if v, err := o.str("variant"); err != nil {
 		return assignment{}, "", false, err

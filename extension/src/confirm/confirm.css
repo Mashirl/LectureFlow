@@ -1,0 +1,9 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* The confirmation window (src/confirm/confirm.js): the popup's frame
+   (popup/popup.css) at the window's width; the card itself is ui/card.css. */
+
+body { width: auto; min-width: 320px; max-width: 480px; margin: 0 auto; }
+.cf-title { font-size: var(--fs-md); font-weight: 600; color: var(--text-2); }
+.cf-embed { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-5) var(--sp-6) 0; }
+.cf-embed .note { margin: 0; }

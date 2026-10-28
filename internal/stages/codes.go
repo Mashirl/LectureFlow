@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/remote"
 	"lectureflow/internal/state"
 )
 
@@ -62,6 +63,11 @@ const (
 	CodePrepMediaVanished     = "prep.media_vanished"      // file
 	CodePrepFFmpegMissing     = "prep.ffmpeg_missing"      // path
 	CodePrepFFmpegStartFailed = "prep.ffmpeg_start_failed" // path
+	// Another program has the file open, so it cannot be replaced (Windows;
+	// test-chaos 3): name is the file's name only (audio.wav, stream.mp4;
+	// an export file's name), never its path. Retryable.
+	CodePrepFileInUse   = "prep.file_in_use"   // name
+	CodeExportFileInUse = "export.file_in_use" // name
 
 	CodeSummaryNoSentences = "summary.no_sentences" //
 	CodeSummaryEmpty       = "summary.empty"        //
@@ -127,6 +133,7 @@ const (
 	NoteRepairChunksFailed = "repair.chunks_failed"        // total, chunks, ranges, attempts
 	WarnRepairUnrepaired   = "repair.sentences_unrepaired" // ranges, attempts
 	NotePrepKeptOriginal   = "prep.kept_original"          // stream_status
+	NotePrepEncoderRetried = "prep.stream_encoder_retried" // failed (encoders, "h264_qsv"), encoder (qsv-retry)
 )
 
 // Why the janitor's action was dropped (JanitorRejected.WhyCode, kind note).
@@ -155,6 +162,7 @@ var ErrorCodes = func() []string {
 		CodeWorkerPythonMissing, CodeWorkerScriptMissing, CodePDFResultUnparsable,
 		CodeWorkerPythonNotInstalled, CodeWorkerFWNotInstalled,
 		CodePrepMediaMissing, CodePrepMediaVanished, CodePrepFFmpegMissing, CodePrepFFmpegStartFailed,
+		CodePrepFileInUse, CodeExportFileInUse,
 		CodeSummaryNoSentences, CodeSummaryEmpty, CodeRepairNoSummary, CodeRepairAllFailed,
 		CodeTranslateNoSummary, CodeTranslateFailed, CodeTranslatePrefixChanged,
 		CodeSnapshotMissing, CodeSentencesChanged, CodeOutputUnusable,
@@ -164,12 +172,18 @@ var ErrorCodes = func() []string {
 		NoteGlossarySeedNoText, NoteGlossarySeedDone, NoteFallbackApplied, NoteGlossarySeedCapped,
 		NoteMaterialNoText, NoteMaterialTermsDone, NoteMaterialCapped, NoteMaterialSkipped, WarnMaterialTermsLost,
 		NoteJanitorDone, NoteJanitorNoops, NoteJanitorIgnored, NoteJanitorSplit, NoteJanitorBatches, NoteJanitorNothing, NoteJanitorUnavailable,
-		NoteRepairChunksFailed, WarnRepairUnrepaired, NotePrepKeptOriginal,
+		NoteRepairChunksFailed, WarnRepairUnrepaired, NotePrepKeptOriginal, NotePrepEncoderRetried,
 		WhyUnknownTerm, WhyLocked, WhyDuplicate, WhyUnknownAction, WhyNoTarget, WhySelf,
 		WhyTargetOff, WhyTargetGone, WhyNoZh, WhyUserZh,
 		CodeRenumberedAuto, // kinds.go: a note on the course page (lecture kinds)
+		// asr_textrepair.go: "修复断句" (textrepair-int)
+		CodeTextRepairNoSentences, CodeTextRepairNoWords, CodeTextRepairUnparsable, CodeTextRepairLanguage,
+		// pdf_limits.go: extract_pdf.py's resource limits (security review 2, M2)
+		CodePDFDecodeBudget, CodePDFMemoryLimit, CodePDFTimeout,
 	}
-	for _, p := range []string{workerASR, workerASROV, workerASRMLX, workerPDF} {
+	// asr_remote.go: the SSH inference servers' codes (ssh-mvp; defined in internal/remote)
+	out = append(out, remote.ErrorCodes...)
+	for _, p := range []string{workerASR, workerASROV, workerASRMLX, workerPDF, workerTextRepairCode} {
 		for _, s := range []string{workerStartFailed, workerInputError, workerFailed, workerError, workerNoOutput} {
 			out = append(out, p+s)
 		}

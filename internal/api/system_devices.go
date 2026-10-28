@@ -30,7 +30,9 @@ const (
 // none on a machine without an Intel GPU or NPU and without an OpenVINO
 // environment, mac-opti M3: openVINOVisible). In desktop mode a missing
 // environment is the asr-openvino component that is not installed.
-func (s *Server) openVINOChecks() []SystemCheck {
+// ext-step1: without an NVIDIA GPU (env) a missing development
+// environment does not mention CUDA (check.openvino_venv_absent).
+func (s *Server) openVINOChecks(env diagEnv) []SystemCheck {
 	if s.dev == nil {
 		return nil
 	}
@@ -50,10 +52,13 @@ func (s *Server) openVINOChecks() []SystemCheck {
 		venv.setDetail("check.openvino_venv_ok", map[string]any{"path": python})
 	} else {
 		venv.Status = statusWarn
-		if s.desktopDiag() || python == "" { // "": no component, nothing configured (3.1.0)
+		switch {
+		case s.desktopDiag() || python == "": // "": no component, nothing configured (3.1.0)
 			venv.setDetail(codeOpenVINONotInstalled, nil)
-		} else {
+		case env.nvidia:
 			venv.setDetail("check.openvino_venv_missing", map[string]any{"path": python})
+		default:
+			venv.setDetail(codeOpenVINOVenvAbsent, map[string]any{"path": python})
 		}
 		venv.setHint(venvHint, nil)
 	}

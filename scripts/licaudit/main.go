@@ -11,7 +11,9 @@
 // tables in packaging/licenses, judges every license against the
 // AGPL-3.0-compatible table (policy.go) and writes THIRD_PARTY_NOTICES.md.
 // With -check it writes nothing (CI). It also checks the SPDX header of
-// every tracked source file. Any violation exits with status 1.
+// every tracked source file, and that the worker sources point to the
+// additional permission in LICENSE-EXCEPTION.md. Any violation exits with
+// status 1.
 package main
 
 import (
@@ -88,6 +90,17 @@ func auditMain(args []string, stdout, stderr io.Writer, goMods func(string) ([]G
 			fmt.Fprintln(stdout, "  FAIL", m)
 		}
 		failed = failed || len(missing) > 0
+
+		noNotice, err := CheckExceptionNotice(*root, files)
+		if err != nil {
+			fmt.Fprintln(stderr, "licaudit:", err)
+			return 2
+		}
+		fmt.Fprintf(stdout, "worker header check: %d worker sources without %q in the first %d lines\n", len(noNotice), exceptionNotice, spdxHeadLines)
+		for _, m := range noNotice {
+			fmt.Fprintln(stdout, "  FAIL", m)
+		}
+		failed = failed || len(noNotice) > 0
 	}
 	if failed {
 		return 1

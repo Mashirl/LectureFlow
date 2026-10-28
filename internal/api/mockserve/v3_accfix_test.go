@@ -40,12 +40,16 @@ func TestMockStagedInstallDevices(t *testing.T) {
 	sawCUDAOnly := false
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
+		// The task state is read before the devices: if the devices still
+		// show CUDA only, the task was certainly running at that earlier
+		// moment. Reading it after left a window in which a loaded machine
+		// moved the task on between the two requests.
+		var list obComponentsView
+		doJSON(t, "GET", srv.URL+"/api/components?mock=ob_staged", nil, 200, &list)
 		doJSON(t, "GET", srv.URL+"/api/asr/devices?mock=ob_staged", nil, 200, &vs)
 		got := deviceIDs(vs)
 		if got["cuda:0"] && !got["ov:GPU"] {
 			sawCUDAOnly = true
-			var list obComponentsView
-			doJSON(t, "GET", srv.URL+"/api/components?mock=ob_staged", nil, 200, &list)
 			if list.Tasks[0].State != "running" {
 				t.Fatalf("task already %s while only CUDA is in", list.Tasks[0].State)
 			}

@@ -43,7 +43,10 @@ type store struct {
 	sentences []api.Sentence
 	patches   []api.Patch
 	paused    bool
-	started   time.Time
+	// redecodeOff: the switch "修复退化的转写窗口" was turned off
+	// (api.Settings.ASRRedecode; on by default, like kv asr.redecode).
+	redecodeOff bool
+	started     time.Time
 	// progress0 is the progress of each running stage at load time; the
 	// current progress grows slowly with the time since the server started.
 	progress0 map[string]float64

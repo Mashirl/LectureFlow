@@ -10,10 +10,15 @@ not two copies). Standard library only: the two workers run in different virtual
 environments (.venv and .venv-ov).
 
 Contents: exit codes and InputError; Word / as_word; sentence splitting
-(split_word_groups, split_sentences, _word_times); remove_repeats; truncate_prompt;
-format_progress / emit_stdout; write_result; the timing block of result.json; the
+(split_word_groups, split_sentences, _word_times); degenerate windows (window_style,
+degeneration: all lower case without punctuation, all upper case); remove_repeats;
+truncate_prompt; format_progress / emit_stdout; write_result; the timing block of
+result.json; the
 checkpoints of both workers (power management: job.json "checkpoint", asr.ckpt.json,
 result.json "parts"); the command-line helpers both workers use.
+
+No usage reporting: importing this module runs telemetry_off() (below), before any worker
+imports a third-party library.
 """
 from __future__ import annotations
 
@@ -26,6 +31,40 @@ import string
 import sys
 from collections import namedtuple
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
+
+# ---------------------------------------------------------------------------
+# No usage reporting (privacy audit before 3.2.0, NOTES.md "无遥测")
+# ---------------------------------------------------------------------------
+
+# The same list as internal/pyenv TelemetryOff (the Go side sets it for every Python
+# child; this covers a worker started any other way) and worker/colab_remote.py.
+TELEMETRY_OFF_ENV = {
+    "HF_HUB_DISABLE_TELEMETRY": "1",
+    "HF_HUB_DISABLE_IMPLICIT_TOKEN": "1",
+    "HF_XET_TELEMETRY_ENABLED": "0",
+    "DO_NOT_TRACK": "1",
+}
+
+# Packages whose only job is usage reporting. openvino-telemetry has no environment switch
+# (only a consent file in the user's profile): `import openvino` sent a Google Analytics
+# event (openvino.tools.ovc) and nncf reports its compression calls through it. Both fall
+# back to built-in no-op stubs when the import fails, which a None entry in sys.modules makes
+# it do.
+TELEMETRY_MODULES = ("openvino_telemetry",)
+
+
+def telemetry_off(environ=None, modules=None) -> None:
+    """Turns off the usage reporting of the libraries the workers load: TELEMETRY_OFF_ENV
+    (huggingface_hub reads it when it is imported) and TELEMETRY_MODULES made unimportable.
+    Must run before openvino / nncf / huggingface_hub are imported; idempotent."""
+    environ = os.environ if environ is None else environ
+    modules = sys.modules if modules is None else modules
+    environ.update(TELEMETRY_OFF_ENV)
+    for name in TELEMETRY_MODULES:
+        modules[name] = None
+
+
+telemetry_off()
 
 EXIT_OK = 0
 EXIT_RETRY = 1
@@ -213,6 +252,93 @@ def split_sentences(words: Iterable) -> List[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Degenerate decoding windows (redecode: worker-builder, 2026-10-27, user-approved)
+# ---------------------------------------------------------------------------
+#
+# large-v3 with condition_on_previous_text=False (SPEC §6.2) writes about half of the
+# 30-second windows of a fast lecture in one of two styles a human transcript never
+# has: all lower case without any punctuation, or all upper case. Both are confident
+# T=0 decodes, so neither the temperature fallback nor the hallucination filter sees
+# them, and the sentence split can only cut such text at the 60th word
+# (.claude/research/asr-degeneration.md). window_style() recognises them from the
+# words alone (no audio, no model), so worker/asr.py (which decodes such a window again)
+# and the statistical repair layer judge text the same way.
+
+DEGENERATE_UNPUNCTUATED = "unpunctuated"
+DEGENERATE_UPPERCASE = "uppercase"
+
+# Punctuation that counts, at the end of a word (closing quotes/brackets stripped):
+# "3.14" or "e.g" inside a word does not make a window punctuated.
+WINDOW_PUNCT = ".,?!;:"
+# "unpunctuated": at least this many words, no sentence end among them and at most one
+# other mark (comma, ...) per UNPUNCTUATED_WORDS_PER_MARK words. Normal Whisper text has
+# a comma or full stop every ~10 words and a sentence end in every window (CSC3631,
+# 2 lectures, 209 windows); the degenerate style has none at all, or a stray comma or
+# two in 60 words. Shorter windows (the end of a talk, a pause) are left alone.
+UNPUNCTUATED_MIN_WORDS = 30
+UNPUNCTUATED_WORDS_PER_MARK = 10
+# "uppercase": at least this many words and UPPERCASE_MIN_RATIO of the letters upper
+# case. Acronym-dense lecture text (AES, XOR, CBC, LFSR) stays far below: the words
+# around the acronyms are lower case.
+UPPERCASE_MIN_WORDS = 8
+UPPERCASE_MIN_RATIO = 0.8
+
+# The numbers window_style() bases its verdict on; kind is "" (not degenerate),
+# DEGENERATE_UPPERCASE or DEGENERATE_UNPUNCTUATED.
+WindowStyle = namedtuple("WindowStyle", ["words", "punct", "sentence_ends", "letters",
+                                         "upper", "kind"])
+
+
+def _word_text(w) -> str:
+    """The text of a word: a str, a Word / faster-whisper Word (.word), or a dict with
+    "word" (checkpoint, as_word) or "w" (result.json sentence words)."""
+    if isinstance(w, str):
+        return w
+    if isinstance(w, dict):
+        return str(w.get("word", w.get("w", "")))
+    return str(w.word)
+
+
+def window_style(words: Iterable) -> WindowStyle:
+    """Counts of a decoded window's words and whether its writing style is degenerate.
+
+    Words without letters or digits (stray punctuation) do not count as words. An
+    upper-case window is DEGENERATE_UPPERCASE even when it has punctuation; otherwise a
+    window of UNPUNCTUATED_MIN_WORDS words or more without a sentence end and with at
+    most one word ending in WINDOW_PUNCT per UNPUNCTUATED_WORDS_PER_MARK words is
+    DEGENERATE_UNPUNCTUATED.
+    """
+    n = punct = ends = letters = upper = 0
+    for raw in words:
+        text = _word_text(raw).strip()
+        if not any(c.isalnum() for c in text):
+            continue
+        n += 1
+        core = _core(text)
+        if core and core[-1] in WINDOW_PUNCT:
+            punct += 1
+        if is_sentence_end(text):
+            ends += 1
+        for c in text:
+            if c.isalpha():
+                letters += 1
+                if c.isupper():
+                    upper += 1
+    kind = ""
+    if n >= UPPERCASE_MIN_WORDS and letters and upper >= UPPERCASE_MIN_RATIO * letters:
+        kind = DEGENERATE_UPPERCASE
+    elif n >= UNPUNCTUATED_MIN_WORDS and ends == 0 and punct * UNPUNCTUATED_WORDS_PER_MARK <= n:
+        kind = DEGENERATE_UNPUNCTUATED
+    return WindowStyle(n, punct, ends, letters, upper, kind)
+
+
+def degeneration(words: Iterable) -> str:
+    """"" when the words read like normal text, else the degenerate style
+    (DEGENERATE_UPPERCASE or DEGENERATE_UNPUNCTUATED); see window_style()."""
+    return window_style(words).kind
+
+
+# ---------------------------------------------------------------------------
 # Repetition filter
 # ---------------------------------------------------------------------------
 
@@ -346,16 +472,23 @@ def peak_working_set_mb() -> int:
 
 
 def make_timing(load_s: float, transcribe_s: float, audio_s: float, first_compile: bool,
-                peak_mb: Optional[int] = None) -> dict:
+                peak_mb: Optional[int] = None, postprocess: Optional[dict] = None) -> dict:
     """The "timing" block of result.json (brief 3b §4): seconds, the first-compile flag
-    and the process's peak working set in MB (0 = unknown)."""
-    return {
+    and the process's peak working set in MB (0 = unknown). postprocess (redecode,
+    2026-10-27): the counters of the steps between decoding and the sentence split
+    that ran, one object per step ({"redecode": {...}}, see worker/asr.py
+    RedecodeStats); left out when no step ran (None or empty). They describe the run,
+    never the transcript (Go: model.ASRTiming.Postprocess)."""
+    timing = {
         "load_s": round(max(0.0, load_s), 2),
         "transcribe_s": round(max(0.0, transcribe_s), 2),
         "audio_s": round(max(0.0, audio_s), 2),
         "first_compile": bool(first_compile),
         "peak_working_set_mb": int(peak_working_set_mb() if peak_mb is None else peak_mb),
     }
+    if postprocess:
+        timing["postprocess"] = {k: dict(v) for k, v in postprocess.items()}
+    return timing
 
 
 # ---------------------------------------------------------------------------
@@ -410,8 +543,11 @@ CheckpointSegment = namedtuple("CheckpointSegment", ["start_ms", "end_ms", "seek
 # checkpoint, in mel frames of the speech-only audio; None for OpenVINO), the first
 # part's prompt_terms_used, the parts so far (dicts), the segments (encoded JSON, written
 # again as they are; raw = read back as CheckpointSegment) and all their words in order.
+# redecode (faster-whisper, 2026-10-27): the checkpoint's "redecode" counters (dict) of
+# the windows in it, None when the file has none (written before degenerate windows
+# were decoded again, or by OpenVINO).
 Resume = namedtuple("Resume", ["resume_ms", "resume_seek", "prompt_terms_used", "parts",
-                               "segments", "raw", "words"])
+                               "segments", "raw", "words", "redecode"], defaults=(None,))
 
 _PART_KEYS = ("from_ms", "to_ms", "device_id", "model", "precision")
 _SAME_PART_KEYS = ("device_id", "model", "precision")
@@ -513,6 +649,14 @@ def _valid_word(w) -> bool:
         all(_is_num(w.get(k)) for k in ("start", "end", "probability"))
 
 
+def _valid_counters(d) -> bool:
+    """A checkpoint's "redecode" object: non-negative numbers (counts and seconds) and
+    the flag "skipped"."""
+    return isinstance(d, dict) and all(
+        isinstance(k, str) and (isinstance(v, bool) if k == "skipped" else _is_num(v) and v >= 0)
+        for k, v in d.items())
+
+
 def _valid_segment(s, faster_whisper: bool) -> bool:
     if not (isinstance(s, dict) and _is_int(s.get("start_ms")) and _is_int(s.get("end_ms"))
             and isinstance(s.get("words"), list) and all(_valid_word(w) for w in s["words"])):
@@ -609,6 +753,8 @@ class Checkpointer:
             # a checkpoint holds at least one complete window / chunk; without one the
             # run starts over, initial_prompt included
             return "no segments"
+        if "redecode" in data and not _valid_counters(data["redecode"]):
+            return "malformed redecode"
         return ""
 
     def load(self, total_ms: int) -> Optional[Resume]:
@@ -641,8 +787,9 @@ class Checkpointer:
                                            seg.no_speech_prob, seg.avg_logprob))
         parts = [{k: p[k] for k in _PART_KEYS} for p in data["parts"]]
         seek = data["resume_seek"] if self.faster_whisper else None
+        redecode = dict(data["redecode"]) if "redecode" in data else None
         resume = Resume(data["resume_ms"], seek, data["prompt_terms_used"], parts, segments,
-                        raw, words)
+                        raw, words, redecode)
         self.emit("resuming from checkpoint %s at %s%s: %d segments, %d words; parts %s"
                   % (name, clock(resume.resume_ms),
                      " (seek %d)" % seek if seek is not None else "", len(segments),
@@ -651,9 +798,18 @@ class Checkpointer:
                                              p["device_id"] or "?") for p in parts)))
         return resume
 
+    def discard(self, why: str) -> None:
+        """Deletes a checkpoint load() accepted but the worker cannot continue (it says
+        why, as load() does); the run starts over."""
+        self.emit("checkpoint %s not used (%s); starting over" % (os.path.basename(self.path), why))
+        self._remove(self.path)
+
     def save(self, resume_ms: int, prompt_terms_used: int, parts: Sequence[dict],
-             segments: Sequence[str], resume_seek: Optional[int] = None) -> bool:
-        """Writes the checkpoint (.tmp, fsync, os.replace); False when it failed (logged)."""
+             segments: Sequence[str], resume_seek: Optional[int] = None,
+             redecode: Optional[dict] = None) -> bool:
+        """Writes the checkpoint (.tmp, fsync, os.replace); False when it failed (logged).
+        redecode: the faster-whisper worker's counters of the windows in the file (left
+        out when None)."""
         head = {"version": CHECKPOINT_VERSION, "job_id": self.job.job_id,
                 "input_hash": self.job.input_hash, "backend": self.backend}
         if self.engine:
@@ -664,6 +820,8 @@ class Checkpointer:
         if resume_seek is not None:
             head["resume_seek"] = int(resume_seek)
         head["prompt_terms_used"] = int(prompt_terms_used)
+        if redecode is not None:
+            head["redecode"] = dict(redecode)
         head["parts"] = list(parts)
         text = json.dumps(head, ensure_ascii=False, separators=(",", ":"))
         text = text[:-1] + ',"segments":[' + ",".join(segments) + "]}"

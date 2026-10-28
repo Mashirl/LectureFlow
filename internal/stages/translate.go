@@ -122,7 +122,9 @@ func (s *translateStage) Run(ctx context.Context, lectureID string, progress fun
 	ev := d.events()
 	notify := newThrottle(time.Second)
 	wctx := context.WithoutCancel(ctx)
-	err = parallel(ctx, len(todo), d.concurrency(config.RoleTranslate, target.ProviderID), func(ctx context.Context, k int) (bool, error) {
+	// The first sentence goes out alone to warm the provider's prompt cache
+	// (perf-llm, warmup.go); the order of sending is all that changes.
+	err = parallelWarm(ctx, len(todo), d.concurrency(config.RoleTranslate, target.ProviderID), translateWarmup, func(ctx context.Context, k int) (bool, error) {
 		idx := todo[k]
 		tr, err := s.translateOne(ctx, ld.snap, idx, x)
 		if err != nil {

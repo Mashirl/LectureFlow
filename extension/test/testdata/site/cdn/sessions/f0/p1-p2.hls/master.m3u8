@@ -1,0 +1,4 @@
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-STREAM-INF:BANDWIDTH=135000,CODECS="mp4a.40.2"
+index_0.m3u8?Policy=abc&Signature=def

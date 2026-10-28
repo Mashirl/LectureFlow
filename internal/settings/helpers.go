@@ -26,6 +26,15 @@ const (
 	DefaultRPM            = 60
 )
 
+// Ranges of a provider's limits (perf-llm, NOTES.md). max_concurrency goes
+// up to 512: DeepSeek's limit is per account (2500 concurrent requests for
+// deepseek-flash) and a lecture of ~290 translate requests gains nothing
+// beyond that. rpm 0 means no per-minute limit (DeepSeek has none).
+const (
+	MaxConcurrencyLimit = 512
+	MaxRPM              = 10000
+)
+
 // DefaultASR is the ASR settings default of Load (SPEC §2, §17.2; SPEC-v2
 // I8 and lead ruling 8 for the four fields of phase 3b: device_mode auto,
 // multi_device true, battery_aware true, mem_reserve_mb 2048).
@@ -390,11 +399,13 @@ func validateProvider(p model.Provider) error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return userErr(ErrInvalid, CodeBaseURLInvalid, nil, "base_url 必须是 http:// 或 https:// 开头的完整地址")
 	}
-	if p.MaxConcurrency < 1 || p.MaxConcurrency > 64 {
-		return userErr(ErrInvalid, CodeConcurrencyInvalid, map[string]any{"min": 1, "max": 64}, "并发上限必须在 1 到 64 之间")
+	if p.MaxConcurrency < 1 || p.MaxConcurrency > MaxConcurrencyLimit {
+		return userErr(ErrInvalid, CodeConcurrencyInvalid, map[string]any{"min": 1, "max": MaxConcurrencyLimit},
+			"并发上限必须在 1 到 %d 之间", MaxConcurrencyLimit)
 	}
-	if p.RPM < 1 || p.RPM > 10000 {
-		return userErr(ErrInvalid, CodeRPMInvalid, map[string]any{"min": 1, "max": 10000}, "每分钟请求数必须在 1 到 10000 之间")
+	if p.RPM < 0 || p.RPM > MaxRPM {
+		return userErr(ErrInvalid, CodeRPMInvalid, map[string]any{"min": 0, "max": MaxRPM},
+			"每分钟请求数必须在 0 到 %d 之间（0 表示不限）", MaxRPM)
 	}
 	if p.BalanceAPI != model.BalanceNone && p.BalanceAPI != model.BalanceDeepSeek {
 		return userErr(ErrInvalid, CodeBalanceAPIInvalid, nil, "余额接口只能是 none 或 deepseek")
@@ -423,8 +434,8 @@ func importLegacy(ctx context.Context, tx db.Store, cfg *config.Config) (noKey [
 			ID: name, Name: name, Type: model.ProviderOpenAI,
 			BaseURL:        strings.TrimRight(strings.TrimSpace(lp.BaseURL), "/"),
 			APIKey:         strings.TrimSpace(lp.Key()),
-			MaxConcurrency: clamp(lp.MaxConcurrency, 1, 64, DefaultMaxConcurrency),
-			RPM:            clamp(lp.RequestsPerMinute, 1, 10000, DefaultRPM),
+			MaxConcurrency: clamp(lp.MaxConcurrency, 1, MaxConcurrencyLimit, DefaultMaxConcurrency),
+			RPM:            legacyRPM(lp.RequestsPerMinute),
 			BalanceAPI:     model.BalanceNone,
 			CreatedAt:      now,
 		}
@@ -513,6 +524,35 @@ func LegacyPrice(cfg *config.Config, provider string) (config.Price, bool) {
 		}
 	}
 	return config.Price{}, false
+}
+
+// legacyRPM is the rpm of a provider imported from config.toml: 0 (the
+// config's DeepSeek default, perf-llm) = no per-minute limit, a negative
+// value the default.
+func legacyRPM(v int) int {
+	if v < 0 {
+		return DefaultRPM
+	}
+	return min(v, MaxRPM)
+}
+
+// SameOrigin reports whether two base_urls point at the same origin
+// (scheme, host and port; case-insensitive, default ports filled in). An
+// unparsable URL only matches itself.
+func SameOrigin(a, b string) bool {
+	origin := func(s string) string {
+		u, err := url.Parse(strings.TrimSpace(s))
+		if err != nil || u.Host == "" {
+			return "raw:" + strings.TrimSpace(s)
+		}
+		scheme := strings.ToLower(u.Scheme)
+		port := u.Port()
+		if port == "" {
+			port = map[string]string{"http": "80", "https": "443"}[scheme]
+		}
+		return scheme + "://" + strings.ToLower(u.Hostname()) + ":" + port
+	}
+	return origin(a) == origin(b)
 }
 
 func clamp(v, lo, hi, def int) int {

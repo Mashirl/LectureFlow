@@ -27,7 +27,7 @@ var (
 	// ProbeTimeout bounds one TestConnection or ProbeModels call.
 	ProbeTimeout = 30 * time.Second
 	// probeHTTP is the HTTP client of TestConnection and ProbeModels.
-	probeHTTP = &http.Client{}
+	probeHTTP = &http.Client{CheckRedirect: checkRedirect}
 )
 
 // maxModelPages bounds the pagination of Anthropic's GET /v1/models.
@@ -78,7 +78,7 @@ func testConnection(ctx context.Context, p model.Provider, modelName string) Tes
 		err = probeErr(CodeProbeHTTP, map[string]any{"status": status}, httpErrorText(status, resp, p.APIKey))
 	}
 	if err == nil && !json.Valid(resp) {
-		err = probeErr(CodeProbeNotJSON, nil, "响应不是 JSON（base_url 是否指向了 API 地址？）："+redact(snippet(resp), p.APIKey))
+		err = probeErr(CodeProbeNotJSON, nil, "响应不是 JSON（base_url 是否指向了 API 地址？）："+redactSnippet(resp, p.APIKey))
 	}
 	if err != nil {
 		res := failedTest(err) // doProbe's errors are coded and redacted
@@ -137,7 +137,7 @@ func listModels(ctx context.Context, endpoint string, p model.Provider) (ids []s
 		LastID  string `json:"last_id"`
 	}
 	if err := json.Unmarshal(body, &page); err != nil {
-		return nil, false, "", probeErr(CodeProbeBadModelList, nil, "模型列表无法解析："+redact(snippet(body), p.APIKey))
+		return nil, false, "", probeErr(CodeProbeBadModelList, nil, "模型列表无法解析："+redactSnippet(body, p.APIKey))
 	}
 	for _, m := range page.Data {
 		ids = append(ids, m.ID)
@@ -179,7 +179,7 @@ func doProbe(ctx context.Context, method, endpoint string, p model.Provider, bod
 
 // httpErrorText is "HTTP 401：{the server's body}" with any echoed key redacted.
 func httpErrorText(status int, body []byte, key string) string {
-	s := redact(snippet(body), key)
+	s := redactSnippet(body, key)
 	if s == "" {
 		return fmt.Sprintf("HTTP %d", status)
 	}

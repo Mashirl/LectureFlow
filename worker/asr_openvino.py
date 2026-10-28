@@ -6,6 +6,15 @@
 Usage (interpreter = config python_openvino, i.e. .venv-ov):
     python worker/asr_openvino.py --in job.json --out result.json.tmp
     python worker/asr_openvino.py --probe
+    python worker/asr_openvino.py --selftest --device CPU|GPU|NPU --model MODEL_DIR [--cache-dir DIR]
+
+--selftest (ext-step1, the diagnostics' CPU inference test; the contract of asr.py
+--selftest): load the converted model of MODEL_DIR on the device (never prepared or
+downloaded here), transcribe 1 s of silence (no VAD in OpenVINO), print "SELFTEST ok
+device=CPU load_s=... transcribe_s=... segments=N". Without --model or with an incomplete
+model: exit 2; the device missing: ERROR_CODE device_unavailable, exit 2; OpenVINO not
+importable: exit 2; anything else exit 1. --cache-dir is GPU / NPU's CACHE_DIR (none:
+compiled every time).
 
 Same protocol as worker/asr.py (SPEC §6.0):
   * Exit code 0 = success; 2 = input error, or the device / environment is not usable
@@ -35,7 +44,9 @@ job.json: {"audio", "model", "precision" (fp16|int8|int4), "model_dir",
            optional "checkpoint" ({"path", "job_id", "input_hash", "device_id", "model",
            "precision", "chunk_s"}, power brief §4)}
 result.json: as worker/asr.py, plus "timing": {"load_s", "transcribe_s", "audio_s" (the
-             audio this run transcribed), "first_compile", "peak_working_set_mb"}.
+             audio this run transcribed), "first_compile", "peak_working_set_mb",
+             "postprocess": {"textrepair": ...}} (textrepair-int: the text repair before
+             the sentence split, as worker/asr.py; there is no redecode here).
              low_conf_words is always [] (OpenVINO gives no word probabilities). Without
              word timestamps the sentences have no "words" (the Go side interpolates,
              SPEC-v2 P4.4). "parts" when job.checkpoint is set (asr_common.Checkpointer).
@@ -80,6 +91,8 @@ from asr_common import (
     BACKEND_OPENVINO, Checkpointer, Resume, audio_ms, clock, encode_segment,
     parse_checkpoint_job, samples_at,
 )
+# The statistical repair of degenerate text before the sentence split (textrepair-int).
+import textrepair
 
 PRECISIONS = ("fp16", "int8", "int4")
 OV_DEVICES = ("GPU", "NPU", "CPU")
@@ -770,12 +783,22 @@ def chunk_words(res, start: float, end: float, frames, threshold: float,
 
 
 def finish_sentences(words: Sequence[Word], duration: float, with_words: bool, counts,
-                     emit: Callable[[str], None]) -> List[dict]:
-    """Orders the words (make_monotonic), removes repeats, splits sentences; without
-    word timestamps the sentences carry no "words"."""
+                     emit: Callable[[str], None], job=None,
+                     postprocess: Optional[dict] = None) -> List[dict]:
+    """Orders the words (make_monotonic), removes repeats, repairs the text of an English
+    lecture (textrepair.repair_transcript with job's whole term list; no window starts:
+    OpenVINO GenAI does not report where its 30-second windows begin, only its generate()
+    calls, which are whole 300-second checkpoint chunks or the whole lecture), splits
+    sentences; without word timestamps the sentences carry no "words". postprocess
+    (optional) receives the repair's counters as postprocess["textrepair"]."""
     words = make_monotonic(words, duration)
     n_before = len(words)
     words = remove_repeats(words)
+    words, repaired = textrepair.repair_transcript(
+        words, job.initial_prompt if job is not None else "",
+        job.language if job is not None else None, None, emit)
+    if postprocess is not None:
+        postprocess["textrepair"] = repaired
     sentences = split_sentences(words)
     if not with_words:
         for s in sentences:
@@ -788,13 +811,14 @@ def finish_sentences(words: Sequence[Word], duration: float, with_words: bool, c
 
 
 def sentences_from_result(res, audio, word_timestamps: bool,
-                          emit: Callable[[str], None]) -> List[dict]:
+                          emit: Callable[[str], None], job=None,
+                          postprocess: Optional[dict] = None) -> List[dict]:
     """result.json sentences of a WhisperDecodedResults (brief 3b §4 "转写")."""
     duration = len(audio) / float(SAMPLE_RATE)
     frames = frame_rms(audio)
     words, with_words, counts = chunk_words(res, 0.0, duration, frames,
                                             voiced_threshold(frames), word_timestamps, emit)
-    return finish_sentences(words, duration, with_words, counts, emit)
+    return finish_sentences(words, duration, with_words, counts, emit, job, postprocess)
 
 
 def next_cut(frames, start: int, n: int, chunk_s: float) -> int:
@@ -930,7 +954,8 @@ def _streamer(genai, duration: float, emit: Callable[[str], None],
 
 def transcribe_chunks(pipe, genai, audio, job: Job, emit: Callable[[str], None], prompt: str,
                       terms_used: int, checkpointer: Optional[Checkpointer],
-                      resume: Optional[Resume], chunk_s: int) -> Tuple[List[dict], float]:
+                      resume: Optional[Resume], chunk_s: int,
+                      postprocess: Optional[dict] = None) -> Tuple[List[dict], float]:
     """Sentences of the audio from the resume point (or 0) on, chunk by chunk (one chunk
     to the end when chunk_s is 0), and the transcribe seconds.
 
@@ -976,19 +1001,22 @@ def transcribe_chunks(pipe, genai, audio, job: Job, emit: Callable[[str], None],
          % (duration, transcribe_s, n_chunks, streamer.calls,
             ", %d checkpoints written" % checkpointer.writes if checkpointer is not None
             else ""))
-    sentences = finish_sentences(words, duration, job.word_timestamps, counts, emit)
+    sentences = finish_sentences(words, duration, job.word_timestamps, counts, emit, job,
+                                 postprocess)
     return sentences, transcribe_s
 
 
 def transcribe(pipe, genai, audio, job: Job, emit: Callable[[str], None],
                count_tokens: Optional[Callable[[str], int]] = None,
                checkpointer: Optional[Checkpointer] = None,
-               resume: Optional[Resume] = None) -> Tuple[dict, float]:
+               resume: Optional[Resume] = None,
+               postprocess: Optional[dict] = None) -> Tuple[dict, float]:
     """Returns ({"prompt_terms_used", "sentences"[, "parts"]}, transcribe seconds).
 
     Without checkpointer, or with checkpoint.chunk_s 0 and nothing to resume: one
     generate() over the whole lecture, as always (no checkpoint file); the checkpointer
-    only adds "parts". Otherwise transcribe_chunks()."""
+    only adds "parts". Otherwise transcribe_chunks(). postprocess (optional) receives the
+    text repair's counters (finish_sentences) for the timing block."""
     if resume is not None:
         prompt, terms_used = "", resume.prompt_terms_used
         emit("continuing at %s without initial_prompt (first chunk only)"
@@ -1010,10 +1038,12 @@ def transcribe(pipe, genai, audio, job: Job, emit: Callable[[str], None],
         transcribe_s = time.monotonic() - t0
         emit("audio duration %.1fs, transcribed in %.1fs (%d streamer calls)"
              % (duration, transcribe_s, streamer.calls))
-        sentences = sentences_from_result(res, audio, job.word_timestamps, emit)
+        sentences = sentences_from_result(res, audio, job.word_timestamps, emit, job,
+                                          postprocess)
     else:
         sentences, transcribe_s = transcribe_chunks(pipe, genai, audio, job, emit, prompt,
-                                                    terms_used, checkpointer, resume, chunk_s)
+                                                    terms_used, checkpointer, resume, chunk_s,
+                                                    postprocess)
     result = {"prompt_terms_used": terms_used, "sentences": sentences}
     if checkpointer is not None:
         result["parts"] = checkpointer.parts(resume, audio_ms(len(audio)))
@@ -1043,15 +1073,41 @@ def run(in_path: str, out_path: str, emit: Callable[[str], None] = emit_stdout) 
                                                    load_s, " (compiled)" if first_compile else ""))
     # the first PROGRESS line: 0.00, or where a resumed run begins
     emit(format_progress(min(PROGRESS_CAP, start / float(len(audio)))))
+    post: dict = {}
     result, transcribe_s = transcribe(pipe, genai, audio, job, emit,
-                                      checkpointer=checkpointer, resume=resume)
+                                      checkpointer=checkpointer, resume=resume, postprocess=post)
     # A run that converted the model peaked in torch, not in transcription: report 0
     # (unknown) so it does not inflate the device's observed memory.
     result["timing"] = make_timing(load_s, transcribe_s,
                                    (len(audio) - start) / float(SAMPLE_RATE),
-                                   first_compile, 0 if prepared else None)
+                                   first_compile, 0 if prepared else None, postprocess=post)
     write_result(out_path, result)
     emit(format_progress(1.0))
+
+
+def selftest(device: str, model_dir: Optional[str], cache_dir: str = "",
+             emit: Callable[[str], None] = emit_stdout) -> None:
+    """--selftest: the converted model loads on the device and transcribes 1 s of
+    silence (greedy, segment timestamps, no word timestamps)."""
+    import numpy as np
+    if device not in OV_DEVICES:
+        raise InputError("unsupported device %r (expected GPU, NPU or CPU)" % (device,))
+    if not model_dir:
+        raise InputError("--model is required: the converted model directory")
+    if not model_ready(model_dir):
+        raise InputError("model is not ready: %s needs %s" % (model_dir, ", ".join(MODEL_FILES)))
+    ov, genai = import_openvino()
+    ov_device = resolve_device(ov.Core(), device)
+    name = os.path.basename(os.path.normpath(model_dir)) or "model"
+    job = Job("", name, "fp16", model_dir, device, "en", "", cache_dir if device != "CPU" else "",
+              "", "", False, 0)
+    t0 = time.monotonic()
+    pipe = load_pipeline(genai, job, ov_device)
+    t1 = time.monotonic()
+    res = pipe.generate(np.zeros(SAMPLE_RATE, dtype=np.float32), generation_config(pipe, job, ""))
+    n = len(getattr(res, "chunks", None) or [])
+    emit("SELFTEST ok device=%s load_s=%.1f transcribe_s=%.2f segments=%d"
+         % (device, t1 - t0, time.monotonic() - t1, n))
 
 
 # ---------------------------------------------------------------------------
@@ -1064,6 +1120,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", dest="out_path", help="result file to write (e.g. result.json.tmp)")
     p.add_argument("--probe", action="store_true",
                    help='print "PROBE {json}" with the usable OpenVINO devices')
+    p.add_argument("--selftest", action="store_true",
+                   help="load the model of --model on --device and transcribe 1 s of silence")
+    p.add_argument("--device", default="CPU", help="selftest device: CPU, GPU or NPU")
+    p.add_argument("--model", dest="model_dir", default=None, help="selftest: the converted model directory")
+    p.add_argument("--cache-dir", dest="cache_dir", default="", help="selftest: CACHE_DIR of GPU / NPU")
     return p
 
 
@@ -1072,6 +1133,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args = build_parser().parse_args(argv)
         if args.probe:
             probe()
+            return EXIT_OK
+        if args.selftest:
+            selftest(args.device, args.model_dir, args.cache_dir)
             return EXIT_OK
         if not args.in_path or not args.out_path:
             raise InputError("--in and --out are required")

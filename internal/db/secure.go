@@ -30,6 +30,12 @@ func (s *sqlStore) SetSecretKV(ctx context.Context, key, value string) error {
 	if s.tx != nil {
 		return errors.New("db: SetSecretKV inside a transaction")
 	}
+	if isSealedKV(key) { // cred-enc: stored sealed (sealed.go)
+		var err error
+		if value, err = sealStored(value); err != nil {
+			return err
+		}
+	}
 	return withSecureConn(ctx, s.db, func(ctx context.Context, c *sql.Conn) error {
 		var err error
 		if value == "" {
@@ -42,8 +48,8 @@ func (s *sqlStore) SetSecretKV(ctx context.Context, key, value string) error {
 }
 
 // ScrubKV deletes keys from the kv table of an opened database d the same
-// way (relocate: the database an import replaced, kept in backups/). A
-// database without a kv table is left as it is.
+// way. A database without a kv table is left as it is. relocate uses
+// ScrubSecrets, which also empties the providers' API keys.
 func ScrubKV(ctx context.Context, d *sql.DB, keys ...string) error {
 	return withSecureConn(ctx, d, func(ctx context.Context, c *sql.Conn) error {
 		var n int
@@ -62,31 +68,104 @@ func ScrubKV(ctx context.Context, d *sql.DB, keys ...string) error {
 	})
 }
 
+// ScrubSecrets removes every credential from the opened database d the same
+// way: the kv rows kvKeys and every kv row holding a sealed value are
+// deleted, and provider.api_key is emptied
+// (cred-enc, sec2-app L5: the database an import replaced, kept in
+// backups/, and the one a move left in the old data directory). Missing
+// tables are skipped.
+func ScrubSecrets(ctx context.Context, d *sql.DB, kvKeys ...string) error {
+	return withSecureConn(ctx, d, func(ctx context.Context, c *sql.Conn) error {
+		return scrubSecretRows(ctx, c, kvKeys) // upgrade.go
+	})
+}
+
+// ScrubFreedSecrets runs the secure path's VACUUM and TRUNCATE checkpoint
+// alone: after a transaction deleted or replaced a credential (settings'
+// DeleteProvider), no copy of it stays in free pages or the WAL.
+func (s *sqlStore) ScrubFreedSecrets(ctx context.Context) error {
+	if s.tx != nil {
+		return errors.New("db: ScrubFreedSecrets inside a transaction")
+	}
+	return withSecureConn(ctx, s.db, func(context.Context, *sql.Conn) error { return nil })
+}
+
+// SecretScrubber is the optional Store method ScrubFreedSecrets.
+type SecretScrubber interface {
+	ScrubFreedSecrets(ctx context.Context) error
+}
+
 // withSecureConn runs write on one connection of d with secure_delete on
 // (restored afterwards), then VACUUM and a TRUNCATE checkpoint.
 func withSecureConn(ctx context.Context, d *sql.DB, write func(context.Context, *sql.Conn) error) error {
-	c, err := d.Conn(ctx)
+	compactErr, err := secureWrite(ctx, d, write)
 	if err != nil {
 		return err
+	}
+	return compactErr
+}
+
+// secureWrite is withSecureConn reporting the failure of write (err:
+// nothing or only part was written) apart from the failure of the
+// VACUUM or the checkpoint after it (compactErr: the write stands, a copy
+// of the old value may remain until the next checkpoint).
+func secureWrite(ctx context.Context, d *sql.DB, write func(context.Context, *sql.Conn) error) (compactErr, err error) {
+	c, err := d.Conn(ctx)
+	if err != nil {
+		return nil, err
 	}
 	defer c.Close()
 	var prev int
 	if err := c.QueryRowContext(ctx, "PRAGMA secure_delete").Scan(&prev); err != nil {
-		return err
+		return nil, err
 	}
 	if _, err := c.ExecContext(ctx, "PRAGMA secure_delete = 1"); err != nil {
-		return err
+		return nil, err
 	}
 	defer c.ExecContext(context.WithoutCancel(ctx), fmt.Sprintf("PRAGMA secure_delete = %d", prev))
+	// sec3 I3: marked before the write, cleared after the checkpoint, so a
+	// start after an interruption (or a failed VACUUM) runs the clean-up
+	// again (SealSecrets).
+	marked := setScrubPending(ctx, c)
 	if err := write(ctx, c); err != nil {
-		return err
+		return nil, err
 	}
 	// VACUUM writes a fresh copy of the live rows: no free page, no unused
 	// space of a page can still hold the old value.
 	if _, err := c.ExecContext(ctx, "VACUUM"); err != nil {
-		return fmt.Errorf("db: vacuum after deleting a secret: %w", err)
+		return fmt.Errorf("db: vacuum after deleting a secret: %w", err), nil
 	}
-	return checkpointTruncate(ctx, c)
+	if err := checkpointTruncate(ctx, c); err != nil {
+		return err, nil
+	}
+	if marked {
+		if _, err := c.ExecContext(ctx, `DELETE FROM kv WHERE key = ?`, kvScrubPending); err == nil {
+			_ = checkpointTruncate(ctx, c) // the marker's own frame; no secret in it
+		}
+	}
+	return nil, nil
+}
+
+// kvScrubPending is set while a secure write's clean-up (VACUUM, TRUNCATE
+// checkpoint) has not completed: freed pages or old WAL frames may still
+// hold a replaced credential (sec3 I3).
+const kvScrubPending = "secrets.scrub_pending"
+
+// setScrubPending sets kvScrubPending when the database has a kv table.
+func setScrubPending(ctx context.Context, c *sql.Conn) bool {
+	var n int
+	if err := c.QueryRowContext(ctx, `SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'kv'`).Scan(&n); err != nil || n == 0 {
+		return false
+	}
+	_, err := c.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES (?, '1') ON CONFLICT(key) DO UPDATE SET value = excluded.value`, kvScrubPending)
+	return err == nil
+}
+
+// scrubPending reports whether kvScrubPending is set in d.
+func scrubPending(ctx context.Context, d *sql.DB) bool {
+	var v string
+	err := d.QueryRowContext(ctx, `SELECT value FROM kv WHERE key = ?`, kvScrubPending).Scan(&v)
+	return err == nil && v != ""
 }
 
 // checkpointTruncate copies the WAL into the database and truncates it to

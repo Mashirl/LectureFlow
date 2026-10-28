@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"lectureflow/internal/colab"
 	"lectureflow/internal/config"
 	"lectureflow/internal/db"
 	"lectureflow/internal/devices"
@@ -65,6 +66,10 @@ type Options struct {
 	ProgressMinInterval time.Duration   // progress/usage flush interval (default 500ms, SPEC §8.2)
 	IncrementalDebounce time.Duration   // quiet time before an incremental translate starts (default 10s, NOTES.md)
 	DeleteWait          time.Duration   // how long a forced delete waits for running jobs (default DefaultDeleteWait, A7)
+	// RemoveRetry are the delays after which a deleted lecture's (or
+	// material's) directory that could not be removed is tried again
+	// (default DefaultRemoveRetry; test-chaos 2).
+	RemoveRetry []time.Duration
 	// FilenameRuleDebounce is the quiet time after the last RequestFilenameRule
 	// of a course before its trigger is evaluated (v2 ruling 2; default 5s).
 	FilenameRuleDebounce time.Duration
@@ -97,6 +102,17 @@ type Options struct {
 	// devices.Registry.SetRemote); never with a lock held.
 	Remote   RemoteBackend
 	OnRemote func(ctx context.Context, present bool, row model.ASRDevice)
+	// RemoteBusyPause: after Colab answered "busy" (colab.IsBusy: the
+	// runtime was being released or started) no lecture is sent to Colab
+	// for this long (0 = 5 s; tests shorten it).
+	RemoteBusyPause time.Duration
+	// RemoteSoon (colab-batch, optional): how soon a download in progress
+	// becomes a lecture (negative: none expected); the Colab runtime is
+	// kept for it (remoteImminent). cmd wires the download queue.
+	RemoteSoon func(ctx context.Context) time.Duration
+	// RemoteImminentMax: the longest the runtime is kept for such work
+	// after its queue emptied (0 = 5 min).
+	RemoteImminentMax time.Duration
 }
 
 // GPUStatus is the GPU row of GET /api/system (SPEC §17.1).
@@ -200,6 +216,7 @@ type Scheduler struct {
 	flushEvery     time.Duration
 	debounce       time.Duration
 	deleteWait     time.Duration
+	removeRetry    []time.Duration
 	fnDebounce     time.Duration
 
 	// scanMu is held by every scan, by Rerun until the rerun's transaction
@@ -277,9 +294,14 @@ type Scheduler struct {
 	powerHolds    []string
 
 	// SPEC-v3 V14 (remote.go): Options.Remote / OnRemote; rem is guarded by mu.
-	remote   RemoteBackend
-	onRemote func(ctx context.Context, present bool, row model.ASRDevice)
-	rem      remoteState
+	remote          RemoteBackend
+	onRemote        func(ctx context.Context, present bool, row model.ASRDevice)
+	rem             remoteState
+	remoteBusyPause time.Duration
+	// colab-batch: the backend as a RemoteBatcher (nil when it is not one)
+	batch             RemoteBatcher
+	remoteSoon        func(ctx context.Context) time.Duration
+	remoteImminentMax time.Duration
 }
 
 // New builds a scheduler and loads the persisted GPU pause flag (SPEC §17.2).
@@ -291,12 +313,13 @@ func New(o Options) (*Scheduler, error) {
 		st: o.Store, cfg: o.Config, ev: o.Events, pool: o.Pool, dataDir: o.DataDir, gpuQ: o.GPUQuery, now: o.Now,
 		scanInterval: o.ScanInterval, sampleInterval: o.VRAMSampleInterval, backoffs: o.RetryBackoff,
 		cpuSlots: o.CPUSlots, cancelWait: o.CancelWait, flushEvery: o.ProgressMinInterval, debounce: o.IncrementalDebounce,
-		deleteWait: o.DeleteWait, fnDebounce: o.FilenameRuleDebounce, stages: map[string]Stage{}, fnReq: map[string]*fnRequest{},
+		deleteWait: o.DeleteWait, removeRetry: o.RemoveRetry, fnDebounce: o.FilenameRuleDebounce, stages: map[string]Stage{}, fnReq: map[string]*fnRequest{},
 		running: map[string]*run{}, backoff: map[string]time.Time{},
 		reasons: map[string]string{}, deferred: map[string]bool{}, incrReq: map[string]time.Time{}, vramObs: map[string]int{},
 		kick: make(chan struct{}, 1),
 		devs: o.Devices, powerFn: o.Power, memAvail: o.MemAvailMB, devTest: o.DeviceTest, keepAwake: o.KeepAwake,
-		remote: o.Remote, onRemote: o.OnRemote,
+		remote: o.Remote, onRemote: o.OnRemote, remoteBusyPause: o.RemoteBusyPause,
+		remoteSoon: o.RemoteSoon, remoteImminentMax: o.RemoteImminentMax,
 		memEstimate: memEstimateWith(o.Config), devPaused: map[string]bool{}, tests: map[string]*devTestRun{}, wanted: map[string]bool{},
 	}
 	if s.memAvail == nil {
@@ -332,6 +355,15 @@ func New(o Options) (*Scheduler, error) {
 	if s.scanInterval <= 0 {
 		s.scanInterval = time.Second
 	}
+	if s.remoteBusyPause <= 0 {
+		s.remoteBusyPause = 5 * time.Second
+	}
+	if s.remoteImminentMax <= 0 {
+		s.remoteImminentMax = remoteImminentMax
+	}
+	if b, ok := s.remote.(RemoteBatcher); ok && s.remote != nil {
+		s.batch = b
+	}
 	if s.sampleInterval <= 0 {
 		s.sampleInterval = 2 * time.Second
 	}
@@ -357,6 +389,9 @@ func New(o Options) (*Scheduler, error) {
 	}
 	if s.deleteWait <= 0 {
 		s.deleteWait = DefaultDeleteWait
+	}
+	if len(s.removeRetry) == 0 {
+		s.removeRetry = DefaultRemoveRetry
 	}
 	if s.fnDebounce <= 0 {
 		s.fnDebounce = DefaultFilenameRuleDebounce
@@ -458,6 +493,23 @@ type scanState struct {
 	gpu     GPUMem
 	gpuErr  error
 
+	// Pools found full in this scan (SPEC §5 FIFO; lead ruling 2026-10-27
+	// 14:30): once a job was refused because a pool had no free slot, the
+	// pool counts as full for the rest of the scan. A run that ends while
+	// the scan goes on frees its slot for the next scan (its end kicks
+	// one), which offers it in FIFO order, instead of to a job further down
+	// this one. Only slots: a refusal for VRAM, memory or a budget depends
+	// on the job's own estimate and does not hold back a smaller job.
+	cpuFull bool // the CPU pool
+	gpuFull bool // the single GPU pool (without Options.Devices)
+	// devFull: asr device id → the waiting_for of the job it was refused
+	// to for want of a slot (pipeline runs, a self-test holding it, the
+	// power policy's queue for it; SSH servers too).
+	devFull map[string]string
+	// multiFull: multi_device is off and a job waited for the asr run of
+	// another device (planDevices' multiBlocked).
+	multiFull bool
+
 	// SPEC-v2 I8 and power management (asr_devices.go), read once per scan
 	asrRead bool
 	policyBase
@@ -484,8 +536,17 @@ type scanState struct {
 	remote         remoteScan
 	remoteQueue    []float64
 	remoteEligible int
-	remoteTaken    bool
 	remoteHold     bool
+	// colab-batch: lectures dispatched to Colab in this scan, the plan of
+	// the waiting ones, the backend's Held, the queued jobs kept for Colab
+	// (and how many of them are not dispatched yet), the asr jobs waiting
+	// for their prep.
+	remoteDispatched int
+	remotePlan       []colab.PlanEntry
+	remoteHeld       map[string]bool
+	remoteKeptJobs   map[string]bool
+	remoteKeptLeft   int
+	remotePending    []model.Job
 }
 
 func (s *Scheduler) scan() {
@@ -516,7 +577,11 @@ func (s *Scheduler) scan() {
 	s.mu.Lock()
 	sc.remoteHold = s.rem.hold
 	s.mu.Unlock()
+	s.remoteScanStart(&sc, jobs)
 	s.enforceTestPolicy() // after the power reading: on battery only the battery device is tested
+
+	// the CPU pool: pipeline stages before auxiliary tasks
+	jobs = s.cpuAuxLast(jobs)
 	var waitAC, noDev int
 	holds := []string{}
 	for _, j := range jobs {
@@ -533,6 +598,13 @@ func (s *Scheduler) scan() {
 				continue
 			}
 			if !ok {
+				if j.Stage == model.StageASR && s.remote != nil {
+					sc.remotePending = append(sc.remotePending, j) // colab-batch: work about to come
+					if sc.remoteKeptJobs[j.ID] {
+						delete(sc.remoteKeptJobs, j.ID)
+						sc.remoteKeptLeft--
+					}
+				}
 				continue
 			}
 			// "只转写" (transcribe_only.go): a deferred lecture gets its
@@ -594,7 +666,7 @@ func (s *Scheduler) scan() {
 	s.mu.Unlock()
 	s.preemptDeviceTests(sc.memPreempt)
 	s.startDeviceTests(ctx, &sc) // after the pipeline jobs had their turn
-	s.endRemoteScan(&sc)
+	s.endRemoteScan(ctx, &sc)
 }
 
 // tryStart starts a queued job if its dependencies still hold and its
@@ -610,7 +682,7 @@ func (s *Scheduler) tryStart(ctx context.Context, j model.Job, depsOK bool, sc *
 	}
 	if inBackoff {
 		if left := nb.Sub(s.now()); left > 0 {
-			if s.devs != nil && stg.Resource() == ResourceGPU {
+			if s.devs != nil && resourceOf(stg, j) == ResourceGPU {
 				s.markWanted(sc, j) // it waits for its devices too (self-tests yield)
 			}
 			return backoffReason(left)
@@ -644,25 +716,20 @@ func (s *Scheduler) tryStart(ctx context.Context, j model.Job, depsOK bool, sc *
 			}
 		}
 	}
-	r := &run{job: j, stage: stg, res: stg.Resource()}
+	// The pool: the stage's, the CPU for a "修复断句" asr job (textrepair.go).
+	r := &run{job: j, stage: stg, res: resourceOf(stg, j)}
 	switch r.res {
 	case ResourceCPU:
-		if s.countRunning(ResourceCPU) >= s.cpuSlots {
+		if sc.cpuFull || s.countRunning(ResourceCPU) >= s.cpuSlots {
+			sc.cpuFull = true // a slot freed later in this scan goes to the next one (scanState)
 			return model.WaitCPUSlot
 		}
 	case ResourceGPU:
 		if s.devs != nil {
-			if s.remote != nil && remotePinned(j) {
-				// SPEC-v3 V14.4: "改用 Colab 处理" (or a fixed colab snapshot).
-				if reason := s.remoteOnlyAdmit(ctx, sc, r); reason != "" {
-					return reason
-				}
-			} else if reason := s.deviceAdmit(ctx, sc, r); reason != "" {
-				// SPEC-v2 I8: per-device pools; SPEC-v3 V14: Colab takes a
-				// lecture the local devices cannot take now.
-				if reason = s.remoteOverflow(ctx, sc, r, reason); reason != "" {
-					return reason
-				}
+			// SPEC-v2 I8 per-device pools, SPEC-v3 V14 Colab, ssh-mvp SSH
+			// servers (remote_devices.go).
+			if reason := s.asrDeviceAdmit(ctx, sc, r); reason != "" {
+				return reason
 			}
 		} else if reason := s.gpuAdmit(ctx, sc, r); reason != "" {
 			return reason
@@ -708,6 +775,34 @@ func (s *Scheduler) providerOf(stg Stage, j model.Job) string {
 		return ps.Provider()
 	}
 	return ""
+}
+
+// cpuAuxLast moves the auxiliary tasks of the CPU pool (the stream task's
+// transcode) behind every other job of the scan, each group keeping its
+// FIFO order (SPEC §5): a free CPU slot goes to a pipeline stage (prep,
+// export, material_extract, …) that can start, and to an auxiliary task only
+// when none can (lead ruling 2026-10-27 14:30). Otherwise, in a batch, the
+// transcodes of the first lectures (minutes each, queued by their prep)
+// would take the slots before the prep of the later lectures, which the
+// transcription devices wait for. A slot is never held back for a pipeline
+// stage that cannot start (pending on its dependencies, in backoff), so the
+// auxiliary tasks still run whenever a slot is free and no pipeline stage
+// takes it. Jobs of the other pools keep their order.
+func (s *Scheduler) cpuAuxLast(jobs []model.Job) []model.Job {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var front, aux []model.Job
+	for _, j := range jobs {
+		if stg := s.stages[j.Stage]; stg != nil && model.IsAuxStage(j.Stage) && resourceOf(stg, j) == ResourceCPU {
+			aux = append(aux, j)
+		} else {
+			front = append(front, j)
+		}
+	}
+	if len(aux) == 0 {
+		return jobs
+	}
+	return append(front, aux...)
 }
 
 func (s *Scheduler) countRunning(res ResourceKind) int {
@@ -919,7 +1014,7 @@ func (s *Scheduler) runStage(ctx context.Context, r *run) (err error) {
 	r.wmu.Lock()
 	j := r.job
 	r.wmu.Unlock()
-	return r.stage.Run(WithRemote(WithStatsSink(WithJob(ctx, j), r), s.remote), j.ScopeID, r.progress)
+	return r.stage.Run(s.withRemotes(WithStatsSink(WithJob(ctx, j), r)), j.ScopeID, r.progress)
 }
 
 // progress is the callback handed to Stage.Run: it only records the latest
@@ -1056,6 +1151,10 @@ func (s *Scheduler) finish(r *run, runErr error, took time.Duration) string {
 		switch {
 		case runErr == nil:
 			st.ASRResume = nil // done: no checkpoint to continue from (power_event stays)
+		case handBack && remoteBusy(runErr):
+			// colabfix: the runtime was being released or started — not
+			// a hand-back: the pin stays and Colab may take it again.
+			st.RemoteRequeues++
 		case handBack:
 			st.RemoteRequeues++
 			st.RemotePin = false

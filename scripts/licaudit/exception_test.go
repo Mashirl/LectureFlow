@@ -4,8 +4,11 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -80,7 +83,9 @@ func TestUserFetchedNeedsException(t *testing.T) {
 }
 
 // The repository's own LICENSE-EXCEPTION.md names every user-fetched
-// package of the real allowlist.
+// package of the real allowlist, and nothing else: the permission's list
+// of libraries stays exactly the audit's list (user decision 2026-10-27,
+// "scope written precisely").
 func TestRepositoryExceptionNamesUserFetched(t *testing.T) {
 	root := filepath.Join("..", "..")
 	b, err := os.ReadFile(filepath.Join(root, exceptionFile))
@@ -96,12 +101,12 @@ func TestRepositoryExceptionNamesUserFetched(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := 0
+	userFetched := map[string]bool{}
 	for _, e := range al.Entries {
 		if e.Scope != ScopeUserFetched {
 			continue
 		}
-		n++
+		userFetched[strings.ToLower(e.Name)] = true
 		if !strings.Contains(list, "`"+strings.ToLower(e.Name)+"`") {
 			t.Errorf("%s does not list user-fetched package %s", exceptionFile, e.Name)
 		}
@@ -109,7 +114,67 @@ func TestRepositoryExceptionNamesUserFetched(t *testing.T) {
 			t.Errorf("allowlist reason of %s does not mention %s", e.Name, exceptionFile)
 		}
 	}
-	if n == 0 {
+	if len(userFetched) == 0 {
 		t.Fatal("no user-fetched entries in the allowlist")
+	}
+	named := regexp.MustCompile("`([^`]+)`").FindAllStringSubmatch(list, -1)
+	if len(named) == 0 {
+		t.Fatalf("%s names no package in %q", exceptionFile, exceptionLibraries)
+	}
+	for _, m := range named {
+		if !userFetched[m[1]] {
+			t.Errorf("%s names %s under %q, but the allowlist has no user-fetched entry for it", exceptionFile, m[1], exceptionLibraries)
+		}
+	}
+}
+
+// The worker sources point to the additional permission; tests, other
+// directories and files deleted in the work tree do not need to.
+func TestExceptionNoticeCheck(t *testing.T) {
+	r := newRepo(t)
+	spdx := "# " + spdxTag + "\n# Copyright (C) 2026 LectureFlow contributors.\n"
+	full := spdx + "# " + exceptionNotice + "\n"
+	files := map[string]string{
+		"worker/ok.py":            full + "import sys\n",
+		"worker/crlf.py":          strings.ReplaceAll(full, "\n", "\r\n"),
+		"worker/plain.py":         spdx + "import sys\n",
+		"worker/late.py":          spdx + "\n\n\n\n# " + exceptionNotice + "\n", // line 7
+		"worker/sub/helper.py":    spdx,
+		"worker/conftest.py":      spdx,
+		"worker/test_plain.py":    spdx,
+		"worker/plain_test.py":    spdx,
+		"worker/testdata/fake.py": "x = 1\n",
+		"worker/requirements.txt": "faster-whisper==1.2.1\n",
+		"cmd/main.go":             "// " + spdxTag + "\npackage main\n",
+	}
+	var list []string
+	for f, c := range files {
+		r.write(f, c)
+		list = append(list, f)
+	}
+	list = append(list, "worker/gone.py") // tracked, deleted in the work tree
+	missing, err := CheckExceptionNotice(r.root, list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"worker/late.py", "worker/plain.py", "worker/sub/helper.py"}
+	if !reflect.DeepEqual(missing, want) {
+		t.Fatalf("missing = %v, want %v", missing, want)
+	}
+
+	// Part of the SPDX run: every file has its SPDX header, the check still fails.
+	var out bytes.Buffer
+	tracked := func(string) ([]string, error) { return list, nil }
+	if code := auditMain([]string{"-root", r.root, "-check", "-only", "spdx"}, &out, &bytes.Buffer{}, nil, tracked); code != 1 ||
+		!strings.Contains(out.String(), "SPDX check: 0 files") || !strings.Contains(out.String(), "FAIL worker/plain.py") {
+		t.Fatalf("exit %d, output %s", code, out.String())
+	}
+
+	for _, f := range want {
+		r.write(f, full)
+	}
+	out.Reset()
+	if code := auditMain([]string{"-root", r.root, "-check", "-only", "spdx"}, &out, &bytes.Buffer{}, nil, tracked); code != 0 {
+		t.Fatalf("all marked: exit %d, output %s", code, out.String())
 	}
 }

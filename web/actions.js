@@ -14,7 +14,7 @@ import { openRecordedAtDialog } from './calendar_ui.js';
 import { zhOn, zhMode, zhConvertible, zhFileName, zhConvertAll } from './zh_display.js';
 import { openKindDialog } from './kind_dialog.js';
 import { kindTag } from './kinds.js';
-import { useColabMenuItem } from './settings_colab.js';
+import { useColabMenuItem, useColab } from './settings_colab.js';
 // (lecture_english.js imports exportItems from here: the cycle only meets
 // inside functions, never at the top level of either module)
 import { lectureDownloadItems } from './lecture_english.js';
@@ -27,19 +27,59 @@ export function setCourseLookup(fn) {
   courseLookup = fn;
 }
 
+// ---------- one request per operation (3.2.0 P2) ----------
+
+// A double click on a row's "启动", "重试" or "更新" sent the request twice:
+// an "already launched" warning after the success, or a second model-choice
+// dialog on top of the first. An operation still on its way (from the first
+// click to the answer, its confirmation and model choice included) is
+// shared: calling it again returns the same promise, so it is sent once and
+// its toast shown once. key names the operation and what it acts on.
+const inflight = new Map(); // key → promise
+
+export function once(key, run) {
+  const had = inflight.get(key);
+  if (had) return had;
+  let p;
+  try {
+    p = Promise.resolve(run());
+  } catch (e) {
+    p = Promise.reject(e);
+  }
+  const shared = p.finally(() => {
+    if (inflight.get(key) === shared) inflight.delete(key);
+  });
+  inflight.set(key, shared);
+  return shared;
+}
+
+const idsKey = (lectures) => lectures.map((l) => l.id).sort().join(',');
+
 // ---------- A4.3 model choice ----------
+
+// The model-choice dialogs open now, by operation key (3.2.0 P2).
+const choosing = new Set();
 
 // Runs run(choice); a 409 needs_model_choice is answered with the dialog and
 // run again with the chosen model_choice. Resolves to run's result, or null
 // when the user cancelled the dialog. Other errors propagate (already shown).
 // `what` names the operation for the dialog: 'update' | 'retry' |
-// 'rerun:{stage}' (anything else: a rerun).
-export async function withModelChoice(run, what) {
+// 'rerun:{stage}' (anything else: a rerun). key (optional) names the
+// operation and its lectures: while its dialog is open, the same operation
+// gets no second dialog (it resolves to null, as if cancelled).
+export async function withModelChoice(run, what, key) {
   try {
     return await run(undefined);
   } catch (e) {
     if (!(e instanceof ApiError) || !e.needsModelChoice) throw e;
-    const choice = await modelChoiceDialog(e.body.diff || [], what);
+    if (key && choosing.has(key)) return null;
+    if (key) choosing.add(key);
+    let choice;
+    try {
+      choice = await modelChoiceDialog(e.body.diff || [], what);
+    } finally {
+      if (key) choosing.delete(key);
+    }
     if (!choice) return null;
     return run(choice);
   }
@@ -146,48 +186,62 @@ async function glossaryCheck(courseIds) {
 
 // ---------- lecture operations ----------
 
-export async function launchLectures(lectures) {
+export function launchLectures(lectures) {
   const list = lectures.filter((l) => (l.lecture_actions || []).includes('launch'));
-  if (!list.length) return [];
-  if (!(await glossaryCheck(list.map((l) => l.course_id)))) return [];
-  if (list.length === 1) {
-    const l = await api.launchLecture(list[0].id);
-    toast(t('common.lectures.launched', { title: list[0].title }), 'success');
-    return l ? [l] : [];
-  }
-  const res = await api.launchLectures(list.map((l) => l.id));
-  return summarize((res && res.results) || [], 'launch');
+  if (!list.length) return Promise.resolve([]);
+  return once(`launch:${idsKey(list)}`, async () => {
+    if (!(await glossaryCheck(list.map((l) => l.course_id)))) return [];
+    if (list.length === 1) {
+      const l = await api.launchLecture(list[0].id);
+      toast(t('common.lectures.launched', { title: list[0].title }), 'success');
+      return l ? [l] : [];
+    }
+    const res = await api.launchLectures(list.map((l) => l.id));
+    return summarize((res && res.results) || [], 'launch');
+  });
 }
 
-export async function launchCourseDrafts(course) {
-  if (!(await glossaryCheck([course.id]))) return null;
-  const res = await api.launchDrafts(course.id);
-  if (res) summarize(res.results || [], 'launch');
-  return res;
+export function launchCourseDrafts(course) {
+  return once(`launch_drafts:${course.id}`, async () => {
+    if (!(await glossaryCheck([course.id]))) return null;
+    const res = await api.launchDrafts(course.id);
+    if (res) summarize(res.results || [], 'launch');
+    return res;
+  });
 }
 
-export async function updateLectures(lectures) {
+export function updateLectures(lectures) {
   const list = lectures.filter((l) => (l.lecture_actions || []).includes('update'));
-  if (!list.length) return [];
-  if (list.length === 1) {
-    const l = await withModelChoice((choice) => api.updateLecture(list[0].id, choice), 'update');
-    if (!l) return [];
-    toast(t('common.lectures.update_started', { title: list[0].title }), 'success');
-    return [l];
-  }
-  const res = await withModelChoice((choice) => api.updateLectures(list.map((l) => l.id), choice), 'update');
-  return res ? summarize(res.results || [], 'update') : [];
+  if (!list.length) return Promise.resolve([]);
+  const key = `update:${idsKey(list)}`;
+  return once(key, async () => {
+    if (list.length === 1) {
+      const l = await withModelChoice((choice) => api.updateLecture(list[0].id, choice), 'update', key);
+      if (!l) return [];
+      toast(t('common.lectures.update_started', { title: list[0].title }), 'success');
+      return [l];
+    }
+    const res = await withModelChoice((choice) => api.updateLectures(list.map((l) => l.id), choice), 'update', key);
+    return res ? summarize(res.results || [], 'update') : [];
+  });
 }
 
-export async function updateCourseStale(course) {
-  const res = await withModelChoice((choice) => api.updateStale(course.id, choice), 'update');
-  if (res) summarize(res.results || [], 'update');
-  return res;
+export function updateCourseStale(course) {
+  const key = `update_stale:${course.id}`;
+  return once(key, async () => {
+    const res = await withModelChoice((choice) => api.updateStale(course.id, choice), 'update', key);
+    if (res) summarize(res.results || [], 'update');
+    return res;
+  });
 }
 
-export async function cancelLectures(lectures) {
+export function cancelLectures(lectures) {
   const list = lectures.filter((l) => (l.lecture_actions || []).includes('cancel'));
-  if (!list.length) return [];
+  if (!list.length) return Promise.resolve([]);
+  return once(`cancel:${idsKey(list)}`, () => cancelConfirmed(list));
+}
+
+async function cancelConfirmed(list) {
   const ok = await confirmDialog({
     title: list.length === 1 ? t('common.lectures.cancel_title') : t('common.lectures.cancel_title_many', { n: list.length }),
     message: list.length === 1 ? t('common.lectures.cancel_message', { title: list[0].title }) : t('common.lectures.cancel_message_many'),
@@ -230,8 +284,12 @@ function confirmForce(n) {
   });
 }
 
-export async function deleteLectures(lectures) {
-  if (!lectures.length) return [];
+export function deleteLectures(lectures) {
+  if (!lectures.length) return Promise.resolve([]);
+  return once(`delete:${idsKey(lectures)}`, () => deleteConfirmed(lectures));
+}
+
+async function deleteConfirmed(lectures) {
   const running = lectures.filter(isBusy);
   const mats = await boundMaterials(lectures);
   const shown = lectures.slice(0, 8);
@@ -287,27 +345,51 @@ export async function deleteLectures(lectures) {
 }
 
 // Stage action from a menu or a pipeline card (confirmation already done by
-// the pipeline card when confirmed is true).
-export async function stageAction(lec, stage, action, confirmed = false) {
-  if (!confirmed && !(await confirmStageAction(stage, action))) return null;
-  const what = action === 'retry' ? 'retry' : `rerun:${stage}`;
-  return withModelChoice((choice) => api.lectureStageAction(lec.id, stage, action, choice), what);
+// the pipeline card when confirmed is true). use_colab (an asr stage Colab
+// handed back while no local device can take it) is "改用 Colab 处理" with
+// its own confirmation and endpoint.
+// The same action of the same stage from two places (the row and the failure
+// notice, a double click) is sent once (3.2.0 P2).
+export function stageAction(lec, stage, action, confirmed = false) {
+  const key = `stage:${lec.id}:${stage}:${action}`;
+  return once(key, async () => {
+    if (action === 'use_colab') return useColab(lec);
+    if (!confirmed && !(await confirmStageAction(stage, action))) return null;
+    // "修复断句" (textrepair-int): the asr rerun with text_only; the model
+    // question, when asked, concerns the stages after asr (once() above
+    // keeps it to one dialog)
+    if (action === 'rerun_text_only') return withModelChoice((choice) => api.lectureTextRepair(lec.id, choice), t('common.model_choice.what_text_repair'));
+    const what = action === 'retry' ? 'retry' : `rerun:${stage}`;
+    return withModelChoice((choice) => api.lectureStageAction(lec.id, stage, action, choice), what, key);
+  });
+}
+
+// The retry of a lecture's task that asks no model question (the playback
+// file "stream", the title task "title"), sent once (3.2.0 P2).
+export function taskRetry(lec, stage) {
+  return once(`stage:${lec.id}:${stage}:retry`, () => api.lectureStageAction(lec.id, stage, 'retry'));
 }
 
 // "Fill in word timings": a lecture transcribed before word timestamps were
 // recorded (SPEC-v2 P4.2) splits its subtitles at whole sentences only. The
 // back end offers lecture_actions fill_words; filling them in is the asr
 // rerun (the stages after it run again; needs_model_choice as for any rerun).
-export async function fillWords(lec) {
-  const ok = await confirmDialog({ title: t('lecture.fill_words.title'), message: t('lecture.fill_words.message'), okText: t('lecture.fill_words.ok'), danger: true });
-  if (!ok) return null;
-  return stageAction(lec, 'asr', 'rerun', true);
+export function fillWords(lec) {
+  return once(`fill_words:${lec.id}`, async () => {
+    const ok = await confirmDialog({ title: t('lecture.fill_words.title'), message: t('lecture.fill_words.message'), okText: t('lecture.fill_words.ok'), danger: true });
+    if (!ok) return null;
+    return stageAction(lec, 'asr', 'rerun', true);
+  });
 }
 
 // v2 P13.5 "regenerate title and blurb": a title the user set is overwritten only
 // after a confirmation (force). Resolves to true when the task was queued;
 // the new title arrives with the lecture's SSE change.
-export async function regenerateTitle(lec) {
+export function regenerateTitle(lec) {
+  return once(`regenerate_title:${lec.id}`, () => regenerate(lec));
+}
+
+async function regenerate(lec) {
   const send = (force) => api.regenerateTitle(lec.id, force, { quiet: true });
   let force = false;
   if (lec.title_source === 'user') {
@@ -407,6 +489,8 @@ export function lectureMenuItems(lec, hd) {
       () => {},
     );
   const reruns = (lec.stages || []).filter((s) => (s.allowed_actions || []).includes('rerun'));
+  // "修复断句" (textrepair-int): offered by the back end on the asr stage
+  const textRepair = (lec.stages || []).some((s) => s.stage === 'asr' && (s.allowed_actions || []).includes('rerun_text_only'));
   return [
     { id: 'open', label: t('menu.open'), icon: 'external-link', onSelect: () => (location.hash = `#/lecture/${encodeURIComponent(lec.id)}`) },
     lec.playable ? { id: 'play', label: t('player.entry.play'), icon: 'play', onSelect: () => (location.hash = `#/play/${encodeURIComponent(lec.id)}`) } : null, // SPEC-v2 P1
@@ -437,6 +521,7 @@ export function lectureMenuItems(lec, hd) {
     // P13.5: offered by the back end (summary done or stale, organizer role configured)
     acts.includes('regenerate_title') ? { id: 'regenerate_title', label: t('lecture.menu.regenerate_title'), icon: 'sparkles', onSelect: () => regenerateTitle(lec) } : null,
     acts.includes('fill_words') ? { id: 'fill_words', label: t('lecture.menu.fill_words'), icon: 'captions', onSelect: () => done(fillWords(lec)) } : null,
+    textRepair ? { id: 'rerun_text_only', label: t('common.action.rerun_text_only'), icon: 'wand-sparkles', onSelect: () => done(stageAction(lec, 'asr', 'rerun_text_only')) } : null,
     'sep',
     {
       id: 'delete',

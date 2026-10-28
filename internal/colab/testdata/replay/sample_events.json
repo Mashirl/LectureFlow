@@ -1,0 +1,270 @@
+{
+ "_source": "依据 borrow_run_release.json（上游 google-colab-cli 0.7.5 构造，非真实录制）加上 colab-obs-core 的远端采样：持有 BASE/sample.lock 的挂接进程先发 machine，再每 2 s 发 sample（字段见 internal/remote/sample.go），与讲座事件交错；磁盘模式，T4。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Client.assign",
+   "colab_cli/client.py#Client.list_assignments",
+   "colab_cli/client.py#Client.unassign",
+   "colab_cli/client.py#Client.get_consumption_user_info",
+   "colab_cli/consumption.py#CcuInfo",
+   "colab_cli/contents.py#ContentsClient",
+   "colab_cli/runtime.py#ColabRuntime.execute_code",
+   "colab_cli/commands/run.py#_teardown",
+   "colab_cli/common.py#State.get_session",
+   "jupyter-kernel-client 0.9.0 manager.py#KernelHttpManager.start_kernel",
+   "jupyter-kernel-client 0.9.0 wsclient.py#KernelWebSocketClient.start_channels"
+  ]
+ },
+ "recorded": false,
+ "extends": "borrow_run_release.json",
+ "until": "kernel channels: run colab_remote.py",
+ "resume": "upload audio chunk 1",
+ "steps": [
+  {
+   "name": "kernel channels: run colab_remote.py",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "'--attach'"
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "execute_input",
+       "content": {
+        "code": "(the cell)",
+        "execution_count": 1
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "machine",
+        "ts": 1793260800.5,
+        "gpu_name": "Tesla T4",
+        "gpu_arch": "Turing",
+        "compute_cap": "7.5",
+        "driver": "580.82.07",
+        "cuda": "13.0",
+        "gpu_count": 1,
+        "vram_total_mb": 15360,
+        "vcpus": 2,
+        "mem_total_mb": 12975,
+        "storage": "disk"
+       },
+       {
+        "type": "sample",
+        "ts": 1793260800.6,
+        "cpu_pct": 12.5,
+        "mem_total_mb": 12975,
+        "mem_available_mb": 11974,
+        "ramdisk_mb": -1,
+        "data_mb": 0,
+        "data_disk_mb": 2,
+        "whisper_mb": -1,
+        "gpu_util_pct": 0,
+        "vram_used_mb": 0,
+        "vram_reserved_mb": 448,
+        "vram_whisper_mb": -1,
+        "gpu_temp_c": 51,
+        "gpu_power_w": 13.5
+       }
+      ]
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260801.0,
+        "stage": "install"
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "parent": "other",
+       "content": {
+        "name": "stdout",
+        "text": "output of another request: Zebrafish\n"
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260840.0,
+        "stage": "download_model"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260870.0,
+        "stage": "load_model"
+       }
+      ]
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "sample",
+        "ts": 1793260872.0,
+        "cpu_pct": 55.0,
+        "mem_total_mb": 12975,
+        "mem_available_mb": 9000,
+        "ramdisk_mb": -1,
+        "data_mb": 0,
+        "data_disk_mb": 2,
+        "whisper_mb": 2900,
+        "gpu_util_pct": 30,
+        "vram_used_mb": 3200,
+        "vram_reserved_mb": 448,
+        "vram_whisper_mb": 3100,
+        "gpu_temp_c": 51,
+        "gpu_power_w": 13.5
+       }
+      ]
+     },
+     {
+      "after": "upload job.json"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260880.0,
+        "stage": "check"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260883.0,
+        "stage": "transcribe"
+       },
+       {
+        "type": "progress",
+        "ts": 1793260907.0,
+        "fraction": 0.25
+       }
+      ]
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "sample",
+        "ts": 1793260908.0,
+        "cpu_pct": 41.0,
+        "mem_total_mb": 12975,
+        "mem_available_mb": 6100,
+        "ramdisk_mb": -1,
+        "data_mb": 0,
+        "data_disk_mb": 2,
+        "whisper_mb": 3412,
+        "gpu_util_pct": 88,
+        "vram_used_mb": 4100,
+        "vram_reserved_mb": 448,
+        "vram_whisper_mb": 3650,
+        "gpu_temp_c": 51,
+        "gpu_power_w": 13.5
+       }
+      ]
+     },
+     {
+      "stdout_raw": "{\"type\":\"progress\",\"ts\":1793260955.0,\"fra"
+     },
+     {
+      "stdout_raw": "ction\":0.75}\n"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "progress",
+        "ts": 1793260979.25,
+        "fraction": 1.0
+       },
+       {
+        "type": "stage",
+        "ts": 1793260979.5,
+        "stage": "write"
+       },
+       {
+        "type": "done",
+        "ts": 1793261000.0,
+        "result": "result.json",
+        "sha256": "{{sha256:result_json}}",
+        "bytes": "{{len:result_json}}",
+        "audio_s": 600.0,
+        "load_s": 12.5,
+        "transcribe_s": 96.25,
+        "sentences": 1
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "content": {
+        "name": "stderr",
+        "text": "UserWarning: something about Zebrafish\n"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 1,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

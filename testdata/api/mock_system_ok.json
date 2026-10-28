@@ -62,6 +62,18 @@
    }
   },
   {
+   "name": "cudnn",
+   "status": "ok",
+   "detail": "cuDNN 9.1.0 可以加载",
+   "hint": "",
+   "detail_info": {
+    "code": "check.cudnn_ok",
+    "params": {
+     "version": "9.1.0"
+    }
+   }
+  },
+  {
    "name": "cuda",
    "status": "ok",
    "detail": "SELFTEST ok device=cuda compute_type=float16 load_s=1.4 transcribe_s=0.71 segments=0",

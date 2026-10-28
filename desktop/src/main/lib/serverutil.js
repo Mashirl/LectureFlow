@@ -21,13 +21,20 @@ function generateToken() {
  * buildServerArgs: the command line of the service. The token is NOT part
  * of it (command lines are visible to other processes); it goes to stdin.
  * locationFile is omitted when the data dir came from LECTUREFLOW_DATA_DIR.
+ * launcher (the program the browser extension's host starts this app with,
+ * lib/nmhost.js), launcherBlocked (why there is none on macOS: the app runs
+ * from its disk image or translocated) and portable (the portable build)
+ * are for the native messaging registration.
  */
-function buildServerArgs({ port, dataDir, resourcesDir, appVersion, configFile, locationFile }) {
+function buildServerArgs({ port, dataDir, resourcesDir, appVersion, configFile, locationFile, launcher = null, launcherBlocked = null, portable = false }) {
   const args = ['-desktop', '-listen', `127.0.0.1:${port}`, '-data-dir', dataDir];
   if (resourcesDir) args.push('-resources', resourcesDir);
   if (appVersion) args.push('-app-version', appVersion);
   if (configFile) args.push('-config', configFile);
   if (locationFile) args.push('-location-file', locationFile);
+  if (launcher) args.push('-launcher', launcher);
+  else if (launcherBlocked) args.push('-launcher-blocked', launcherBlocked);
+  if (portable) args.push('-portable');
   return args;
 }
 
@@ -73,11 +80,20 @@ function redact(text, secret) {
  *               A LECTUREFLOW_SERVER ending in .js/.cjs/.mjs is run with the
  *               Electron binary as Node (tests use a fake service this way).
  * Returns { command, prefixArgs, resourcesDir, extraEnv }.
+ *
+ * Packaged on macOS, extraEnv has PYTHONDONTWRITEBYTECODE=1: the worker
+ * scripts are inside the signed app bundle (Contents/Resources/worker), and
+ * the components' Python would otherwise write worker/__pycache__ there on
+ * the first transcription, which breaks the bundle's seal ("file added" in
+ * codesign --verify; mac-accept 3.2.0). The service passes its environment
+ * on to every Python it starts; the components' own modules keep the
+ * bytecode they were installed with.
  */
 function resolveServerCommand({ isPackaged, resourcesPath, env = {}, repoRoot, platform, execPath, pathMod = path }) {
   const exe = platform === 'win32' ? 'lectureflow.exe' : 'lectureflow';
   if (isPackaged) {
-    return { command: pathMod.join(resourcesPath, 'bin', exe), prefixArgs: [], resourcesDir: resourcesPath, extraEnv: {} };
+    const extraEnv = platform === 'darwin' ? { PYTHONDONTWRITEBYTECODE: '1' } : {};
+    return { command: pathMod.join(resourcesPath, 'bin', exe), prefixArgs: [], resourcesDir: resourcesPath, extraEnv };
   }
   const resourcesDir = env.LECTUREFLOW_RESOURCES ? pathMod.resolve(env.LECTUREFLOW_RESOURCES) : repoRoot;
   const command = env.LECTUREFLOW_SERVER ? pathMod.resolve(env.LECTUREFLOW_SERVER) : pathMod.join(repoRoot, exe);
@@ -87,9 +103,40 @@ function resolveServerCommand({ isPackaged, resourcesPath, env = {}, repoRoot, p
   return { command, prefixArgs: [], resourcesDir, extraEnv: {} };
 }
 
+/**
+ * NO_TELEMETRY_ENV: what the service gets on top of the shell's environment,
+ * and passes on to everything it starts: the switches that turn off the
+ * usage reporting of the Python libraries the workers load (NOTES.md
+ * "无遥测"). The same list as internal/pyenv TelemetryOff, which the service
+ * sets again for each Python it starts (also without this shell).
+ */
+const NO_TELEMETRY_ENV = Object.freeze({
+  HF_HUB_DISABLE_TELEMETRY: '1',
+  HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
+  HF_XET_TELEMETRY_ENABLED: '0',
+  DO_NOT_TRACK: '1',
+});
+
+/**
+ * serviceEnv(base, extraEnv): the environment the service starts with: base
+ * without NO_TELEMETRY_ENV's keys in any case (Windows keys are
+ * case-insensitive, so a user's "hf_hub_disable_telemetry=0" must not stay
+ * next to ours), then NO_TELEMETRY_ENV, then extraEnv
+ * (resolveServerCommand's).
+ */
+function serviceEnv(base, extraEnv = {}) {
+  const off = new Set(Object.keys(NO_TELEMETRY_ENV).map((k) => k.toUpperCase()));
+  const env = {};
+  for (const [k, v] of Object.entries(base || {})) {
+    if (!off.has(k.toUpperCase())) env[k] = v;
+  }
+  return { ...env, ...NO_TELEMETRY_ENV, ...extraEnv };
+}
+
 module.exports = {
   READY_PREFIX,
   EXIT_RESTART,
+  NO_TELEMETRY_ENV,
   generateToken,
   buildServerArgs,
   parseReadyLine,
@@ -97,4 +144,5 @@ module.exports = {
   isPortInUseError,
   redact,
   resolveServerCommand,
+  serviceEnv,
 };

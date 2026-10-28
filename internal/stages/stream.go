@@ -4,6 +4,7 @@
 package stages
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,13 +21,19 @@ import (
 	"time"
 
 	"lectureflow/internal/db"
+	lfmedia "lectureflow/internal/media"
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
 	"lectureflow/internal/sched"
+	"lectureflow/internal/state"
 )
 
 // The playback file of SPEC-v2 P8.1: stream.mp4 in the lecture directory,
-// browser-playable MP4 (H.264 + AAC). prep makes it right after audio.wav;
-// the auxiliary task "stream" makes it for lectures prepared before v2.
+// browser-playable MP4 (H.264 + AAC). prep remuxes it right after audio.wav;
+// a source that must be transcoded gets it from the auxiliary task "stream",
+// which prep queues and which runs in parallel with asr (stream-parallel,
+// user decision 2026-10-27); the same task makes it for lectures prepared
+// before v2 (queued by GET /media).
 // Its state is kv stream:{lecture} (model.StreamState, lead ruling 7 of
 // phase 2), which records outcomes only: while a stream job is queued or
 // running the API shows "generating", and no kv entry means "pending".
@@ -51,6 +58,15 @@ const (
 	MediaNoAudio         = "media.no_audio"         // the file has no audio track
 	MediaFailed          = "media.failed"           // anything else ("处理这个文件时出错")
 	MediaOriginalMissing = "media.original_missing" // the stream task found no original file (deleted after prep)
+	// MediaFormatRejected (security review 2, M3): the media is a text
+	// playlist (internal/media.SniffFile), or ffmpeg / ffprobe refused it
+	// because its demuxer (or a protocol it needs) is outside the
+	// whitelists of media.InputArgs: it would make ffmpeg read other
+	// files. Params: format, the playlist kind ("m3u8", "ffconcat") or the
+	// demuxer / protocol ("hls", "concat", "http"), "?" when ffmpeg did not
+	// name it. Permanent: converting the file to a common format is the way
+	// out.
+	MediaFormatRejected = "media.format_rejected"
 )
 
 // mediaTools runs the external programs of prep and of the playback file
@@ -121,9 +137,13 @@ func (m *execMedia) FFmpeg(ctx context.Context, dir string, args []string, progr
 	if err != nil {
 		return "", err
 	}
-	if err := cmd.Start(); err != nil {
+	// Tied: ffmpeg ends with LectureFlow, also when LectureFlow crashes or
+	// is killed (test-chaos 1: an orphaned ffmpeg kept writing its .tmp).
+	proc, err := procutil.Start(cmd, procutil.Tied)
+	if err != nil {
 		return "", &ffmpegStartError{exe: m.ffmpeg, err: err}
 	}
+	defer proc.Close()
 	var (
 		mu       sync.Mutex
 		duration float64 // seconds, from stderr
@@ -190,21 +210,30 @@ func ffprobeFor(ffmpeg string) (string, error) {
 	return p, nil
 }
 
+// probeArgs are the ffprobe arguments of Probe: the input read with the
+// whitelists of media.InputArgs (security review 2, M3), before the media.
+func probeArgs(media string) []string {
+	args := append([]string{"-v", "error"}, lfmedia.InputArgs()...)
+	return append(args, "-print_format", "json", "-show_format", "-show_streams", media)
+}
+
 func (m *execMedia) Probe(ctx context.Context, media string) ([]byte, string, error) {
 	ffprobe, err := ffprobeFor(m.ffmpeg)
 	if err != nil {
 		return nil, "", err
 	}
-	cmd := exec.CommandContext(ctx, ffprobe, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", media)
+	cmd := exec.CommandContext(ctx, ffprobe, probeArgs(media)...)
 	cmd.WaitDelay = 3 * time.Second
 	tail := &tailBuffer{n: stderrTailBytes}
+	var out bytes.Buffer
+	cmd.Stdout = &out
 	cmd.Stderr = tail
-	out, err := cmd.Output()
+	err = procutil.Run(cmd, procutil.Tied) // ends with LectureFlow (test-chaos 1)
 	var ee *exec.ExitError
 	if err != nil && !errors.As(err, &ee) {
 		return nil, tail.String(), &ffmpegStartError{exe: ffprobe, err: err}
 	}
-	return out, tail.String(), err
+	return out.Bytes(), tail.String(), err
 }
 
 func (m *execMedia) FreeSpace(dir string) (int64, error) { return diskFree(dir) }
@@ -324,10 +353,14 @@ func browserReady(info mediaInfo) bool {
 // enc (SPEC-v3 V7, videoEncodeArgs: 8-bit 4:2:0, even dimensions) + AAC.
 // Both map exactly the probed video and audio stream, use -threads 2
 // (SPEC §17.3) and put the index first (+faststart) so seeking plays at
-// once.
+// once. The input is read with the whitelists of media.InputArgs (security
+// review 2, M3), right before its "-i" (after it they would be output
+// options and silently do nothing).
 func streamArgs(info mediaInfo, media, out, enc string) []string {
-	args := []string{"-hide_banner", "-nostdin", "-nostats", "-progress", "pipe:1", "-y", "-threads", "2", "-i", media,
-		"-map", "0:" + strconv.Itoa(info.Video.Index), "-map", "0:" + strconv.Itoa(info.Audio.Index)}
+	args := []string{"-hide_banner", "-nostdin", "-nostats", "-progress", "pipe:1", "-y", "-threads", "2"}
+	args = append(args, lfmedia.InputArgs()...)
+	args = append(args, "-i", media,
+		"-map", "0:"+strconv.Itoa(info.Video.Index), "-map", "0:"+strconv.Itoa(info.Audio.Index))
 	if enc == "" {
 		args = append(args, "-c", "copy")
 	} else {
@@ -361,12 +394,16 @@ func planOf(info mediaInfo) streamPlan {
 // returns the state to record: audio_only (no video; a stale stream.mp4 is
 // removed), no_space, failed with MediaNoH264Encoder (a transcode is needed
 // and no encoder of SPEC-v3 V7 is usable; the player runs in audio mode,
-// as with no_space), or ready. Failures are CodedErrors (media.*); a
-// cancelled ctx returns ctx.Err(). The file is written as stream.mp4.tmp and
-// renamed, so a partial file is never served.
+// as with no_space), or ready. Failures are CodedErrors (media.*;
+// MediaEncoderFailed when the encoders themselves failed); a cancelled ctx
+// returns ctx.Err(). A file made only after an encoder failed is noted on
+// the job (NotePrepEncoderRetried). The file is written as stream.mp4.tmp
+// (another free .tmp name when that one is still held: tmpFor) and put in
+// place with replaceFile, so a partial file is never served; a stream.mp4
+// that another program has open (the player) is a prep.file_in_use error
+// and stays as it was.
 func makeStream(ctx context.Context, tools mediaTools, dir, media string, info mediaInfo, progress func(float64)) (model.StreamState, error) {
 	out := filepath.Join(dir, model.StreamFile)
-	tmp := out + ".tmp"
 	if info.Video == nil {
 		if err := os.Remove(out); err != nil && !errors.Is(err, os.ErrNotExist) {
 			slog.Warn("stream: remove stale stream.mp4", "dir", dir, "err", err)
@@ -382,6 +419,10 @@ func makeStream(ctx context.Context, tools mediaTools, dir, media string, info m
 		slog.Warn("stream: free space unknown, generating anyway", "dir", dir, "err", err)
 	case free < StreamMinFreeBytes:
 		return model.StreamState{Status: StreamNoSpace}, nil
+	}
+	tmp, err := tmpFor(out)
+	if err != nil {
+		return model.StreamState{}, streamFileError(err)
 	}
 	remux := browserReady(info)
 	encoders := []string{""} // "" = remux
@@ -400,8 +441,10 @@ func makeStream(ctx context.Context, tools mediaTools, dir, media string, info m
 	}
 	// A transcode falls back to the next usable encoder when one fails for
 	// a reason that is not the file's (a hardware encoder can pass the test
-	// and still refuse a size or run out of sessions). The progress never
-	// goes back.
+	// and still refuse a size, run out of sessions or glitch under load).
+	// When the encoder itself failed (transcodeError), a hardware encoder
+	// is run once more first. Only after every usable encoder failed is
+	// there a conclusion (transcodeFailure). The progress never goes back.
 	var done float64
 	mono := func(p float64) {
 		if p > done {
@@ -409,38 +452,73 @@ func makeStream(ctx context.Context, tools mediaTools, dir, media string, info m
 			progress(p)
 		}
 	}
-	var stderr string
+	var (
+		stderr string
+		tries  []encoderTry // failed transcode attempts
+		used   = -1         // index of the encoder that made the file
+	)
+encoders:
 	for i, enc := range encoders {
-		os.Remove(tmp)
-		stderr, err = tools.FFmpeg(ctx, dir, streamArgs(info, media, tmp, enc), mono)
-		if ctx.Err() != nil {
+		for attempt := 1; attempt <= encoderAttempts(enc); attempt++ {
 			os.Remove(tmp)
-			return model.StreamState{}, ctx.Err()
-		}
-		if err == nil {
-			if enc != "" {
-				slog.Info("stream: transcoded", "dir", dir, "encoder", enc)
+			stderr, err = tools.FFmpeg(ctx, dir, streamArgs(info, media, tmp, enc), mono)
+			if ctx.Err() != nil {
+				os.Remove(tmp)
+				return model.StreamState{}, ctx.Err()
+			}
+			if err == nil {
+				used = i
+				break encoders
+			}
+			os.Remove(tmp)
+			if enc == "" {
+				return model.StreamState{}, mediaError(stderr, err)
+			}
+			merr, fault := transcodeError(stderr, err, enc)
+			if sched.IsPermanent(merr) {
+				return model.StreamState{}, merr // the file's own problem: no encoder helps
+			}
+			tries = append(tries, encoderTry{enc: enc, attempt: attempt, err: merr, fault: fault})
+			if fault && attempt < encoderAttempts(enc) {
+				slog.Warn("stream: the encoder failed, trying it once more", "dir", dir, "encoder", enc, "err", merr)
+				continue
+			}
+			if i+1 < len(encoders) {
+				slog.Warn("stream: encoder failed, trying the next one", "dir", dir, "encoder", enc, "next", encoders[i+1], "err", merr)
 			}
 			break
 		}
-		os.Remove(tmp)
-		merr := mediaError(stderr, err)
-		if enc == "" || i+1 == len(encoders) || sched.IsPermanent(merr) {
-			return model.StreamState{}, merr
+	}
+	if used < 0 {
+		return model.StreamState{}, transcodeFailure(tries)
+	}
+	if enc := encoders[used]; enc != "" {
+		slog.Info("stream: transcoded", "dir", dir, "encoder", enc, "failed_attempts", len(tries))
+		if len(tries) > 0 {
+			noteEncoderRetried(ctx, tryNames(tries), enc)
 		}
-		slog.Warn("stream: encoder failed, trying the next one", "dir", dir, "encoder", enc, "next", encoders[i+1], "err", merr)
 	}
 	fi, err := os.Stat(tmp)
 	if err != nil || fi.Size() == 0 {
 		os.Remove(tmp)
 		return model.StreamState{}, model.Errorf(MediaFailed, nil, fmt.Errorf("ffmpeg 退出码为 0 但没有写出 %s：%v。ffmpeg 输出：%s", tmp, err, stderr))
 	}
-	if err := os.Rename(tmp, out); err != nil {
+	if err := replaceFile(tmp, out); err != nil {
 		os.Remove(tmp)
-		return model.StreamState{}, model.Errorf(MediaFailed, nil, err)
+		return model.StreamState{}, streamFileError(err)
 	}
 	progress(1)
 	return model.StreamState{Status: StreamReady, Transcoded: !remux, SizeBytes: fi.Size()}, nil
+}
+
+// streamFileError is the error of a stream.mp4 that could not be written
+// or put in place: prep.file_in_use when another program holds it,
+// media.failed otherwise.
+func streamFileError(err error) error {
+	if _, ok := asFileInUse(err); ok {
+		return inUseCoded(CodePrepFileInUse, err)
+	}
+	return model.Errorf(MediaFailed, nil, err)
 }
 
 // unsupportedMarkers are fatal ffmpeg/ffprobe messages about a codec or
@@ -460,26 +538,19 @@ var outputFailureMarkers = []string{"No space left on device"}
 // Problems of the file itself are permanent. prep's audio conversion and
 // the playback file share it (lead ruling at the phase-2 gate).
 func mediaError(stderr string, err error) error {
-	detail := stderr
-	if detail == "" {
-		detail = err.Error()
-	} else {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			detail = fmt.Sprintf("退出码 %d：%s", ee.ExitCode(), stderr)
-		} else {
-			detail = fmt.Sprintf("%v：%s", err, stderr)
-		}
-	}
 	var se *ffmpegStartError
 	if errors.As(err, &se) {
 		return model.Errorf(MediaFailed, nil, err)
 	}
-	cause := errors.New(detail)
-	for _, m := range outputFailureMarkers {
-		if strings.Contains(stderr, m) {
-			return model.Errorf(MediaFailed, nil, cause)
+	cause := errors.New(ffmpegDetail(stderr, err))
+	if what, refused := lfmedia.Refused(stderr); refused {
+		if what == "" {
+			what = "?"
 		}
+		return sched.Permanent(model.Errorf(MediaFormatRejected, map[string]any{"format": what}, cause))
+	}
+	if outputFailed(stderr) {
+		return model.Errorf(MediaFailed, nil, cause)
 	}
 	switch classifyFFmpeg(stderr) {
 	case ffmpegNoAudio:
@@ -498,6 +569,49 @@ func mediaError(stderr string, err error) error {
 		}
 	}
 	return model.Errorf(MediaFailed, nil, cause)
+}
+
+// playlistRefusal is the media.format_rejected error of a media file that
+// starts like a text playlist (media.SniffFile: HLS, ffconcat, PLS, DASH
+// and other manifests), nil otherwise — also when the file cannot be read
+// (ffmpeg then reports that).
+func playlistRefusal(path string) error {
+	kind, err := lfmedia.SniffFile(path)
+	if err != nil || kind == "" {
+		return nil
+	}
+	return sched.Permanent(model.Errorf(MediaFormatRejected, map[string]any{"format": kind},
+		fmt.Errorf("媒体文件是播放列表或清单（%s），不是录音录像本身；ffmpeg 会读取其中列出的其他文件，为安全起见不处理：%s", kind, path)))
+}
+
+// isFormatRejected reports whether err is a media.format_rejected error.
+func isFormatRejected(err error) bool {
+	var ce *model.CodedError
+	return errors.As(err, &ce) && ce.Info.Code == MediaFormatRejected
+}
+
+// ffmpegDetail is the "查看详情" of a failed ffmpeg/ffprobe run: the exit
+// code (or the process error) and the tail of its output.
+func ffmpegDetail(stderr string, err error) string {
+	if stderr == "" {
+		return err.Error()
+	}
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return fmt.Sprintf("退出码 %d：%s", ee.ExitCode(), stderr)
+	}
+	return fmt.Sprintf("%v：%s", err, stderr)
+}
+
+// outputFailed reports whether ffmpeg's output says a write failed
+// (outputFailureMarkers).
+func outputFailed(stderr string) bool {
+	for _, m := range outputFailureMarkers {
+		if strings.Contains(stderr, m) {
+			return true
+		}
+	}
+	return false
 }
 
 // errorInfoJSON is the language-neutral form of err for StreamState.Error:
@@ -548,8 +662,13 @@ func StreamStateOf(ctx context.Context, st db.Store, lectureID string) (model.St
 // ---------- the auxiliary task ----------
 
 // streamStage is the auxiliary task "stream" (P8.1, lead ruling 1 of phase
-// 2): it makes stream.mp4 for a lecture prepared before v2, from its
-// original media, by the rules of prep. It is queued by GET /media; a
+// 2): it makes stream.mp4 from the lecture's original media by the rules of
+// prep. prep queues it for a source that must be transcoded
+// (stream-parallel: the transcode runs in the background, in parallel with
+// asr, instead of holding up prep); GET /media queues it for a lecture
+// prepared before v2. It needs prep done (state auxDeps) and one slot of
+// the CPU pool, like prep; it neither waits for nor holds a transcription
+// device, whichever H.264 encoder it uses (NOTES stream-parallel). A
 // failure is not retried automatically.
 type streamStage struct {
 	d     Deps
@@ -572,14 +691,26 @@ func (s *streamStage) Run(ctx context.Context, lectureID string, progress func(f
 	if err != nil {
 		return err
 	}
+	media := ""
+	if !state.StoredPathUnsafe(state.PathLectureMedia, lectureID, l.MediaPath) {
+		media = resolvePath(l.MediaPath, dir) // a path naming another computer is never opened (M3)
+	}
 	fail := func(err error) error {
+		d.setStreamState(ctx, lectureID, model.StreamState{Status: StreamFailed, Error: errorInfoJSON(err)})
+		if !d.keepOriginalMedia() {
+			// the original stays for a retry; the note says why (as prep's did)
+			removeOriginal(ctx, d, lectureID, media, dir, StreamFailed)
+		}
+		return err
+	}
+	if fi, err := os.Stat(media); media == "" || err != nil || fi.IsDir() {
+		err := sched.Permanent(model.Errorf(MediaOriginalMissing, nil,
+			fmt.Errorf("讲座的原始媒体文件不存在（%s），无法生成播放文件；可能已按 keep_original_media = false 在预处理后删除", l.MediaPath)))
 		d.setStreamState(ctx, lectureID, model.StreamState{Status: StreamFailed, Error: errorInfoJSON(err)})
 		return err
 	}
-	media := resolvePath(l.MediaPath, dir)
-	if fi, err := os.Stat(media); l.MediaPath == "" || err != nil || fi.IsDir() {
-		return fail(sched.Permanent(model.Errorf(MediaOriginalMissing, nil,
-			fmt.Errorf("讲座的原始媒体文件不存在（%s），无法生成播放文件；可能已按 keep_original_media = false 在预处理后删除", l.MediaPath))))
+	if err := playlistRefusal(media); err != nil {
+		return fail(err)
 	}
 	tools, err := d.tools(s.media)
 	if err != nil {
@@ -600,11 +731,26 @@ func (s *streamStage) Run(ctx context.Context, lectureID string, progress func(f
 		return fail(err)
 	}
 	d.setStreamState(ctx, lectureID, st)
-	// A prep that kept the original for this (lead ruling on
-	// keep_original_media) deletes it now that the playback file exists.
+	// The original that prep left for this task (a transcode, or a playback
+	// file prep could not make; lead ruling on keep_original_media) goes now
+	// that the playback file exists — unless prep is being run again, which
+	// reads it (a prep rerun queued or started while this task ran): then it
+	// stays, as with keep_original_media = true, rather than leaving the
+	// lecture without audio.wav and without its source.
 	if !d.keepOriginalMedia() {
-		removeOriginal(ctx, d, lectureID, media, dir, st.Status)
+		if prepSettled(ctx, d, lectureID) {
+			removeOriginal(ctx, d, lectureID, media, dir, st.Status)
+		} else {
+			slog.Info("keep_original_media=false: original kept, prep runs again", "lecture", lectureID)
+		}
 	}
 	progress(1)
 	return nil
+}
+
+// prepSettled reports whether the lecture's current prep job is done (no
+// rerun waiting or running that still needs the original media).
+func prepSettled(ctx context.Context, d Deps, lectureID string) bool {
+	j, err := d.Store.GetCurrentJob(context.WithoutCancel(ctx), model.ScopeLecture, lectureID, model.StagePrep)
+	return err == nil && j.Status == model.StatusDone
 }

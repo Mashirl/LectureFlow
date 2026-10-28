@@ -25,7 +25,8 @@ import asr
 import asr_common
 import asr_mlx
 import asr_openvino
-from conftest import FAKE_SCRIPT_SRC, WORKER_DIR, script_read_wav, write_wav_parts
+from conftest import FAKE_SCRIPT_SRC, WORKER_DIR, all_speech_vad, script_read_wav, \
+    write_wav_parts
 
 JOB_ID = "j-asr-mlx-01"
 INPUT_HASH = "v3:fedcba9876543210"
@@ -381,6 +382,7 @@ def test_same_words_give_the_same_result_as_the_other_workers(tmp_path, monkeypa
     """Fed the words of test_asr_contract, the three workers write the same sentences."""
     import test_asr_contract as contract
     audio = write_wav_parts(tmp_path / "audio.wav", [(6.0, 8000)])
+    all_speech_vad(monkeypatch, asr)          # asr.py's own VAD step: all of it is speech
     monkeypatch.setattr(asr, "load_model", lambda *a: contract._FWModel())
     monkeypatch.setattr(asr, "setup_cuda_libs", lambda: [])
     fake_ov.words = list(contract.WORDS)
@@ -419,6 +421,11 @@ def test_same_words_give_the_same_result_as_the_other_workers(tmp_path, monkeypa
     assert {k: type(v) for k, v in timings["mlx"].items()} == \
         {k: type(v) for k, v in timings["fw"].items()}
     assert timings["mlx"]["audio_s"] == 6.0 and timings["mlx"]["first_compile"] is False
+    # the same text repair in every worker (textrepair-int): the same counters but its time
+    repairs = [dict(timings[k]["postprocess"]["textrepair"]) for k in ("fw", "ov", "mlx")]
+    for r in repairs:
+        assert isinstance(r.pop("ms"), int)
+    assert repairs[0] == repairs[1] == repairs[2]
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +448,9 @@ def test_success_with_word_timestamps(lecture, mlxjob):
     assert result["prompt_terms_used"] == 2
     t = result["timing"]
     assert t["audio_s"] == 100.0 and t["first_compile"] is False
-    assert set(t) == set(asr_common.make_timing(0, 0, 0, False, 0))
+    # make_timing's fields and the text repair's counters (textrepair-int)
+    assert set(t) == set(asr_common.make_timing(0, 0, 0, False, 0)) | {"postprocess"}
+    assert set(t["postprocess"]) == {"textrepair"}
     assert not os.path.exists(os.path.join(os.path.dirname(out_path), "asr.ckpt.json"))
 
 

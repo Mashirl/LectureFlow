@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="optionsTitle">LectureFlow</title>
+  <link rel="stylesheet" href="../ui/tokens.css">
+  <link rel="stylesheet" href="../ui/base.css">
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <main class="page">
+    <h1 data-i18n="optionsTitle"></h1>
+
+    <section class="card section" id="language-section">
+      <h2><label for="language" data-i18n="languageHeading"></label></h2>
+      <p class="small muted" data-i18n="languageHint"></p>
+      <div class="row-actions">
+        <select class="input" id="language"></select>
+      </div>
+    </section>
+
+    <section class="card section" id="profiles-section">
+      <h2 data-i18n="profilesHeading"></h2>
+      <p class="small muted" data-i18n="profilesHint"></p>
+      <ul class="rows" id="profiles"></ul>
+      <div class="row-actions">
+        <label class="btn" for="import-file"><span data-i18n="importProfile"></span></label>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+      <div class="note note-warn" id="import-confirm" role="alertdialog" hidden></div>
+      <p class="note" id="import-msg" role="status" hidden></p>
+    </section>
+
+    <section class="card section" id="sites-section">
+      <h2 data-i18n="sitesHeading"></h2>
+      <p class="small muted" data-i18n="sitesHint"></p>
+      <ul class="rows" id="sites"></ul>
+      <form class="row-actions" id="add-site">
+        <input class="input" id="site-input" type="url" placeholder="https://video.example.edu" required>
+        <button class="btn" type="submit"><span data-i18n="addSite"></span></button>
+      </form>
+      <p class="note" id="site-msg" role="status" hidden></p>
+    </section>
+
+    <section class="card section" id="trusted-section">
+      <h2 data-i18n="trustedHeading"></h2>
+      <p class="small muted" data-i18n="trustedHint"></p>
+      <ul class="rows" id="trusted"></ul>
+      <p class="small faint" id="trusted-empty" data-i18n="trustedEmpty" hidden></p>
+    </section>
+
+    <section class="card section" id="restricted-section">
+      <h2 data-i18n="restrictedHeading"></h2>
+      <p class="small muted" data-i18n="restrictedHint"></p>
+      <ul class="rows" id="restricted"></ul>
+      <p class="small faint" id="restricted-empty" data-i18n="restrictedEmpty" hidden></p>
+    </section>
+
+    <section class="card section" id="reports-section">
+      <h2 data-i18n="reportsHeading"></h2>
+      <p class="small muted" data-i18n="reportsHint"></p>
+      <ul class="rows" id="reports"></ul>
+      <p class="small faint" id="reports-empty" data-i18n="reportsEmpty" hidden></p>
+      <p class="note" id="report-msg" role="status" hidden></p>
+    </section>
+
+    <section class="card section">
+      <h2 data-i18n="privacyHeading"></h2>
+      <p class="small muted" data-i18n="privacyText"></p>
+      <p class="small faint" id="version"></p>
+    </section>
+  </main>
+</body>
+</html>

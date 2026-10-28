@@ -18,7 +18,7 @@ import pytest
 import asr
 import asr_common
 import asr_openvino
-from conftest import write_wav_parts
+from conftest import all_speech_vad, write_wav_parts
 
 SHARED = ["split_sentences", "split_word_groups", "is_sentence_end", "remove_repeats",
           "truncate_prompt", "format_progress", "write_result", "as_word", "_word_times",
@@ -80,6 +80,7 @@ class _FWModel:
 def both(tmp_path, monkeypatch, fake_ov):
     """Runs both workers on the same audio and words; returns their result.json dicts."""
     audio = write_wav_parts(tmp_path / "audio.wav", [(6.0, 8000)])
+    all_speech_vad(monkeypatch, asr)          # asr.py's own VAD step: all of it is speech
     monkeypatch.setattr(asr, "load_model", lambda *a: _FWModel())
     monkeypatch.setattr(asr, "setup_cuda_libs", lambda: [])
     fake_ov.words = list(WORDS)
@@ -121,7 +122,10 @@ def test_same_words_give_the_same_result(both):
     assert texts == ["Okay, e.g. a cache of 3.5 MB.", "J. Smith said so yes. Right? Ok."]
     assert r["fw"]["prompt_terms_used"] == 3
     assert set(ov_timing) == {"load_s", "transcribe_s", "audio_s", "first_compile",
-                              "peak_working_set_mb"}
+                              "peak_working_set_mb", "postprocess"}
+    # every backend repairs the text before the split (textrepair-int): nothing to do here
+    assert set(ov_timing["postprocess"]) == {"textrepair"}
+    assert ov_timing["postprocess"]["textrepair"]["segments"] == 0
 
 
 def test_timing_blocks_have_the_same_shape(both):
@@ -130,6 +134,13 @@ def test_timing_blocks_have_the_same_shape(both):
     assert r["fw"] == r["ov"]
     assert set(fw) == set(ov)
     assert {k: type(v) for k, v in fw.items()} == {k: type(v) for k, v in ov.items()}
+    # every backend writes postprocess (textrepair-int): the text repair's counters, the
+    # same for the same words but its time; faster-whisper's redecode needs windows
+    # (segments with seek), which this fake does not give
+    assert set(fw["postprocess"]) == set(ov["postprocess"]) == {"textrepair"}
+    fw_tr, ov_tr = dict(fw["postprocess"]["textrepair"]), dict(ov["postprocess"]["textrepair"])
+    assert isinstance(fw_tr.pop("ms"), int) and isinstance(ov_tr.pop("ms"), int)
+    assert fw_tr == ov_tr
     assert fw["audio_s"] == ov["audio_s"] == 6.0
     assert fw["first_compile"] is False
 
@@ -138,6 +149,7 @@ def test_timing_blocks_have_the_same_shape(both):
 
 def test_asr_timing_opt_in(tmp_path, monkeypatch, capsys):
     audio = write_wav_parts(tmp_path / "audio.wav", [(6.0, 8000)])
+    all_speech_vad(monkeypatch, asr)
     monkeypatch.setattr(asr, "load_model", lambda *a: _FWModel())
     monkeypatch.setattr(asr, "setup_cuda_libs", lambda: [])
     job = {"audio": audio, "model": "large-v3", "compute_type": "float16", "language": "en",

@@ -12,6 +12,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -127,8 +128,16 @@ func baseClient(cfg *config.Config, pool sched.APIPool, logDir string, hc *http.
 	}
 	if hc == nil {
 		tr := http.DefaultTransport.(*http.Transport).Clone()
-		tr.MaxIdleConnsPerHost = 32
-		hc = &http.Client{Transport: tr}
+		// Room for the connections of a provider's whole concurrency
+		// (perf-llm: DeepSeek 64 by default, up to settings.MaxConcurrencyLimit),
+		// so a burst does not close and reopen TLS connections.
+		tr.MaxIdleConns = 0
+		tr.MaxIdleConnsPerHost = 256
+		hc = &http.Client{Transport: tr, CheckRedirect: checkRedirect}
+	} else if hc.CheckRedirect == nil {
+		cp := *hc // the caller's client is left as it is
+		cp.CheckRedirect = checkRedirect
+		hc = &cp
 	}
 	return &HTTPClient{
 		cfg:     cfg,
@@ -139,6 +148,49 @@ func baseClient(cfg *config.Config, pool sched.APIPool, logDir string, hc *http.
 		Timeout: DefaultTimeout,
 		Sleep:   sleepCtx,
 	}
+}
+
+// checkRedirect is the redirect policy of the LLM clients (sec2-app): a
+// redirect is followed only to the same host (scheme://host:port of the
+// previous request; http → https on the same host name is allowed), so the
+// API key never goes to another host — net/http keeps custom headers such
+// as x-api-key on every redirect and Authorization on redirects within the
+// same domain. Any other redirect is not followed: the 3xx response comes
+// back as the answer (a failed request that names the status).
+func checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return http.ErrUseLastResponse
+	}
+	if !sameOrigin(via[len(via)-1].URL, req.URL) {
+		return http.ErrUseLastResponse
+	}
+	return nil
+}
+
+// sameOrigin reports whether a redirect from prev to next stays on the same
+// origin; an upgrade from http to https on the same host name counts.
+func sameOrigin(prev, next *url.URL) bool {
+	if !strings.EqualFold(prev.Hostname(), next.Hostname()) {
+		return false
+	}
+	ps, ns := strings.ToLower(prev.Scheme), strings.ToLower(next.Scheme)
+	switch {
+	case ps == ns:
+		return portOf(prev) == portOf(next)
+	case ps == "http" && ns == "https":
+		return true
+	}
+	return false
+}
+
+func portOf(u *url.URL) string {
+	if p := u.Port(); p != "" {
+		return p
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 // ErrTruncated: an answer was cut off at its output limit (Anthropic
@@ -268,6 +320,13 @@ type attemptErr struct {
 	hasRA      bool
 	err        error
 	res        Result // failTruncated: the usage of the truncated answer
+}
+
+// throttled reports a throttling answer (perf-llm): 429 Too Many Requests,
+// 503 Service Unavailable (DeepSeek's "server overloaded") and Anthropic's
+// 529 Overloaded. The API pool lowers the provider's concurrency on it.
+func (e *attemptErr) throttled() bool {
+	return e.kind == failStatus && (e.status == http.StatusTooManyRequests || e.status == http.StatusServiceUnavailable || e.status == StatusOverloaded)
 }
 
 func (e *attemptErr) retryable() bool {
@@ -454,8 +513,17 @@ func (c *HTTPClient) Complete(ctx context.Context, role, system, user string, js
 	// retries counts the §12 transport retries (they use Backoff);
 	// truncations the appendix D2 retries of a truncated answer.
 	retries, truncations := 0, 0
+	fb, _ := c.pool.(RateFeedback)
 	for attempt := 0; ; attempt++ {
 		res, start, aerr := c.attempt(ctx, call, body, attempt)
+		if fb != nil && !start.IsZero() {
+			switch {
+			case aerr == nil || aerr.kind == failTruncated:
+				fb.Succeeded(call.provider)
+			case aerr.throttled():
+				fb.Throttled(call.provider, start)
+			}
+		}
 		if aerr == nil {
 			c.reportUsage(ctx, tg, res, start)
 			return res, nil
@@ -585,6 +653,9 @@ func (c *HTTPClient) attempt(ctx context.Context, call callInfo, body []byte, n 
 		}
 		defer release()
 	}
+	if fn := sentHookFrom(ctx); fn != nil {
+		fn()
+	}
 	actx, cancel := context.WithTimeout(ctx, call.timeout)
 	defer cancel()
 
@@ -618,20 +689,20 @@ func (c *HTTPClient) attempt(ctx context.Context, call callInfo, body []byte, n 
 		return Result{}, start, &attemptErr{kind: failNetwork, err: err}
 	}
 	if status != http.StatusOK {
-		ae := &attemptErr{kind: failStatus, status: status, body: redact(snippet(respBody), call.key)}
+		ae := &attemptErr{kind: failStatus, status: status, body: redactSnippet(respBody, call.key)}
 		ae.retryAfter, ae.hasRA = parseRetryAfter(resp.Header.Get("Retry-After"))
 		return Result{}, start, ae
 	}
 	if call.api == model.ProviderAnthropic {
-		res, aerr := parseAnthropic(respBody)
+		res, aerr := parseAnthropic(respBody, call.key)
 		return res, start, aerr
 	}
 	var cr chatResponse
 	if err := json.Unmarshal(respBody, &cr); err != nil {
-		return Result{}, start, &attemptErr{kind: failEnvelope, body: snippet(respBody), err: err}
+		return Result{}, start, &attemptErr{kind: failEnvelope, body: redactSnippet(respBody, call.key), err: err}
 	}
 	if len(cr.Choices) == 0 {
-		return Result{}, start, &attemptErr{kind: failEnvelope, body: snippet(respBody), err: errors.New("no choices in response")}
+		return Result{}, start, &attemptErr{kind: failEnvelope, body: redactSnippet(respBody, call.key), err: errors.New("no choices in response")}
 	}
 	res := Result{Text: cr.Choices[0].Message.Content}
 	if u := cr.Usage; u != nil {
@@ -695,6 +766,13 @@ func snippet(b []byte) string {
 }
 
 func utf8RuneStart(b byte) bool { return b&0xC0 != 0x80 }
+
+// redactSnippet is the excerpt of a server's body for an error or a log:
+// the key is redacted BEFORE the body is cut to its excerpt, so a key that
+// straddles the cut cannot leak in part (sec2-app L1).
+func redactSnippet(b []byte, key string) string {
+	return snippet([]byte(redact(string(b), key)))
+}
 
 // redact replaces a key echoed by a server (some error bodies quote the
 // key they rejected) with its hint, so it never reaches job.error or the UI.

@@ -1,13 +1,13 @@
 {
   "_doc": "Source of components.json (go run ./packaging/components/gen). Everything except _doc, gen and models is copied as it is; gen blocks and models are expanded with SHA-256 and sizes fetched from python-build-standalone, PyPI and the Hugging Face API at the pinned revisions. See packaging/components/README.md.",
   "schema": 1,
-  "serial": 2,
-  "published": "2026-10-26",
-  "app_version": "3.1.0",
+  "serial": 3,
+  "published": "2026-10-27",
+  "app_version": "3.2.0",
   "compat": ">=3.0.0 <4.0.0",
   "update_url": "",
   "installed_factor": {
-    "venv": { "windows-x64": 1.7, "darwin-arm64": 3.0 },
+    "venv": { "windows-x64": 1.7, "darwin-arm64": 3.0, "linux-x64": 1.7 },
     "runtime": 4.0
   },
   "sources": {
@@ -81,15 +81,22 @@
   "components": [
     {
       "id": "core",
-      "version": "3.1.0",
-      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1",
+      "version": "3.2.0",
+      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1, aria2 1.37.0",
       "kind": "binary",
       "bundled": true,
       "name_key": "compui.name.core",
       "desc_key": "compui.hint.core",
       "license": "AGPL-3.0-or-later",
       "license_note": "Third-party parts: THIRD_PARTY_NOTICES.md",
-      "platforms": {}
+      "platforms": {
+        "windows-x64": {
+          "download_size": 0, "installed_size": 0,
+          "files": [
+            { "name": "bin/aria2c.exe", "url": "", "sha256": "be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2", "size": 5649408 }
+          ]
+        }
+      }
     },
     {
       "id": "python",
@@ -109,10 +116,11 @@
           "flavor": "install_only_stripped",
           "platforms": {
             "windows-x64": { "triple": "x86_64-pc-windows-msvc", "exe": "python/python.exe" },
-            "darwin-arm64": { "triple": "aarch64-apple-darwin", "exe": "python/bin/python3", "min_os": "13.0" }
+            "darwin-arm64": { "triple": "aarch64-apple-darwin", "exe": "python/bin/python3", "min_os": "13.0" },
+            "linux-x64": { "triple": "x86_64-unknown-linux-gnu", "exe": "python/bin/python3" }
           }
         },
-        "locks": ["windows-x64", "darwin-arm64"],
+        "locks": ["windows-x64", "darwin-arm64", "linux-x64"],
         "runtime_factor": { "windows-x64": 3.3 },
         "max_path": { "windows-x64": 113 }
       }
@@ -130,7 +138,7 @@
       "license_note": "faster-whisper and CTranslate2: MIT; onnxruntime: MIT; PyAV: BSD-3-Clause. nvidia-cublas-cu12, nvidia-cudnn-cu12 and nvidia-cuda-nvrtc-cu12 are NVIDIA proprietary runtime libraries (LicenseRef-NVIDIA-Proprietary) that uv downloads from PyPI on the user's computer; they are not part of the installer.",
       "source": "https://github.com/SYSTRAN/faster-whisper",
       "check_imports": ["faster_whisper", "ctranslate2", "av"],
-      "gen": { "locks": ["windows-x64"], "installed_factor": { "windows-x64": 1.65 }, "max_path": { "windows-x64": 123 } }
+      "gen": { "locks": ["windows-x64", "linux-x64"], "installed_factor": { "windows-x64": 1.65, "linux-x64": 1.65 }, "max_path": { "windows-x64": 123 } }
     },
     {
       "id": "asr-openvino",
@@ -236,7 +244,7 @@
       "repo": "Systran/faster-whisper-large-v3",
       "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
       "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
-      "platforms": ["windows-x64"],
+      "platforms": ["windows-x64", "linux-x64"],
       "depends": ["asr-cuda"],
       "license": "MIT",
       "license_note": "CTranslate2 conversion of openai/whisper-large-v3 (MIT). The same files serve every compute type.",
@@ -249,7 +257,7 @@
       "repo": "dropbox-dash/faster-whisper-large-v3-turbo",
       "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
       "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
-      "platforms": ["windows-x64"],
+      "platforms": ["windows-x64", "linux-x64"],
       "depends": ["asr-cuda"],
       "license": "MIT",
       "license_note": "CTranslate2 conversion of openai/whisper-large-v3-turbo (MIT); the repository faster-whisper 1.2.1 maps large-v3-turbo to (formerly mobiuslabsgmbh/faster-whisper-large-v3-turbo).",
@@ -262,7 +270,7 @@
       "repo": "Systran/faster-whisper-large-v2",
       "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
       "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
-      "platforms": ["windows-x64"],
+      "platforms": ["windows-x64", "linux-x64"],
       "depends": ["asr-cuda"],
       "license": "MIT",
       "license_note": "CTranslate2 conversion of openai/whisper-large-v2 (MIT).",
@@ -275,7 +283,7 @@
       "repo": "Systran/faster-whisper-medium",
       "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
       "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
-      "platforms": ["windows-x64"],
+      "platforms": ["windows-x64", "linux-x64"],
       "depends": ["asr-cuda"],
       "license": "MIT",
       "license_note": "CTranslate2 conversion of openai/whisper-medium (MIT).",
@@ -288,7 +296,7 @@
       "repo": "Systran/faster-whisper-small",
       "revision": "536b0662742c02347bc0e980a01041f333bce120",
       "files": ["config.json", "preprocessor_config.json", "model.bin", "tokenizer.json", "vocabulary.*"],
-      "platforms": ["windows-x64"],
+      "platforms": ["windows-x64", "linux-x64"],
       "depends": ["asr-cuda"],
       "license": "MIT",
       "license_note": "CTranslate2 conversion of openai/whisper-small (MIT).",
@@ -551,8 +559,8 @@
           "onboarding.preset.deepseek.step3"
         ],
         "cost_key": "onboarding.preset.deepseek.cost",
-        "max_concurrency": 8,
-        "rpm": 300,
+        "max_concurrency": 64,
+        "rpm": 0,
         "balance_api": "deepseek",
         "refs": [
           "https://api-docs.deepseek.com/quick_start/rate_limit"

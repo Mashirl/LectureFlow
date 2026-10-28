@@ -96,6 +96,7 @@ func RenderNotices(r *Report) string {
 	renderMedia(w, r)
 	renderReferences(w, r)
 	renderTools(w, r)
+	renderExtension(w, r)
 
 	// Appendix A: identical texts are printed once with every user listed.
 	type group struct {
@@ -145,6 +146,7 @@ func RenderNotices(r *Report) string {
 	w("- Programs downloaded from their vendor (section 10): the license files inside the installed tool (`components/{id}/{version}/tool/`; for the Google Cloud CLI its `LICENSE` and the license files of the parts it bundles).\n")
 	w("- Bundled binaries: the license files shipped next to each binary (section 6).\n")
 	w("- Electron: `LICENSE` and `LICENSES.chromium.html` in the application directory.\n")
+	w("- Browser extension (section 11): `vendor/NOTICE` and the license file of each package next to it, inside the extension package (`extension/src/vendor/` in the repository); the Tabler Icons notice is also at the top of `ui/icons.js`.\n")
 	return b.String()
 }
 
@@ -164,6 +166,8 @@ func skippedKind(s string) string {
 		return KindMedia
 	case strings.HasPrefix(s, refsFile):
 		return KindReference
+	case strings.HasPrefix(s, "extension/"):
+		return KindExtension
 	}
 	return ""
 }
@@ -282,6 +286,33 @@ func renderTools(w func(string, ...any), r *Report) {
 		return
 	}
 	w("| Name | Version | License | Platforms | Source | Note |\n|---|---|---|---|---|---|\n")
+	for _, c := range cs {
+		note := c.Note
+		if c.Allowed != "" {
+			note = strings.TrimSpace(note + " Accepted by allowlist: " + c.Allowed)
+		}
+		lic := c.License
+		if lic == "" {
+			lic = "(unknown)"
+		}
+		w("| %s | %s | %s | %s | %s | %s |\n", mdEscape(c.Name), mdEscape(c.Version), mdEscape(lic), mdEscape(c.Group), mdEscape(c.Source), mdEscape(note))
+	}
+	w("\n")
+}
+
+// renderExtension writes section 11: third-party content of the browser
+// extension's packages (extension.go).
+func renderExtension(w func(string, ...any), r *Report) {
+	w("## 11. Browser extension / 浏览器扩展\n\n")
+	w("Third-party files inside the browser extension's packages (Chrome, Edge, Firefox): copied unchanged from npm into `extension/src/vendor`, registered in `packaging/licenses/extension.json`, and shipped with `vendor/NOTICE` and their license texts (Appendix A). The extension's own code is under the AGPL like the rest of LectureFlow. Its platform profiles and detection fixtures (`extension/profiles`, `extension/fixtures`) are dedicated to the public domain under CC0-1.0 (`extension/profiles/LICENSE`). Its development tools (Playwright, for the end-to-end tests) are not shipped and not listed.\n\n")
+	w("浏览器扩展安装包（Chrome、Edge、Firefox）中的第三方文件：从 npm 原样复制到 `extension/src/vendor`，登记在 `packaging/licenses/extension.json`，与 `vendor/NOTICE` 及各自的许可证全文一起分发（附录 A）。扩展自身的代码与 LectureFlow 其他部分一样以 AGPL 发布；平台对策文件与探测报告样例（`extension/profiles`、`extension/fixtures`）以 CC0-1.0 贡献到公有领域（`extension/profiles/LICENSE`）。开发工具（端到端测试用的 Playwright）不随扩展分发，不在此列出。\n\n")
+	skippedNote(w, r, KindExtension)
+	cs := componentsOf(r, KindExtension)
+	if len(cs) == 0 {
+		w("_None._\n\n")
+		return
+	}
+	w("| Name | Version | License | Shipped as | Source | Note |\n|---|---|---|---|---|---|\n")
 	for _, c := range cs {
 		note := c.Note
 		if c.Allowed != "" {

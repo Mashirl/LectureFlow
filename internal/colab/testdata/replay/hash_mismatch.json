@@ -53,7 +53,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete audio.wav",
@@ -68,7 +69,8 @@
    },
    "response": {
     "status": 404
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete job.json",
@@ -83,7 +85,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json",
@@ -98,7 +101,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json.tmp",
@@ -113,7 +117,8 @@
    },
    "response": {
     "status": 404
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete stderr.log",
@@ -128,7 +133,40 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete events",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/events",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete job.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete the job directory",

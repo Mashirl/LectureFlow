@@ -133,6 +133,12 @@ export function createChapters(opts) {
     return lastStartingBefore(chapters(), ms);
   }
 
+  // ext web3: the chapter list from elsewhere (the current chapter's name)
+  function openList(anchor) {
+    if (running() || !chapters().length) return;
+    openMenu(menuItems(), { anchor }, { returnFocus: anchor });
+  }
+
   render();
   load();
 
@@ -145,6 +151,7 @@ export function createChapters(opts) {
     currentIndex,
     running,
     generate,
+    openList,
     get stale() {
       return !!(view && view.stale);
     },

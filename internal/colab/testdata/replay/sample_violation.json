@@ -1,0 +1,86 @@
+{
+ "_source": "依据 contract_violation.json（上游 google-colab-cli 0.7.5 构造，非真实录制）：job.json 之后来了一行不合契约的 machine 事件（gpu_name 含逗号，像讲稿文字），按 CodeContractViolation 处理，讲座退回本机。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/runtime.py#ColabRuntime.execute_code",
+   "jupyter-kernel-client 0.9.0 client.py#output_hook"
+  ]
+ },
+ "recorded": false,
+ "extends": "contract_violation.json",
+ "until": "kernel channels: run colab_remote.py",
+ "resume": "upload audio chunk 1",
+ "steps": [
+  {
+   "name": "kernel channels: run colab_remote.py",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "'--attach'"
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "after": "upload job.json"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260880.0,
+        "stage": "check"
+       }
+      ]
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "machine",
+        "ts": 1793260881.0,
+        "gpu_name": "Welcome, students",
+        "gpu_arch": "Turing",
+        "compute_cap": "7.5",
+        "driver": "580.82.07",
+        "cuda": "13.0",
+        "gpu_count": 1,
+        "vram_total_mb": 15360,
+        "vcpus": 2,
+        "mem_total_mb": 12975,
+        "storage": "disk"
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ]
+}

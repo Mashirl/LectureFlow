@@ -25,6 +25,10 @@
 
 const { signingFrom } = require('./scripts/lib/signing');
 const { updateBuildConfig } = require('./scripts/lib/updaterepo');
+// The minimum macOS (LSMinimumSystemVersion): the highest minimum of Electron,
+// the Go programs and the binaries in resources/ (packaging/third-party.json
+// macos explains it; scripts/stage.js checks every Mach-O file against it).
+const { macos } = require('./packaging/third-party.json');
 
 const { macCert, macNotarize, winCert } = signingFrom(process.env);
 const updates = updateBuildConfig(process.env, { winCert });
@@ -67,6 +71,12 @@ module.exports = {
       { target: 'portable', arch: ['x64'] },
     ],
     executableName: 'LectureFlow',
+    // Signed builds sign every .exe of extraResources too; aria2c.exe is
+    // upstream's official build whose SHA-256 is pinned (stage.js,
+    // components.json), so it stays byte for byte as published. Only the
+    // exclusion: a positive entry (".exe") would win over it (electron-builder
+    // 26 shouldSignFile; NOTES.md "Windows 签名排除 aria2c.exe").
+    signExts: ['!aria2c.exe'],
     verifyUpdateCodeSignature: true, // signed builds: publisherName goes into app-update.yml
     ...(updates.winPublisherName ? { signtoolOptions: { publisherName: updates.winPublisherName } } : {}),
   },
@@ -78,6 +88,9 @@ module.exports = {
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
     deleteAppDataOnUninstall: false, // the data directory belongs to the user
+    // Uninstall removes the browser extension's native messaging
+    // registration (HKCU keys, manifests, the host copy); see the file.
+    include: 'packaging/installer.nsh',
     artifactName: 'LectureFlow-Setup-${version}-x64.${ext}',
   },
   portable: {
@@ -95,7 +108,7 @@ module.exports = {
     entitlements: 'packaging/entitlements.mac.plist',
     entitlementsInherit: 'packaging/entitlements.mac.plist',
     notarize: macNotarize,
-    minimumSystemVersion: '12.0',
+    minimumSystemVersion: macos.minimum_system_version,
   },
   dmg: {
     artifactName: 'LectureFlow-${version}-arm64.${ext}',

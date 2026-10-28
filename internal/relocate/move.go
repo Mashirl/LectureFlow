@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,7 +23,7 @@ import (
 	"sync/atomic"
 
 	"lectureflow/internal/components"
-	"lectureflow/internal/db"
+	"lectureflow/internal/dirperm"
 )
 
 // caseInsensitive: Windows paths compare without ASCII case.
@@ -34,8 +35,10 @@ const KVOldDataDir = "app.old_data_dir"
 
 // KVOldDataDirScrubbed (in the new database) is the old data directory
 // whose database has had its secret rows removed (ScrubOldDataDir): the
-// scrub runs once per move.
-const KVOldDataDirScrubbed = "app.old_data_dir_scrubbed"
+// scrub runs once per move. cred-enc renamed the key ("_v2"): a directory
+// scrubbed before the providers' API keys were scrubbed too is scrubbed
+// once more.
+const KVOldDataDirScrubbed = "app.old_data_dir_scrubbed_v2"
 
 // LocationName is the file in the default data directory that points the
 // desktop shell at a moved data directory ({"data_dir": "..."}).
@@ -44,6 +47,27 @@ const LocationName = "location.json"
 // ShellProfileDir is the desktop shell's Chromium profile under the default
 // data directory (desktop/src/main/lib/datadir.js): never copied or deleted.
 const ShellProfileDir = "electron"
+
+// The browser extension's native messaging files also live under
+// {UserConfigDir}/LectureFlow, which is the default data directory
+// (internal/nmhost): the manifests and launch.json, and the macOS socket.
+// Like the shell profile they belong to the installation, not to the data.
+const (
+	NMHostDir = "nmhost"
+	NMRunDir  = "run"
+)
+
+// IsInstallationEntry reports whether a top-level entry of the default data
+// directory belongs to the installation (location.json, the shell profile,
+// the native messaging files): never copied, deleted, or counted as data.
+func IsInstallationEntry(name string) bool {
+	for _, n := range []string{LocationName, ShellProfileDir, NMHostDir, NMRunDir} {
+		if strings.EqualFold(name, n) {
+			return true
+		}
+	}
+	return false
+}
 
 // StagingDir is the import staging area inside the data directory.
 const StagingDir = "import-staging"
@@ -104,9 +128,11 @@ func rootSkip(rel string, dir bool) bool {
 		name = strings.ToLower(name)
 	}
 	if dir {
-		return name == StagingDir || name == ShellProfileDir
+		return name == StagingDir || name == ShellProfileDir || name == NMHostDir || name == NMRunDir
 	}
-	if name == DBName || name == LocationName || name == LocationName+".tmp" {
+	// lectureflow.lock: the running service's instance lock
+	// (cmd/lectureflow/instancelock.go), meaningful only where it was taken.
+	if name == DBName || name == LocationName || name == LocationName+".tmp" || name == "lectureflow.lock" {
 		return true
 	}
 	for _, s := range dbSidecars {
@@ -118,7 +144,8 @@ func rootSkip(rel string, dir bool) bool {
 }
 
 // targetEmpty reports whether dst is missing or holds nothing but the
-// desktop shell's files when it is the default data directory.
+// installation's files (IsInstallationEntry) when it is the default data
+// directory.
 func targetEmpty(dst, locationFile string) (bool, error) {
 	ents, err := os.ReadDir(dst)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -130,7 +157,7 @@ func targetEmpty(dst, locationFile string) (bool, error) {
 	isDefault := locationFile != "" && samePath(filepath.Clean(filepath.Dir(locationFile)), dst)
 	for _, e := range ents {
 		n := e.Name()
-		if isDefault && (strings.EqualFold(n, LocationName) || strings.EqualFold(n, ShellProfileDir)) {
+		if isDefault && IsInstallationEntry(n) {
 			continue
 		}
 		return false, nil
@@ -329,13 +356,35 @@ func MoveDataDir(ctx context.Context, o MoveOptions) (err error) {
 	}
 	src, dst := plan.Src, plan.Dst
 	t := &tracker{}
+	// The new data directory admits only this user (sec-update M2: a place
+	// like D:\ lets every account of the computer modify what is created
+	// there). Set before anything is copied, so everything inherits it; a
+	// directory the user chose gets its old permissions back if the move
+	// fails.
+	var restorePerm func() error
 	defer func() {
 		if err != nil {
 			t.cleanup()
+			if restorePerm != nil {
+				if rerr := restorePerm(); rerr != nil {
+					slog.Warn("relocate: restoring the permissions of the target", "dir", dst, "err", rerr)
+				}
+			}
 		}
 	}()
+	if fi, serr := os.Stat(dst); serr == nil && fi.IsDir() {
+		if restorePerm, err = dirperm.Save(dst); err != nil {
+			return coded(CodeTargetNotWritable, map[string]any{"path": dst}, err)
+		}
+	}
 	if err := t.mkdirAll(dst); err != nil {
 		return coded(CodeTargetNotWritable, map[string]any{"path": dst}, err)
+	}
+	if perr := dirperm.Restrict(dst); perr != nil {
+		// e.g. a FAT or exFAT drive, which keeps no permissions: the move
+		// goes on; the diagnostics then say that other accounts can reach
+		// the data
+		slog.Warn("relocate: the new data directory could not be made private", "dir", dst, "err", perr)
 	}
 	files, dirs, fileBytes, err := scanTree(src, rootSkip)
 	if err != nil {
@@ -424,16 +473,17 @@ func MoveDataDir(ctx context.Context, o MoveOptions) (err error) {
 	return nil
 }
 
-// ScrubOldDataDir removes the secret kv rows (the Colab credential,
-// secretKVKeys) from the database a move left in the old data directory
-// oldDir, leaving no copy in free pages or the WAL (db.ScrubKV:
-// secure_delete, VACUUM, TRUNCATE checkpoint; closing the connection
-// removes the WAL). Everything else in oldDir stays until the user deletes
-// it (v3 Gate round 2, lead ruling). It runs after the switch, in the
-// service started on the new directory currentDir: the old service, the
-// only other user of that database, has exited by then. A missing
-// database is nothing to do; oldDir must be absolute and must not be
-// currentDir or hold it.
+// ScrubOldDataDir removes the credentials (the Colab credential,
+// secretKVKeys, and the providers' API keys) from the database a move left
+// in the old data directory oldDir, leaving no copy in free pages or the
+// WAL (db.ScrubSecrets: secure_delete, VACUUM, TRUNCATE checkpoint;
+// closing the connection removes the WAL), and so are the databases
+// imports replaced in the old backups/ (sec3 L1). Everything else in oldDir
+// stays until the user deletes it (v3 Gate round 2, lead ruling). It runs
+// after the switch, in the service started on the new directory
+// currentDir: the old service, the only other user of that database, has
+// exited by then. Missing databases are nothing to do; oldDir must be
+// absolute and must not be currentDir or hold it.
 func ScrubOldDataDir(ctx context.Context, oldDir, currentDir string) error {
 	old, err := cleanAbs(oldDir)
 	if err != nil {
@@ -446,21 +496,19 @@ func ScrubOldDataDir(ctx context.Context, oldDir, currentDir string) error {
 		}
 	}
 	path := filepath.Join(old, DBName)
-	if fi, err := os.Stat(path); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil
-		}
+	fi, err := os.Stat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
 		return err
-	} else if fi.IsDir() {
+	case fi.IsDir():
 		return fmt.Errorf("relocate: %s is a directory", path)
+	default:
+		if err := scrubDB(ctx, path); err != nil { // cred-enc: provider keys too (L5)
+			return err
+		}
 	}
-	d, err := openDB(path, false)
-	if err != nil {
-		return err
-	}
-	if err := db.ScrubKV(ctx, d, secretKVKeys...); err != nil {
-		d.Close()
-		return err
-	}
-	return d.Close()
+	// sec3 L1: the databases imports replaced, kept in the old backups/
+	_, err = ScrubImportBackups(ctx, old)
+	return err
 }

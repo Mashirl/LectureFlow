@@ -364,22 +364,56 @@ func TestLaunchSkipsAux(t *testing.T) {
 }
 
 // §4.7 for auxiliary tasks: an interrupted one is failed and NOT requeued
-// (no automatic retry); a pipeline stage is requeued as before.
+// (no automatic retry); a pipeline stage is requeued as before. The
+// exception is stream (lead ruling 2026-10-27 14:30: since stream-parallel
+// the playback file is a regular product of the pipeline): requeued like a
+// pipeline stage while it has retries left, then failed for good (the
+// player's EnsureStream takes over). A stream task that failed by itself is
+// not touched.
 func TestRecoverDoesNotRetryAux(t *testing.T) {
 	f := newFixture(t)
 	l := f.lecture()
 	f.to(model.ScopeLecture, l.ID, model.StagePrep, model.StatusRunning)
 	f.lecAux(l.ID, model.StageStream, model.StatusRunning)
 	f.aux(model.ScopeCourse, f.course.ID, model.StageFilenameRule, model.StatusRunning)
+	l2 := f.lecture()
+	f.lecAux(l2.ID, model.StageTitle, model.StatusRunning)
+	f.lecAux(l2.ID, model.StageChapters, model.StatusRunning)
+	failed := f.lecAux(l2.ID, model.StageStream, model.StatusFailed) // failed by itself, before the restart
 	if err := Recover(f.ctx, f.st, f.dataDir); err != nil {
 		t.Fatal(err)
 	}
 	if j := f.lj(l.ID, model.StagePrep); j.Status != model.StatusQueued || j.Attempt != 1 {
 		t.Errorf("prep = %s attempt %d", j.Status, j.Attempt)
 	}
-	for _, j := range []model.Job{f.lj(l.ID, model.StageStream), f.job(model.ScopeCourse, f.course.ID, model.StageFilenameRule)} {
+	for _, j := range []model.Job{f.job(model.ScopeCourse, f.course.ID, model.StageFilenameRule), f.lj(l2.ID, model.StageTitle), f.lj(l2.ID, model.StageChapters)} {
 		if j.Status != model.StatusFailed || j.Attempt != 0 || j.Error == nil || *j.Error != model.ErrInterruptedByRestart || !IsInterrupted(j.Error) {
 			t.Errorf("%s = %s attempt %d error %v", j.Stage, j.Status, j.Attempt, j.Error)
+		}
+	}
+	stream := f.lj(l.ID, model.StageStream)
+	if stream.Status != model.StatusQueued || stream.Attempt != 1 || stream.Error == nil || !IsInterrupted(stream.Error) {
+		t.Errorf("interrupted stream = %s attempt %d error %v, want queued again (attempt 1)", stream.Status, stream.Attempt, stream.Error)
+	}
+	if j := f.lj(l2.ID, model.StageStream); j.ID != failed.ID || j.Status != model.StatusFailed || j.Attempt != failed.Attempt {
+		t.Errorf("a failed stream task was touched: %s %s attempt %d", j.ID, j.Status, j.Attempt)
+	}
+	// interrupted again and again: requeued until model.MaxAutoRetries, then
+	// it stays failed (same job, no new one)
+	for attempt := 2; attempt <= model.MaxAutoRetries+1; attempt++ {
+		f.drive(model.ScopeLecture, l.ID, model.StageStream, model.StatusRunning)
+		if err := Recover(f.ctx, f.st, f.dataDir); err != nil {
+			t.Fatal(err)
+		}
+		j := f.lj(l.ID, model.StageStream)
+		if j.ID != stream.ID || !IsInterrupted(j.Error) {
+			t.Fatalf("restart %d: stream %s %v", attempt, j.ID, j.Error)
+		}
+		if attempt <= model.MaxAutoRetries && (j.Status != model.StatusQueued || j.Attempt != attempt) {
+			t.Errorf("restart %d: stream %s attempt %d, want queued attempt %d", attempt, j.Status, j.Attempt, attempt)
+		}
+		if attempt > model.MaxAutoRetries && (j.Status != model.StatusFailed || j.Attempt != model.MaxAutoRetries) {
+			t.Errorf("restart %d: stream %s attempt %d, want failed (retries used up)", attempt, j.Status, j.Attempt)
 		}
 	}
 }

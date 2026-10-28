@@ -1,0 +1,16 @@
+{
+ "_source": "依据 memory_run_release.json 构造，非真实录制：/dev/shm 空间不足，探测自建 tmpfs 挂载于 /mnt/lectureflow。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/contents.py#ContentsClient"
+  ]
+ },
+ "recorded": false,
+ "extends": "memory_run_release.json",
+ "vars": {
+  "base": "mnt/lectureflow"
+ },
+ "steps": []
+}

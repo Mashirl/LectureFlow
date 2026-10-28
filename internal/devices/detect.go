@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/pyenv"
 )
 
 // Detection helpers of the Registry (task B): the default nvidia-smi name
@@ -128,8 +130,9 @@ func (r *Registry) workerProbe(ctx context.Context) (*OVProbe, error) {
 	defer r.trackPython(py)()
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, py, script, "--probe")
+	cmd.Env = pyenv.Environ() // no usage reporting (the probe imports openvino)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
+	err := procutil.Run(cmd, procutil.Tied) // ends with LectureFlow, also on a crash (test-chaos 1)
 	if err != nil {
 		var ee *exec.ExitError
 		switch {

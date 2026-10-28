@@ -1,0 +1,8 @@
+# Build output and local tooling (the extension's own; see scripts/build.mjs)
+/dist/
+/node_modules/
+/test-results/
+*.pem
+*.crx
+*.xpi
+*.zip

@@ -1,0 +1,456 @@
+{
+  "kind": "lectureflow-detection-report",
+  "reportVersion": 1,
+  "generatedAt": "2026-10-26",
+  "extension": {
+    "version": "0.1.0",
+    "browser": "chrome"
+  },
+  "page": {
+    "url": "https://tenant.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id={uuid-1}&start={num1-2}",
+    "frames": [
+      {
+        "frameId": 0,
+        "url": "https://tenant.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id={uuid-1}&start={num1-2}"
+      }
+    ]
+  },
+  "profile": {
+    "id": "panopto",
+    "version": "1.1.1",
+    "reviewed": true
+  },
+  "inputs": {
+    "frames": [
+      {
+        "frameId": 0,
+        "url": "https://tenant.cloud.panopto.eu/Panopto/Pages/Viewer.aspx?id={uuid-1}&start={num1-2}",
+        "encryptedEvents": 0,
+        "elements": [
+          {
+            "tag": "video",
+            "src": "blob:",
+            "currentSrc": "blob:",
+            "sources": [],
+            "mediaKeys": false,
+            "videoWidth": 1920,
+            "videoHeight": 1080,
+            "duration": 3300,
+            "readyState": 4
+          },
+          {
+            "tag": "video",
+            "src": "blob:",
+            "currentSrc": "blob:",
+            "sources": [],
+            "mediaKeys": false,
+            "videoWidth": 0,
+            "videoHeight": 0,
+            "duration": 3300,
+            "readyState": 4
+          }
+        ],
+        "resources": [
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/seg_00001.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/seg_00001.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          }
+        ],
+        "observed": [
+          {
+            "key": "panopto:1.1.1",
+            "index": 0,
+            "url": "https://tenant.cloud.panopto.eu/Panopto/Pages/Viewer/DeliveryInfo.aspx",
+            "values": {
+              "downloadUrl": null,
+              "podcastUrl": [
+                "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.mp4?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "webRequests": [],
+    "fetches": [
+      {
+        "purpose": "manifest",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:550\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:550.000,\nseg_00001.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00002.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00003.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00004.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00005.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00006.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXT-X-ENDLIST\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-INDEPENDENT-SEGMENTS\n#EXT-X-STREAM-INF:BANDWIDTH=135000,AVERAGE-BANDWIDTH=128000,CODECS=\"mp4a.40.2\"\nindex_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:550\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXTINF:550.000,\nseg_00001.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00002.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00003.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00004.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00005.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXTINF:550.000,\nseg_00006.ts?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n#EXT-X-ENDLIST\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=1920x1080,CODECS=\"avc1.640028\"\nindex_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-STREAM-INF:BANDWIDTH=700000,RESOLUTION=1280x720,CODECS=\"avc1.64001f\"\nindex_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}\n"
+      },
+      {
+        "purpose": "probe",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "ok": false,
+        "status": 404,
+        "contentType": "text/html"
+      }
+    ]
+  },
+  "dom": [
+    {
+      "frameId": 0,
+      "key": "lecture.title.0",
+      "selector": "h1#deliveryTitle",
+      "attr": "",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": [
+        {
+          "path": [
+            {
+              "tag": "html",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "body",
+              "id": "",
+              "classes": [
+                "viewer"
+              ]
+            },
+            {
+              "tag": "h1",
+              "id": "deliveryTitle",
+              "classes": []
+            }
+          ],
+          "attrNames": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.title.1",
+      "selector": "h1#title .title-text",
+      "attr": "",
+      "count": 0,
+      "valueShape": "",
+      "nodes": []
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.title.2",
+      "selector": "meta[property=\"og:title\"]",
+      "attr": "content",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": [
+        {
+          "path": [
+            {
+              "tag": "html",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "head",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "meta",
+              "id": "",
+              "classes": []
+            }
+          ],
+          "attrNames": [
+            "property",
+            "content"
+          ]
+        }
+      ]
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.title.3",
+      "selector": "title",
+      "attr": "",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": [
+        {
+          "path": [
+            {
+              "tag": "html",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "head",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "title",
+              "id": "",
+              "classes": []
+            }
+          ],
+          "attrNames": []
+        }
+      ]
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.recordedAt.0",
+      "selector": "h1#deliveryTitle",
+      "attr": "",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": [
+        {
+          "path": [
+            {
+              "tag": "html",
+              "id": "",
+              "classes": []
+            },
+            {
+              "tag": "body",
+              "id": "",
+              "classes": [
+                "viewer"
+              ]
+            },
+            {
+              "tag": "h1",
+              "id": "deliveryTitle",
+              "classes": []
+            }
+          ],
+          "attrNames": [
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.recordedAt.1",
+      "selector": "h1#title .title-text",
+      "attr": "",
+      "count": 0,
+      "valueShape": "",
+      "nodes": []
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.recordedAt.2",
+      "selector": "meta[property=\"og:title\"]",
+      "attr": "content",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": []
+    },
+    {
+      "frameId": 0,
+      "key": "lecture.recordedAt.3",
+      "selector": "title",
+      "attr": "",
+      "count": 1,
+      "valueShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+      "nodes": []
+    }
+  ],
+  "expected": {
+    "summary": {
+      "total": 3,
+      "audio": 1,
+      "video": 2,
+      "unknown": 0,
+      "protected": 0
+    },
+    "tracks": [
+      {
+        "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "kind": "video",
+        "format": "hls",
+        "sizeBytes": 371250000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "quality": "1080p",
+        "durationSec": 3300,
+        "variants": [
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "bandwidth": 900000,
+            "width": 1920,
+            "height": 1080,
+            "codecs": "avc1.640028"
+          }
+        ]
+      },
+      {
+        "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "kind": "video",
+        "format": "hls",
+        "sizeBytes": 288750000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "quality": "720p",
+        "durationSec": 3300,
+        "variants": [
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "bandwidth": 700000,
+            "width": 1280,
+            "height": 720,
+            "codecs": "avc1.64001f"
+          }
+        ]
+      },
+      {
+        "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+        "kind": "audio",
+        "format": "hls",
+        "sizeBytes": 52800000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "durationSec": 3300,
+        "variants": [
+          {
+            "url": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/index_0.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+            "bandwidth": 135000,
+            "codecs": "mp4a.40.2"
+          }
+        ]
+      }
+    ],
+    "segmentRuns": [],
+    "evidence": {
+      "mse": true,
+      "mediaKeys": false,
+      "mediaKeysOnStream": false,
+      "encrypted": false
+    },
+    "profile": {
+      "id": "panopto",
+      "version": "1.1.1",
+      "sessionIdSource": "profile",
+      "lecture": {
+        "titleShape": "XXX0000/X00/00 Xxx Xxx 00 00:00:00 XXX 0000",
+        "recordedAtShape": "0000-00-00X00:00",
+        "durationSec": 3300
+      },
+      "downloadPolicy": "disabled",
+      "tracks": [
+        {
+          "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.mp4?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+          "role": "podcast",
+          "labelIndex": 0,
+          "recommended": true
+        },
+        {
+          "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000002-00000000-0000-4000-8000-000000000003.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+          "role": "primary-audio",
+          "labelIndex": 0,
+          "recommended": false
+        },
+        {
+          "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000004.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+          "role": "screen",
+          "labelIndex": 1,
+          "recommended": false
+        },
+        {
+          "id": "https://d0000fixture00.cloudfront.net/sessions/00000000-0000-4000-8000-000000000001/00000000-0000-4000-8000-000000000005.object.hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}",
+          "role": "screen",
+          "labelIndex": 2,
+          "recommended": false
+        }
+      ],
+      "others": 0
+    }
+  }
+}

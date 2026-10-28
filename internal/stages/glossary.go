@@ -341,11 +341,15 @@ func (s *glossaryStage) syllabusText(ctx context.Context, courseID string, sy mo
 	if err != nil {
 		return "", err
 	}
-	path := resolvePath(sy.Path, dir)
-	if path == "" {
-		path = resolvePath(sy.Filename, dir)
+	// a path naming another computer is never opened (review 2, M3)
+	path := ""
+	if !state.StoredPathUnsafe(state.PathSyllabus, courseID, sy.Path) {
+		path = resolvePath(sy.Path, dir)
+		if path == "" && !state.StoredPathUnsafe(state.PathSyllabus, courseID, sy.Filename) {
+			path = resolvePath(sy.Filename, dir)
+		}
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err := os.Stat(path); path == "" || err != nil {
 		return "", sched.Permanent(model.Errorf(CodeGlossarySyllabusMissing, map[string]any{"filename": sy.Filename},
 			fmt.Errorf("找不到大纲文件 %s，请重新上传大纲", sy.Filename)))
 	}

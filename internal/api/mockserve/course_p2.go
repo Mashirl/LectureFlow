@@ -144,6 +144,9 @@ func numberCourse(c *api.Course, lectures []api.Lecture, kc *kindCtx) {
 		resolveKind(c, l, kc)
 		recs[k] = recordedOf(l)
 		in[k] = calendar.LectureTime{ID: l.ID, RecordedAt: recs[k], OriginalFilename: l.OriginalFilename, Kind: l.Kind, KindSource: l.KindSource}
+		if o := l.WeekOverride; o != nil { // course-ux (course_ux.go)
+			in[k].Override, in[k].OverrideWeek = o.Kind, o.Week
+		}
 	}
 	nums := calendar.LabelKinds(in, ts, skips, calendar.NumberOptions{Kinds: kc.calendarKinds(), Numbering: c.Numbering})
 	for pos, k := range calendar.Order(in) {
@@ -153,6 +156,11 @@ func numberCourse(c *api.Course, lectures []api.Lecture, kc *kindCtx) {
 		l.Week, l.N, l.Numbered, l.Label, l.SameDayByName, l.CiteLabel = n.Week, n.N, n.OK, n.Label, n.SameDayByName, n.CiteLabel
 		l.Kind, l.KindSource = n.Kind, api.ViewKindSource(l.Kind, l.KindSource, n.Kind)
 		l.KindN, l.KindCount, l.ShowN = n.KindN, n.KindCount, n.ShowN
+		if o := l.WeekOverride; o != nil { // a new value: renumberCheck's copies share the pointer
+			wo := *o
+			wo.Applied = n.Override != ""
+			l.WeekOverride = &wo
+		}
 		l.RecordedHasTime = recs[k] != nil && calendar.HasClock(*recs[k])
 		l.CalendarHint = ""
 		if !n.OK {

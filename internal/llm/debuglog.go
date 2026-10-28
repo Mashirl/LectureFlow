@@ -37,7 +37,8 @@ type debugEntry struct {
 
 // debugLog appends request and response to {logDir}/{job_id}.jsonl when
 // log_level = debug. Authentication headers (Authorization, x-api-key) are
-// never written.
+// never written, and a key echoed in the response or the error is redacted
+// (sec2-app L1).
 func (c *HTTPClient) debugLog(ctx context.Context, call callInfo, h http.Header, reqBody []byte, attempt, status int, respBody []byte, err error, d time.Duration) {
 	if c.cfg.LogLevel != "debug" {
 		return
@@ -69,6 +70,9 @@ func (c *HTTPClient) debugLog(ctx context.Context, call callInfo, h http.Header,
 		DurationMS: d.Milliseconds(),
 	}
 	if len(respBody) > 0 {
+		// A key is plain ASCII without JSON metacharacters: replacing it
+		// keeps a JSON body valid.
+		respBody = []byte(redact(string(respBody), call.key))
 		if json.Valid(respBody) {
 			e.Response = json.RawMessage(respBody)
 		} else {
@@ -77,7 +81,7 @@ func (c *HTTPClient) debugLog(ctx context.Context, call callInfo, h http.Header,
 		}
 	}
 	if err != nil {
-		e.Error = err.Error()
+		e.Error = redact(err.Error(), call.key)
 	}
 	line, mErr := json.Marshal(e)
 	if mErr != nil {

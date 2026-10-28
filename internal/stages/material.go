@@ -31,17 +31,30 @@ func (d Deps) extractPDF(ctx context.Context, dir, pdf string, progress func(flo
 
 // extractPDFWith is extractPDF with the interpreter python (the component
 // update self-test runs the new base environment before it is active).
+// The run has the limits of pdf_limits.go: memory cap, decode budget and a
+// time limit by file size and page count; over any of them is an input
+// error (not retried).
 func (d Deps) extractPDFWith(ctx context.Context, python, dir, pdf string, progress func(float64)) ([]string, error) {
 	abs, err := filepath.Abs(pdf)
 	if err != nil {
 		return nil, err
 	}
-	raw, err := d.runWorker(ctx, workerCall{
+	var size int64
+	if fi, err := os.Stat(abs); err == nil {
+		size = fi.Size()
+	}
+	deadline := NewPDFDeadline(ctx, size, pdfTimeoutMax)
+	defer deadline.Stop()
+	raw, err := d.runWorker(deadline.Context(), workerCall{
 		name: "extract_pdf", label: "PDF 抽取进程（extract_pdf.py）", code: workerPDF, dir: dir,
-		job: map[string]string{"pdf": abs}, out: "result.json", progress: progress,
+		job: PDFJob(abs), out: "result.json", progress: progress, status: deadline.Status,
 		python: python, pythonKey: "python",
+		errorCode: PDFErrorCode, limits: PDFLimits(), memoryErr: PDFMemoryError,
 	})
 	if err != nil {
+		if terr := deadline.Err(ctx); terr != nil {
+			return nil, terr
+		}
 		return nil, err
 	}
 	var res struct {
@@ -72,8 +85,11 @@ func (s *materialExtractStage) Run(ctx context.Context, materialID string, progr
 	if err != nil {
 		return err
 	}
-	path := resolvePath(m.Path, dir)
-	if _, err := os.Stat(path); m.Path == "" || err != nil {
+	path := ""
+	if !state.StoredPathUnsafe(state.PathMaterial, materialID, m.Path) {
+		path = resolvePath(m.Path, dir) // a path naming another computer is never opened (review 2, M3)
+	}
+	if _, err := os.Stat(path); path == "" || err != nil {
 		return sched.Permanent(model.Errorf(CodeMaterialFileMissing, map[string]any{"filename": m.Filename},
 			fmt.Errorf("找不到课件文件 %s，请重新上传", m.Filename)))
 	}

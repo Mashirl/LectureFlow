@@ -82,9 +82,41 @@ function hardenSession(ses, ctx) {
     }
   });
 
-  // On Linux Chromium would fetch dictionaries from the network; English
-  // course terms would also be underlined everywhere.
-  ses.setSpellCheckerEnabled(false);
+  // Chromium would fetch dictionaries from the network; English course
+  // terms would also be underlined everywhere.
+  disableSpellcheck(ses);
+}
+
+/**
+ * disableSpellcheck(ses): no spellchecker and no languages, so no Hunspell
+ * dictionary is ever downloaded for the session. Both calls are needed: with
+ * the sandbox on (app.enableSandbox), a session whose spellchecker is only
+ * switched off still downloads the dictionary of the UI language from
+ * Google's CDN (redirector.gvt1.com). setSpellCheckerLanguages is a no-op on
+ * macOS (the system spellchecker downloads nothing).
+ */
+function disableSpellcheck(ses) {
+  try {
+    ses.setSpellCheckerEnabled(false);
+  } catch {
+    // an Electron without the API: nothing to switch off
+  }
+  try {
+    ses.setSpellCheckerLanguages([]);
+  } catch {
+    // macOS, or an Electron without the API
+  }
+}
+
+/**
+ * noSpellcheckDownloads(app): every session gets disableSpellcheck as soon
+ * as Electron creates it, the default session included, which no window of
+ * the shell uses: with the sandbox on it downloaded en-US-10-1.bdic from
+ * redirector.gvt1.com at every start (privacy audit before 3.2.0, NOTES.md
+ * "无遥测"). Call before the app is ready.
+ */
+function noSpellcheckDownloads(app) {
+  app.on('session-created', disableSpellcheck);
 }
 
 /**
@@ -129,4 +161,4 @@ function hardenWebContents(contents, ctx) {
   });
 }
 
-module.exports = { hardenSession, hardenWebContents };
+module.exports = { hardenSession, hardenWebContents, disableSpellcheck, noSpellcheckDownloads };

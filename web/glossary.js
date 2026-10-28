@@ -291,7 +291,7 @@ export function createGlossary({ courseId, ctx, onCourse, reloadCourse }) {
     const busy = U.reviewBusy(course);
     let status = null;
     if (st && st.status === 'running') status = h('span', { class: 'chip chip-run' }, icon('loader-circle', { size: 11, class: 'spin' }), t('glossary.janitor.running', { pct: U.pct(st.progress) }));
-    else if (st && (st.status === 'queued' || st.status === 'pending')) status = h('span', { class: 'chip chip-quiet' }, st.waiting_for ? U.waitingForText(st.waiting_for, ctx.system(), ctx.resources()) : t('glossary.janitor.waiting'));
+    else if (st && (st.status === 'queued' || st.status === 'pending')) status = h('span', { class: 'chip chip-quiet' }, st.waiting_for ? U.stageWaitingText(st, ctx.system(), ctx.resources()) : t('glossary.janitor.waiting'));
     else if (st && st.status === 'failed') status = h('span', { class: 'chip chip-warn' }, t('glossary.janitor.last_failed'));
     else if (st && st.status === 'cancelled') status = h('span', { class: 'chip chip-quiet' }, t('glossary.janitor.last_cancelled'));
     reviewChip = st && st.status === 'running' ? status : null;

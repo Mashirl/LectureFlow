@@ -35,14 +35,20 @@ func OpenDB(path string) (*sql.DB, error) {
 	return d, nil
 }
 
+// connPragmas are the connection parameters: the three of SPEC §3.3 and
+// (perf-fix, NOTES.md) a 32 MiB page cache instead of SQLite's 2 MB, so the
+// lecture lists' reads stay in memory (the sentence rows with their word
+// timestamps are several MB). Still one connection (SetMaxOpenConns).
+const connPragmas = "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)" +
+	"&_pragma=cache_size(-32768)"
+
 // openRaw opens the database with the SPEC §3.3 parameters, without migrating.
 func openRaw(path string) (*sql.DB, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
-	dsn := "file:" + (&url.URL{Path: filepath.ToSlash(abs)}).EscapedPath() + "?" +
-		"_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)"
+	dsn := "file:" + (&url.URL{Path: filepath.ToSlash(abs)}).EscapedPath() + "?" + connPragmas
 	d, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -52,7 +58,9 @@ func openRaw(path string) (*sql.DB, error) {
 }
 
 // Migrate applies migrations/NNN_*.sql in order, tracking the applied
-// number in PRAGMA user_version.
+// number in PRAGMA user_version. A database whose user_version is above
+// SchemaVersion (written by a newer LectureFlow) is refused with
+// *NewerSchemaError and left as it is (test-upgrade F2).
 func Migrate(ctx context.Context, d *sql.DB) error {
 	return migrateUpTo(ctx, d, 0)
 }
@@ -63,6 +71,9 @@ func migrateUpTo(ctx context.Context, d *sql.DB, upTo int) error {
 	var cur int
 	if err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&cur); err != nil {
 		return err
+	}
+	if known := SchemaVersion(); cur > known {
+		return &NewerSchemaError{Found: cur, Known: known}
 	}
 	entries, err := fs.ReadDir(migrationFS, "migrations")
 	if err != nil {

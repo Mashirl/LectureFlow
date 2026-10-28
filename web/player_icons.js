@@ -13,6 +13,10 @@ const L = (x1, y1, x2, y2) => ['line', { x1, y1, x2, y2 }];
 const SPEAKER = ['polygon', { points: '11 5 6 9 2 9 2 15 6 15 11 19 11 5' }];
 
 const ICONS = {
+  // ext web3: picture in picture (second angle), swapping, chapters folded
+  'picture-in-picture-2': [P('M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4'), ['rect', { width: 10, height: 7, x: 12, y: 13, rx: 2 }]],
+  'arrow-left-right': [P('M8 3 4 7l4 4'), P('M4 7h16'), P('m16 21 4-4-4-4'), P('M20 17H4')],
+  'list-collapse': [P('m3 10 2.5-2.5L3 5'), P('m3 19 2.5-2.5L3 14'), P('M10 6h11'), P('M10 12h11'), P('M10 18h11')],
   'skip-back': [['polygon', { points: '19 20 9 12 19 4 19 20' }], L(5, 19, 5, 5)],
   'skip-forward': [['polygon', { points: '5 4 15 12 5 20 5 4' }], L(19, 5, 19, 19)],
   'repeat-1': [P('m17 2 4 4-4 4'), P('M3 11v-1a4 4 0 0 1 4-4h14'), P('m7 22-4-4 4-4'), P('M21 13v1a4 4 0 0 1-4 4H3'), P('M11 10h1v4')],

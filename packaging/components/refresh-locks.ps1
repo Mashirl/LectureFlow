@@ -32,11 +32,13 @@ $env:MACOSX_DEPLOYMENT_TARGET = "13.0"
 $platforms = @{
     "windows-x64"  = "x86_64-pc-windows-msvc"
     "darwin-arm64" = "aarch64-apple-darwin"
+    # linux-x64 is only a target of the SSH inference servers (ssh-mvp; glibc 2.28+)
+    "linux-x64"    = "x86_64-manylinux_2_28"
 }
 # component -> platforms (see manifest.src.json "gen.locks")
 $locks = [ordered]@{
-    "python"       = @("windows-x64", "darwin-arm64")
-    "asr-cuda"     = @("windows-x64")
+    "python"       = @("windows-x64", "darwin-arm64", "linux-x64")
+    "asr-cuda"     = @("windows-x64", "linux-x64")
     "asr-openvino" = @("windows-x64")
     "asr-mlx"      = @("darwin-arm64")
 }

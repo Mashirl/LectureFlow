@@ -32,10 +32,23 @@
 //	renumbered  COMP3311 with a term start and an exported citation JSON, where
 //	       the title task's kind (a tutorial) renumbered another lecture: the
 //	       course page's notice (Course.renumber_notices, kinds.go)
+//	courseux  week overrides: a material hung under week 3, two make-ups
+//	       ("补"); batch rerun and PUT/DELETE .../week (course_ux.go)
 //	peak, offpeak  the default data with the tariff clock moved ahead into that
 //	       period (P12.4 tags; course_p2.go); set the browser clock to the
 //	       resources' sampled_at for consistent countdowns
 //	battery, noov, cpuonly  transcription devices (devices.go)
+//	diag_intel, diag_mac, diag_cloud  the diagnostics by hardware and
+//	       transcription mode: a pure Intel laptop, an Apple silicon Mac,
+//	       only Colab (ext_diag.go; GET / PUT /api/asr-mode)
+//	angles  CSC3631 L01 has a second camera angle (ext_web3.go; -angle2 <file>)
+//	ext_ok, ext_unregistered, ext_broken, ext_unmanaged, ext_nmoff
+//	       the diagnostics rows aria2c and browser_ext and GET /api/nmhost
+//	       (ext_web3.go)
+//	datadir_shared, datadir_readable, datadir_fat
+//	       other accounts can change / read the data folder (the data_dir
+//	       row's warning and "收紧权限"; the last one cannot be restricted)
+//	       (datadir.go)
 //	power_ac_dgpu, power_ac_intel, power_battery_npu, power_battery_suspended,
 //	power_ac_switch, power_all_suspended
 //	       the power policy's resource bar (power.go): AC + NVIDIA card, AC +
@@ -143,13 +156,14 @@ type handler struct {
 }
 
 type mock struct {
-	dataDir string
-	main    *store
-	empty   *store
-	renum   *store    // scenario "renumbered" (kinds.go)
-	battery lazyStore // scenario "battery" (devices.go)
-	noov    lazyStore // scenario "noov" (devices.go)
-	cpuonly lazyStore // scenario "cpuonly" (devices.go)
+	dataDir  string
+	main     *store
+	empty    *store
+	renum    *store    // scenario "renumbered" (kinds.go)
+	courseUX lazyStore // scenario "courseux" (course_ux.go)
+	battery  lazyStore // scenario "battery" (devices.go)
+	noov     lazyStore // scenario "noov" (devices.go)
+	cpuonly  lazyStore // scenario "cpuonly" (devices.go)
 	// scenario "transcribe_only" (v31_transcribe_only.go)
 	transcribeOnly lazyStore
 	// the power scenarios (power.go)
@@ -185,6 +199,8 @@ func newHandler(webDir, dataDir string, tick time.Duration) http.Handler {
 		reg(m, mux)
 	}
 	mux.HandleFunc("GET /api/events", m.events(tick))
+	// perf-fix: the page reports whether it is shown; the mock does not sample.
+	mux.HandleFunc("POST /api/events/visibility", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	mux.HandleFunc("GET /api/system", a(m.getSystem))
 	mux.HandleFunc("POST /api/system/recheck", a(m.getSystem))
 	mux.HandleFunc("POST /api/system/gpu", a(m.setGPU))
@@ -239,11 +255,16 @@ func scenario(r *http.Request) string {
 }
 
 func (m *mock) storeFor(r *http.Request) *store {
+	if s, ok := m.diagStore(r); ok { // ext-step1 (ext_diag.go)
+		return s
+	}
 	switch scenario(r) {
 	case "empty":
 		return m.empty
 	case "renumbered":
 		return m.renum
+	case "courseux": // course_ux.go
+		return m.courseUX.get(m, setupCourseUX)
 	case "battery":
 		return m.battery.get(m, func(s *store) {
 			pct := 64
@@ -448,6 +469,9 @@ func (m *mock) system(r *http.Request, s *store) (api.System, error) {
 	sys.Checks = s.withDeviceChecks(sys.Checks)
 	obDesktopChecks(r, &sys)                // ob_desktop (v3_accfix.go)
 	sys.Config = mockConfigView(r, s, &sys) // 3.1.0 (v31_config.go)
+	m.diagSystem(r, s, &sys)                // ext-step1 (ext_diag.go)
+	m.web3System(r, &sys)                   // ext web3: aria2c, browser_ext (ext_web3.go)
+	m.dataDirSystem(r, &sys)                // datadir-ui: who else can reach the data folder (datadir.go)
 	return sys, nil
 }
 
@@ -714,7 +738,7 @@ func (m *mock) getLecture(w http.ResponseWriter, r *http.Request, s *store) {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, l)
+	writeJSON(w, http.StatusOK, m.lectureJSON(r, s, l)) // ext web3: the second angle (ext_web3.go)
 }
 
 func (m *mock) patchLecture(w http.ResponseWriter, r *http.Request, s *store) {

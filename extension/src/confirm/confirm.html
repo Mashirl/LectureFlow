@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LectureFlow</title>
+  <link rel="stylesheet" href="../ui/tokens.css">
+  <link rel="stylesheet" href="../ui/base.css">
+  <link rel="stylesheet" href="../ui/card.css">
+  <link rel="stylesheet" href="../popup/popup.css">
+  <link rel="stylesheet" href="confirm.css">
+  <script type="module" src="confirm.js"></script>
+</head>
+<body data-view="loading">
+  <header class="hd">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect class="logo-bg" width="32" height="32" rx="8"/>
+        <path class="logo-bars" d="M9 13v6M13 10v12M17 8v16M21 11v10M25 14v4"/>
+      </svg>
+      <span>LectureFlow</span>
+    </div>
+    <h1 class="cf-title" id="cf-title"></h1>
+  </header>
+
+  <section class="cf-embed" id="embed" hidden>
+    <p class="note note-warn" id="embed-why"></p>
+    <p class="small muted" id="embed-from"></p>
+    <label class="check-line" id="trust-line" hidden><input type="checkbox" id="trust"><span id="trust-text"></span></label>
+  </section>
+
+  <main class="body" id="main" aria-live="polite"></main>
+</body>
+</html>

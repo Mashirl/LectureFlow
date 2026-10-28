@@ -18,10 +18,17 @@
 // materials without a teaching week (a past lecture recorded before the
 // term) form their own group after the weeks; a week's header shows how
 // many slide files apply to it.
+//
+// course-ux (2026-10-27): the selection bar reruns one stage of the
+// selected lectures (course_ux.js, one confirmation) and selects the whole
+// course; a teaching material can be dragged (or, from its handle's menu,
+// sent) under a teaching week, where it shows indented as that week's
+// supplement; a make-up lecture is listed in the week whose content it is,
+// after that week's own lectures, with a yellow "补" tag.
 
-import { h, append, clear, btn, iconBtn, preserveFocus } from './dom.js';
+import { h, append, clear, btn, iconBtn, preserveFocus, everySecond } from './dom.js';
 import { icon } from './icons.js';
-import { pipelineBar } from './pipeline.js';
+import { pipelineBar, streamProgress } from './pipeline.js';
 import { bindContextMenu, menuButton, openMenu } from './menu.js';
 import * as A from './actions.js';
 import { api } from './api.js';
@@ -31,6 +38,7 @@ import { lectureTitles, titleLang, weekTitle, weekRangeText, mondayOf, parseYMD,
 import { zh, zhOn } from './zh_display.js';
 import { zhEditNote } from './widgets.js';
 import { kindTag, isMaterial, weekOf, lectureTagText, kindSourceText } from './kinds.js';
+import { batchRerun, rerunStages, weekMenuItems, hangItems, canHang, appliedOverride, makeupTag, weekMonday, hangUnder, clearOverride } from './course_ux.js';
 
 const enc = encodeURIComponent;
 
@@ -45,9 +53,14 @@ function countNodes(key, n, wrap) {
 }
 
 // opts: {ctx, onLectures(updated[]), onDeleted(ids[]), onCourseSettings(),
-// onShowMaterial(id) (a week's slide file chosen in its header menu)}
+// onShowMaterial(id) (a week's slide file chosen in its header menu),
+// course() (the course: term start, weeks; course-ux), filtered() (a search
+// narrows the list)}
 export function createLectureList(opts) {
   const { ctx } = opts;
+  const course = () => (opts.course ? opts.course() : null);
+  let drag = null; // course-ux: {lec} while a teaching material is dragged
+  let pendingList = null; // a render that arrived during the drag
   let lectures = [];
   const selected = new Set();
   let anchor = null; // last clicked id (Shift range)
@@ -67,6 +80,8 @@ export function createLectureList(opts) {
     h('span', { class: 'lt-h lt-h-end', role: 'columnheader' }, h('span', { class: 'visually-hidden' }, t('course.lectures.col.actions'))),
   );
   const body = h('div', { class: 'lt-body', role: 'rowgroup' });
+  // course-ux: shown while an attached supplement is dragged
+  const unhangZone = h('div', { class: 'lt-unhang', role: 'row', 'aria-hidden': 'true' }, h('span', { role: 'cell' }, icon('undo-2', { size: 14 }), t('course.week.drop_unhang')));
   const table = h('div', { class: 'lt', role: 'table', 'aria-label': t('course.lectures.table_label') }, head, body);
   const bar = h('div', { class: 'batchbar', role: 'region', 'aria-label': t('course.lectures.batch.label'), hidden: true });
 
@@ -116,6 +131,10 @@ export function createLectureList(opts) {
   // ---- rows ----
 
   function render(list) {
+    if (drag) {
+      pendingList = list; // re-rendering would remove the dragged row
+      return;
+    }
     lectures = list;
     for (const id of [...selected]) if (!lectures.some((l) => l.id === id)) selected.delete(id);
     preserveFocus(() => {
@@ -125,8 +144,10 @@ export function createLectureList(opts) {
       const groups = groupLectures(lectures);
       for (const g of groups) {
         body.append(groupRow(g));
-        for (const lec of g.lectures) body.append(row(lec, lang));
+        for (const lec of g.lectures) body.append(row(lec, lang, g.week));
+        for (const lec of g.children || []) body.append(row(lec, lang, g.week, true));
       }
+      body.append(unhangZone);
       headCheck.checked = lectures.length > 0 && selected.size === lectures.length;
       headCheck.indeterminate = selected.size > 0 && selected.size < lectures.length;
       headCheck.disabled = lectures.length === 0;
@@ -196,11 +217,20 @@ export function createLectureList(opts) {
 
   // Consecutive runs of lectures in list order (seq) that share a week;
   // then the teaching materials without a week; "time unknown" last.
+  // course-ux: lectures with a week override join the group of their week
+  // (made when no lecture of its own is in it): make-ups after the week's
+  // own lectures, as the back end numbers them; supplements as its
+  // indented children.
   function groupLectures(list) {
     const out = [];
     let materials = null;
     let unknown = null;
+    const placed = [];
     for (const lec of list) {
+      if (appliedOverride(lec)) {
+        placed.push(lec);
+        continue;
+      }
       if (isMaterial(lec) && !weekOf(lec)) {
         if (!materials) materials = { key: 'mat', title: t('lecture.group.materials'), hint: t('lecture.group.materials_hint'), lectures: [] };
         materials.lectures.push(lec);
@@ -216,6 +246,18 @@ export function createLectureList(opts) {
       if (last && last.key === g.key) last.lectures.push(lec);
       else out.push({ ...g, lectures: [lec] });
     }
+    for (const lec of placed) {
+      const o = appliedOverride(lec);
+      let g = out.find((x) => x.week === o.week);
+      if (!g) {
+        const mon = weekMonday(course(), o.week);
+        g = { key: `w${o.week}`, title: mon ? weekTitle(o.week, mon) : t('kind.week', { week: o.week }), week: o.week, mon, lectures: [] };
+        const at = mon ? out.findIndex((x) => x.mon && x.mon > mon) : -1;
+        out.splice(at < 0 ? out.length : at, 0, g);
+      }
+      if (o.kind === 'supplement') (g.children || (g.children = [])).push(lec);
+      else g.lectures.push(lec);
+    }
     if (materials) out.push(materials);
     if (unknown) out.push(unknown);
     return out;
@@ -225,18 +267,19 @@ export function createLectureList(opts) {
     const d = parseYMD(lec.recorded_at);
     if (!d) return { key: 'none', title: t('lecture.group.unknown'), hint: t('lecture.group.unknown_hint') };
     const mon = mondayOf(d);
-    if (lec.numbered && lec.week > 0) return { key: `w${lec.week}`, title: weekTitle(lec.week, mon), week: lec.week };
+    if (lec.numbered && lec.week > 0) return { key: `w${lec.week}`, title: weekTitle(lec.week, mon), week: lec.week, mon };
     const range = weekRangeText(mon);
-    if (lec.calendar_hint === 'skipped_week') return { key: `s${ymd(mon)}`, title: t('lecture.group.skipped', { range }) };
-    if (lec.calendar_hint === 'before_term') return { key: `b${ymd(mon)}`, title: t('lecture.group.before_term', { range }) };
-    return { key: `c${ymd(mon)}`, title: range }; // no term start: calendar weeks
+    if (lec.calendar_hint === 'skipped_week') return { key: `s${ymd(mon)}`, title: t('lecture.group.skipped', { range }), mon };
+    if (lec.calendar_hint === 'before_term') return { key: `b${ymd(mon)}`, title: t('lecture.group.before_term', { range }), mon };
+    return { key: `c${ymd(mon)}`, title: range, mon }; // no term start: calendar weeks
   }
 
   function groupRow(g) {
+    const n = g.lectures.length + (g.children ? g.children.length : 0);
     return h(
       'div',
-      { class: 'lt-group' + (g.key === 'none' ? ' is-unknown' : '') + (g.key === 'mat' ? ' is-materials' : ''), role: 'row' },
-      h('span', { class: 'lt-group-t', role: 'cell', title: g.hint || undefined }, g.title, h('span', { class: 'lt-group-n' }, t('lecture.group.count', { n: g.lectures.length }))),
+      { class: 'lt-group' + (g.key === 'none' ? ' is-unknown' : '') + (g.key === 'mat' ? ' is-materials' : ''), role: 'row', dataset: g.week ? { week: g.week, dropWeek: g.week } : undefined },
+      h('span', { class: 'lt-group-t', role: 'cell', title: g.hint || undefined }, g.title, h('span', { class: 'lt-group-n' }, t('lecture.group.count', { n }))),
       g.week ? weekSlides(g) : null,
     );
   }
@@ -245,7 +288,7 @@ export function createLectureList(opts) {
   // lectures; the back end lists them per lecture): a count that opens them.
   function weekSlides(g) {
     const seen = new Map();
-    for (const l of g.lectures) for (const m of l.materials || []) if (m.via !== 'course' && !seen.has(m.id)) seen.set(m.id, m);
+    for (const l of [...g.lectures, ...(g.children || [])]) for (const m of l.materials || []) if (m.via !== 'course' && !seen.has(m.id)) seen.set(m.id, m);
     const mats = [...seen.values()];
     if (!mats.length) return null;
     const b = h(
@@ -295,19 +338,31 @@ export function createLectureList(opts) {
       .join('\n');
   }
 
-  function row(lec, lang = titleLang()) {
+  // week: the teaching week of the row's group (a drop target for
+  // supplements, course-ux); child: an indented supplement of that week.
+  function row(lec, lang = titleLang(), week = 0, child = false) {
     const fk = `lec:${lec.id}`;
     const tt = lectureTitles(lec, lang);
     const isSel = selected.has(lec.id);
     const pipe = pipelineBar(lec.stages, {
       key: fk,
+      lecture: lec.id, // a remote asr's live steps (pipeline.js)
       sys: ctx.system,
       res: ctx.resources,
+      stream: lec.stream, // stream-parallel: the playback file with prep
       onAction: (stage, action) => done(A.stageAction(lec, stage, action, true)),
     });
     const st = statusLine(lec);
     const statusEl = h('span', { class: `lrow-status tone-${st.sum.tone}`, title: st.text }, st.text);
     refs.set(lec.id, { bar: pipe, statusEl, lec });
+    // a retry's countdown goes on by the second (3.2.0 L12)
+    if (U.backoffCounting(lec.stages))
+      everySecond(statusEl, () => {
+        const s = statusLine(lec);
+        statusEl.textContent = s.text;
+        statusEl.title = s.text;
+        return U.backoffCounting(lec.stages);
+      });
     const check = h('input', { type: 'checkbox', class: 'check', checked: isSel, 'aria-label': t('course.lectures.select', { label: lectureTagText(lec), title: lec.title }), dataset: { fkey: `${fk}:check` }, onclick: (e) => onCheck(lec, e) });
     const allDone = U.isAllDone(lec.stages);
     // SPEC-v2 P1: once everything is done the row's action is "play" and
@@ -319,10 +374,31 @@ export function createLectureList(opts) {
         )
       : null;
     const more = menuButton(iconBtn('ellipsis', t('course.lectures.more_label', { title: lec.title }), { fkey: `${fk}:more`, menu: true }), () => menuFor(lec));
+    // course-ux: a teaching material's drag handle; Enter opens the weeks
+    const hangable = canHang(lec, course());
+    const grip = hangable
+      ? h(
+          'button',
+          {
+            type: 'button',
+            class: 'lrow-grip',
+            'aria-label': t('course.week.grip', { title: lec.title }),
+            title: t('course.week.grip', { title: lec.title }),
+            'aria-haspopup': 'menu',
+            dataset: { fkey: `${fk}:grip` },
+            onclick: (e) => openMenu(hangItems(lec, course(), lectures, (l) => opts.onLectures([l])), { anchor: e.currentTarget }),
+          },
+          icon('grip-vertical', { size: 14 }),
+        )
+      : null;
     const el = h(
       'div',
-      { class: 'lrow' + (isSel ? ' is-selected' : '') + (lec.draft ? ' is-draft' : ''), role: 'row', dataset: { id: lec.id } },
-      h('span', { class: 'lt-check', role: 'cell' }, check),
+      {
+        class: 'lrow' + (isSel ? ' is-selected' : '') + (lec.draft ? ' is-draft' : '') + (hangable ? ' can-hang' : '') + (child ? ' is-child' : ''),
+        role: 'row',
+        dataset: week ? { id: lec.id, week, dropWeek: week } : { id: lec.id },
+      },
+      h('span', { class: 'lt-check', role: 'cell' }, grip, check),
       h('span', { class: 'lrow-kind', role: 'cell', title: kindTitle(lec) }, kindTag(lec)),
       h(
         'div',
@@ -332,9 +408,11 @@ export function createLectureList(opts) {
           { class: 'lrow-title-line' },
           titleCell(lec, tt, lang),
           tt.sub && editing !== lec.id ? h('span', { class: 'lrow-subtitle', title: tt.sub, lang: tt.subLang }, tt.sub) : null, // the Chinese title (fonts, P14.5; script, P14.6)
+          makeupTag(lec),
           lec.draft ? h('span', { class: 'chip chip-draft' }, t('course.lectures.draft')) : null,
           calendarHint(lec),
         ),
+        child ? h('span', { class: 'visually-hidden' }, t('course.week.child', { week })) : null,
         editing === lec.id && renamesZh(lec) ? zhEditNote(`lec-${lec.id}-zh-note`) : null, // P14.6: the editor holds the stored Simplified title
         tt.blurb ? h('div', { class: 'lrow-blurb', title: tt.blurbFull, lang: tt.blurbLang }, tt.blurb) : null,
         h('div', { class: 'lrow-sub' }, statusEl, st.warn ? h('span', { class: 'chip chip-warn', title: t('course.lectures.warn_tip') }, st.warn) : null, st.meta.length ? h('span', { class: 'lrow-meta', title: st.meta.join(' · ') }, st.meta.join(' · ')) : null),
@@ -357,14 +435,97 @@ export function createLectureList(opts) {
     );
     bindContextMenu(el, (e) => (editing === lec.id ? null : menuFor(lec)));
     el.addEventListener('keydown', (e) => onRowKey(e, lec, el));
+    if (grip) dragSource(el, grip, lec);
     return el;
   }
 
   function menuFor(lec) {
     const sel = selectedLectures();
     if (selected.has(lec.id) && sel.length > 1) return batchItems(sel);
-    return A.lectureMenuItems(lec, menuHandlers);
+    const items = A.lectureMenuItems(lec, menuHandlers);
+    // course-ux: hang under a week / make-up, after "change kind"
+    const extra = weekMenuItems(lec, course(), lectures, (l) => opts.onLectures([l]));
+    if (extra.length) {
+      const i = items.findIndex((x) => x && x.id === 'kind');
+      items.splice(i < 0 ? items.length : i + 1, 0, ...extra);
+    }
+    return items;
   }
+
+  // ---- course-ux: dragging a teaching material under a week ----
+
+  // The row is draggable only from its handle (text stays selectable).
+  function dragSource(el, grip, lec) {
+    grip.addEventListener('pointerdown', () => (el.draggable = true));
+    el.addEventListener('dragstart', (e) => {
+      if (!el.draggable) return;
+      drag = { lec };
+      el.classList.add('is-dragging');
+      table.classList.add('is-dragging');
+      table.classList.toggle('can-unhang', !!lec.week_override);
+      e.dataTransfer.effectAllowed = 'move';
+      try {
+        e.dataTransfer.setData('text/plain', lec.title);
+      } catch {
+        // the lecture is kept in drag
+      }
+    });
+    el.addEventListener('dragend', () => {
+      el.draggable = false;
+      el.classList.remove('is-dragging');
+      endDrag();
+    });
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    drag = null;
+    table.classList.remove('is-dragging', 'can-unhang');
+    highlight(null);
+    if (pendingList) {
+      const l = pendingList;
+      pendingList = null;
+      render(l);
+    }
+  }
+
+  const hasFiles = (e) => Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files');
+
+  // The week a drop at e lands in: {week} (0 = detach), or null.
+  function dropAt(e) {
+    const tgt = e.target && e.target.closest ? e.target.closest('[data-drop-week], .lt-unhang') : null;
+    if (!tgt || !body.contains(tgt)) return null;
+    if (tgt.classList.contains('lt-unhang')) return drag.lec.week_override ? { week: 0 } : null;
+    const week = Number(tgt.dataset.dropWeek);
+    return week > 0 ? { week } : null;
+  }
+
+  function highlight(week) {
+    for (const x of body.querySelectorAll('.is-drop')) x.classList.remove('is-drop');
+    if (week == null) return;
+    for (const x of body.querySelectorAll(week ? `[data-drop-week="${week}"]` : '.lt-unhang')) x.classList.add('is-drop');
+  }
+
+  body.addEventListener('dragover', (e) => {
+    if (!drag || hasFiles(e)) return;
+    const d = dropAt(e);
+    highlight(d ? d.week : null);
+    if (!d) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+  body.addEventListener('dragleave', (e) => {
+    if (drag && !body.contains(e.relatedTarget)) highlight(null);
+  });
+  body.addEventListener('drop', (e) => {
+    if (!drag || hasFiles(e)) return;
+    const d = dropAt(e);
+    const lec = drag.lec;
+    if (d) e.preventDefault();
+    endDrag();
+    if (!d) return;
+    (d.week ? hangUnder(lec, d.week) : clearOverride(lec)).then((l) => l && opts.onLectures([l]));
+  });
 
   function onRowKey(e, lec, el) {
     if (e.target.closest('input[type="text"], textarea')) return;
@@ -474,6 +635,7 @@ export function createLectureList(opts) {
       c.launch ? { label: t('course.lectures.batch.launch_n', { n: c.launch }), icon: 'play', onSelect: () => batch(() => A.launchLectures(sel)) } : null,
       c.cancel ? { label: t('course.lectures.batch.cancel_n', { n: c.cancel }), icon: 'ban', onSelect: () => batch(() => A.cancelLectures(sel)) } : null,
       c.update ? { label: t('course.lectures.batch.update_n', { n: c.update }), icon: 'refresh-cw', onSelect: () => batch(() => A.updateLectures(sel)) } : null,
+      rerunStages(sel).length ? { label: t('course.lectures.batch.rerun_menu'), icon: 'rotate-cw', onSelect: () => rerun(sel) } : null,
       'sep',
       { label: t('course.lectures.batch.delete_n', { n: sel.length }), icon: 'trash-2', danger: true, onSelect: () => batchDelete(sel) },
     ];
@@ -484,6 +646,12 @@ export function createLectureList(opts) {
       (ls) => ls && ls.length && opts.onLectures(ls),
       () => {},
     );
+  }
+
+  // course-ux: one stage of the selected lectures, confirmed once
+  function rerun(sel) {
+    const c = course();
+    return batch(() => batchRerun(c ? c.id : sel[0].course_id, sel));
   }
 
   function batchDelete(sel) {
@@ -507,12 +675,22 @@ export function createLectureList(opts) {
       return;
     }
     const c = counts(sel);
+    const filtered = !!(opts.filtered && opts.filtered());
     append(bar, [
       h('span', { class: 'batchbar-count' }, countNodes('course.lectures.batch.selected', sel.length, (num) => h('b', null, num))),
+      // course-ux: "select the whole course" (the shown lectures while a search narrows the list)
+      sel.length < lectures.length
+        ? h(
+            'button',
+            { type: 'button', class: 'batchbar-all', dataset: { fkey: 'batch:all' }, onclick: () => toggleAll(true) },
+            filtered ? t('course.lectures.batch.select_shown', { n: U.count(lectures.length) }) : t('course.lectures.batch.select_course', { n: U.count(lectures.length) }),
+          )
+        : null,
       h('span', { class: 'batchbar-sep' }),
       c.launch ? btn(t('course.lectures.batch.launch'), { size: 'sm', kind: 'primary', icon: 'play', count: c.launch, fkey: 'batch:launch', onclick: () => batch(() => A.launchLectures(sel)) }) : null,
       c.cancel ? btn(t('course.lectures.batch.cancel'), { size: 'sm', kind: 'inverse', icon: 'ban', count: c.cancel, fkey: 'batch:cancel', onclick: () => batch(() => A.cancelLectures(sel)) }) : null,
       c.update ? btn(t('course.lectures.batch.update'), { size: 'sm', kind: 'inverse', icon: 'refresh-cw', count: c.update, fkey: 'batch:update', onclick: () => batch(() => A.updateLectures(sel)) }) : null,
+      rerunStages(sel).length ? btn(t('course.lectures.batch.rerun'), { size: 'sm', kind: 'inverse', icon: 'rotate-cw', fkey: 'batch:rerun', onclick: () => rerun(sel) }) : null,
       btn(t('course.lectures.batch.delete'), { size: 'sm', kind: 'inverse-danger', icon: 'trash-2', count: sel.length, fkey: 'batch:delete', onclick: () => batchDelete(sel) }),
       h('span', { class: 'batchbar-sep' }),
       iconBtn('x', t('course.lectures.batch.clear'), {
@@ -533,6 +711,7 @@ export function createLectureList(opts) {
   function setProgress(ev) {
     const ref = refs.get(ev.scope_id);
     if (!ref) return false;
+    if (streamProgress(ref.lec, ref.bar, ev)) return true; // the background playback file
     const st = ref.lec.stages.find((s) => s.stage === ev.stage);
     if (!st || st.status !== ev.status) return false;
     ref.bar.setProgress(ev.stage, ev.progress);

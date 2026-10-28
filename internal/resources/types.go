@@ -12,6 +12,7 @@ package resources
 import (
 	"lectureflow/internal/colab"
 	"lectureflow/internal/model"
+	"lectureflow/internal/remote"
 )
 
 // Snapshot is the body of GET /api/resources and of SSE "event: resources".
@@ -40,6 +41,12 @@ type Snapshot struct {
 	// switched off, so snapshots without it keep their bytes; with no
 	// session its State is "none" ("远端 GPU：未使用"). Never a credential.
 	Remote *colab.Status `json:"remote,omitempty"`
+	// Remotes (colab-obs-core, lead freeze 2026-10-27): every remote
+	// device as a remote.Card (Colab today, SSH servers next; remotes.go
+	// builds them). Colab's card carries its colab.Status in Card.Colab;
+	// Remote above stays for the front ends that read it. Omitted when there
+	// is none.
+	Remotes []remote.Card `json:"remotes,omitempty"`
 }
 
 // Device is one transcription device card of the resource bar (SPEC-v2

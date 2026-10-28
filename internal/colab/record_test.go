@@ -51,7 +51,7 @@ func TestRecorderRoundTrip(t *testing.T) {
 
 	// Replay the recording.
 	rs := newReplayPath(t, path)
-	kv := NewMemKV()
+	kv := newDiskKV()
 	clk := newFakeClock()
 	lg, lb := newTestLogger()
 	b2, err := New(Options{KV: kv, ColabURL: rs.colabURL(), TokenURL: rs.tokenURL(), RevokeURL: rs.revokeURL(),

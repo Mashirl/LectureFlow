@@ -151,7 +151,8 @@ func (s *repairStage) Run(ctx context.Context, lectureID string, progress func(f
 		failed []int
 	)
 	pc := &progressCounter{total: len(chunks), report: progress}
-	err = parallel(ctx, len(chunks), d.concurrency(config.RoleRepair, target.ProviderID), func(ctx context.Context, i int) (bool, error) {
+	// The first chunk gets a head start to warm the prompt cache (perf-llm, warmup.go).
+	err = parallelWarm(ctx, len(chunks), d.concurrency(config.RoleRepair, target.ProviderID), repairWarmup, func(ctx context.Context, i int) (bool, error) {
 		c := chunks[i]
 		a, err := askJSON(ctx, d.LLM, config.RoleRepair, c.System, c.User, checkRepairAnswer)
 		if err != nil {

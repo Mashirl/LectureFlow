@@ -15,12 +15,15 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"lectureflow/internal/fetch"
 	"lectureflow/internal/model"
 	"lectureflow/internal/sched"
 )
@@ -62,11 +65,16 @@ const maxOnboardingBytes = 64 << 10
 
 // ---- middleware ----
 
-// secure adds the security headers to every response and, in desktop mode,
-// checks the Host header of every request and the token of every /api/
-// request. The static front end needs no token: the window loads it before
+// secure adds the security headers to every response and checks the Host
+// header of every request (DNS rebinding): in desktop mode against the
+// configured port, in web mode against the port the request came in on
+// (security review L6). In desktop mode it checks the token of every /api/
+// request; the static front end needs no token: the window loads it before
 // any script runs, and the main process injects the header into the API
-// requests (fetch, EventSource, <video>).
+// requests (fetch, EventSource, <video>). In both modes a request that
+// changes something (not GET, HEAD or OPTIONS) and that another site's
+// page sent is refused (crossOrigin: a form post or a no-cors fetch needs
+// no CORS preflight; security review L6).
 func (s *Server) secure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hd := w.Header()
@@ -81,16 +89,73 @@ func (s *Server) secure(next http.Handler) http.Handler {
 				writeError(w, http.StatusUnauthorized, "auth.token_required", nil)
 				return
 			}
+		} else if !webHostAllowed(r) {
+			writeError(w, http.StatusForbidden, "auth.bad_host", nil)
+			return
+		}
+		if !safeMethod(r.Method) && s.crossOrigin(r) {
+			writeError(w, http.StatusForbidden, "app.cross_site", nil)
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
 // hostAllowed: 127.0.0.1:Port or localhost:Port (DNS rebinding, V1.2).
-func (d *DesktopOptions) hostAllowed(host string) bool {
-	p := ":" + strconv.Itoa(d.Port)
+func (d *DesktopOptions) hostAllowed(host string) bool { return loopbackHost(host, d.Port) }
+
+// loopbackHost: host is 127.0.0.1:port or localhost:port.
+func loopbackHost(host string, port int) bool {
+	p := ":" + strconv.Itoa(port)
 	h := strings.ToLower(host)
 	return h == "127.0.0.1"+p || h == "localhost"+p
+}
+
+// webHostAllowed is web mode's Host check: 127.0.0.1 or localhost with the
+// port of the connection (the server listens on 127.0.0.1 only, config
+// "listen"; a page of a site whose name was made to resolve to 127.0.0.1
+// sends its own name). A request that came through no listener (a handler
+// called directly) has no port to compare and is not checked.
+func webHostAllowed(r *http.Request) bool {
+	la, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	if !ok {
+		return true
+	}
+	ta, ok := la.(*net.TCPAddr)
+	if !ok {
+		return true // (not TCP: a test's pipe)
+	}
+	return loopbackHost(r.Host, ta.Port)
+}
+
+func safeMethod(m string) bool {
+	return m == http.MethodGet || m == http.MethodHead || m == http.MethodOptions
+}
+
+// crossOrigin reports a request another page than LectureFlow's own sent.
+// Fetch Metadata first: anything but same-origin, or none (typed by the
+// user, a bookmark), is refused, same-site too (another port of
+// localhost); a client that is no browser sends none of it. Without it (an
+// older browser), the Origin header, which browsers send with every
+// request that changes something, must name this server; desktop mode
+// needs no fallback, its token stays inside LectureFlow's own pages.
+func (s *Server) crossOrigin(r *http.Request) bool {
+	switch site := r.Header.Get("Sec-Fetch-Site"); site {
+	case "same-origin", "none":
+		return false
+	case "":
+	default: // cross-site, same-site
+		return true
+	}
+	if s.desktop != nil {
+		return false
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return false
+	}
+	u, err := url.Parse(origin)
+	return err != nil || !strings.EqualFold(u.Host, r.Host) || (u.Scheme != "http" && u.Scheme != "https")
 }
 
 // tokenOK compares in constant time; an empty configured token accepts nothing.
@@ -159,18 +224,26 @@ func (s *Server) getApp(w http.ResponseWriter, r *http.Request) {
 
 // ---- /api/app/settings ----
 
-// AppSettings is GET/PATCH /api/app/settings (V1.1, V11).
+// AppSettings is GET/PATCH /api/app/settings (V1.1, V11; the download
+// queue's two numbers of SPEC-ext, both modes).
 type AppSettings struct {
 	CloseBehavior string `json:"close_behavior"` // ask | background | quit
 	PreventSleep  bool   `json:"prevent_sleep"`
 	UpdateChannel string `json:"update_channel"` // stable | beta
+	// DownloadConcurrency is how many lectures download at once (1–6,
+	// default 3); DownloadConnections the connections per file (1–16,
+	// default 4; a platform's own limit may lower it).
+	DownloadConcurrency int `json:"download_concurrency"`
+	DownloadConnections int `json:"download_connections"`
 }
 
 // AppSettingsPatch is the body of PATCH /api/app/settings (omitted = unchanged).
 type AppSettingsPatch struct {
-	CloseBehavior *string `json:"close_behavior"`
-	PreventSleep  *bool   `json:"prevent_sleep"`
-	UpdateChannel *string `json:"update_channel"`
+	CloseBehavior       *string `json:"close_behavior"`
+	PreventSleep        *bool   `json:"prevent_sleep"`
+	UpdateChannel       *string `json:"update_channel"`
+	DownloadConcurrency *int    `json:"download_concurrency"`
+	DownloadConnections *int    `json:"download_connections"`
 }
 
 func oneOf(v string, list []string) bool {
@@ -213,6 +286,9 @@ func (s *Server) appSettings(ctx context.Context) (AppSettings, error) {
 	if ok && oneOf(v, updateChannels) {
 		out.UpdateChannel = v
 	}
+	if out.DownloadConcurrency, out.DownloadConnections, err = fetch.ReadLimits(ctx, s.st); err != nil {
+		return out, err
+	}
 	return out, nil
 }
 
@@ -234,9 +310,10 @@ func (s *Server) patchAppSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	if in.CloseBehavior == nil && in.PreventSleep == nil && in.UpdateChannel == nil {
+	if in.CloseBehavior == nil && in.PreventSleep == nil && in.UpdateChannel == nil &&
+		in.DownloadConcurrency == nil && in.DownloadConnections == nil {
 		writeError(w, http.StatusBadRequest, "request.nothing_to_change",
-			map[string]any{"fields": "close_behavior, prevent_sleep, update_channel"})
+			map[string]any{"fields": "close_behavior, prevent_sleep, update_channel, download_concurrency, download_connections"})
 		return
 	}
 	if in.CloseBehavior != nil && !oneOf(*in.CloseBehavior, closeBehaviors) {
@@ -245,6 +322,16 @@ func (s *Server) patchAppSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if in.UpdateChannel != nil && !oneOf(*in.UpdateChannel, updateChannels) {
 		writeError(w, http.StatusBadRequest, "app_settings.update_channel_invalid", map[string]any{"value": *in.UpdateChannel})
+		return
+	}
+	if v := in.DownloadConcurrency; v != nil && (*v < fetch.MinConcurrency || *v > fetch.MaxConcurrency) {
+		writeError(w, http.StatusBadRequest, fetch.CodeConcurrencyInvalid,
+			map[string]any{"value": *v, "min": fetch.MinConcurrency, "max": fetch.MaxConcurrency})
+		return
+	}
+	if v := in.DownloadConnections; v != nil && (*v < fetch.MinConnections || *v > fetch.MaxConnections) {
+		writeError(w, http.StatusBadRequest, fetch.CodeConnectionsInvalid,
+			map[string]any{"value": *v, "min": fetch.MinConnections, "max": fetch.MaxConnections})
 		return
 	}
 	ctx := r.Context()
@@ -262,11 +349,20 @@ func (s *Server) patchAppSettings(w http.ResponseWriter, r *http.Request) {
 	if in.UpdateChannel != nil {
 		writes = append(writes, [2]string{kvAppUpdateChannel, *in.UpdateChannel})
 	}
+	if in.DownloadConcurrency != nil {
+		writes = append(writes, [2]string{fetch.KVConcurrency, strconv.Itoa(*in.DownloadConcurrency)})
+	}
+	if in.DownloadConnections != nil {
+		writes = append(writes, [2]string{fetch.KVConnections, strconv.Itoa(*in.DownloadConnections)})
+	}
 	for _, kv := range writes {
 		if err := s.st.SetKV(ctx, kv[0], kv[1]); err != nil {
 			s.fail(w, r, err)
 			return
 		}
+	}
+	if s.dl != nil && (in.DownloadConcurrency != nil || in.DownloadConnections != nil) {
+		s.dl.SettingsChanged() // a higher limit starts waiting downloads now
 	}
 	s.hub.Changed("settings", "")
 	s.getAppSettings(w, r)
@@ -275,12 +371,16 @@ func (s *Server) patchAppSettings(w http.ResponseWriter, r *http.Request) {
 // ---- GET /api/app/activity ----
 
 // AppActivity is GET /api/app/activity, polled by the main process every 5
-// seconds (the close-window question and the sleep blocker, V1.1).
+// seconds (the close-window question and the sleep blocker, V1.1). The
+// browser extension's downloads count as activity too (SPEC-ext): one in
+// progress is part of running, a waiting one of queued, so the shell's
+// close question and sleep blocker cover them without a change of its own.
 type AppActivity struct {
-	Running      int  `json:"running"`      // current jobs in status running
-	Queued       int  `json:"queued"`       // current jobs in status queued
+	Running      int  `json:"running"`      // current jobs in status running + downloads in progress
+	Queued       int  `json:"queued"`       // current jobs in status queued + waiting downloads
 	Transcribing bool `json:"transcribing"` // an asr job or a device self-test runs
 	APIRunning   bool `json:"api_running"`  // a job calling a model (an API stage) runs
+	Downloads    int  `json:"downloads"`    // downloads in progress or waiting (included above)
 }
 
 func (s *Server) getActivity(w http.ResponseWriter, r *http.Request) {
@@ -302,6 +402,12 @@ func (s *Server) getActivity(w http.ResponseWriter, r *http.Request) {
 		if balanceStages[j.Stage] {
 			out.APIRunning = true
 		}
+	}
+	if s.dl != nil {
+		a := s.dl.Activity()
+		out.Running += a.Active
+		out.Queued += a.Queued
+		out.Downloads = a.Active + a.Queued
 	}
 	if s.dsc != nil && !out.Transcribing {
 		for _, d := range s.dsc.DeviceStatuses() {

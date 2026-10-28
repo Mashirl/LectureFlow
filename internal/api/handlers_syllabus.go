@@ -4,6 +4,7 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -25,6 +26,8 @@ import (
 	"lectureflow/internal/ctxbuild"
 	"lectureflow/internal/db"
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/pyenv"
 	"lectureflow/internal/stages"
 	"lectureflow/internal/state"
 )
@@ -100,9 +103,15 @@ func (s *Server) receiveSyllabusFile(w http.ResponseWriter, r *http.Request, dir
 				return up, "", r.Context().Err()
 			}
 			var ce *model.CodedError
-			if errors.As(err, &ce) && ce.Info.Code == stages.CodeWorkerPythonNotInstalled {
-				// 3.1.0: the python component is not installed (desktop)
-				return up, "", apiErrDetail(http.StatusUnprocessableEntity, ce.Info.Code, nil, err.Error())
+			if errors.As(err, &ce) {
+				switch ce.Info.Code {
+				case stages.CodeWorkerPythonNotInstalled:
+					// 3.1.0: the python component is not installed (desktop)
+					return up, "", apiErrDetail(http.StatusUnprocessableEntity, ce.Info.Code, nil, err.Error())
+				case stages.CodePDFDecodeBudget, stages.CodePDFMemoryLimit, stages.CodePDFTimeout:
+					// over the extraction's limits (security review 2, M2)
+					return up, "", apiErrDetail(http.StatusUnprocessableEntity, ce.Info.Code, ce.Info.Params, err.Error())
+				}
 			}
 			return up, "", apiErrDetail(http.StatusUnprocessableEntity, "syllabus.pdf_failed", nil, err.Error())
 		}
@@ -403,11 +412,18 @@ func (s *Server) saveSyllabus(w http.ResponseWriter, r *http.Request) {
 	s.respondCourse(w, r, c.ID, http.StatusOK)
 }
 
+// syllabusPDFTimeout caps the syllabus extraction's time limit
+// (stages.PDFTimeout; the user waits for the request).
+var syllabusPDFTimeout = 5 * time.Minute
+
 // runExtractPDF runs {python} {worker_dir}/extract_pdf.py --in job.json
 // --out result.json.tmp in dir (SPEC §6.0, §6.0.1) and returns the pages.
 // The request context kills the process. While it runs the interpreter is
 // reported by RunningPythons with reason material, so the python
 // component is not uninstalled or switched under it (v3 Gate round 2).
+// It has the material stage's limits (stages/pdf_limits.go: memory cap,
+// decode budget, a time limit by size and page count capped at
+// syllabusPDFTimeout); over one of them is a coded error.
 func (s *Server) runExtractPDF(ctx context.Context, dir, pdf string) ([]string, error) {
 	if s.cfg == nil {
 		return nil, errors.New("没有配置 python 与 worker_dir")
@@ -436,7 +452,7 @@ func (s *Server) runExtractPDF(ctx context.Context, dir, pdf string) ([]string, 
 		return nil, err
 	}
 	defer s.trackPython(py, PythonUseMaterial)()
-	job, _ := json.Marshal(map[string]string{"pdf": absPDF})
+	job, _ := json.Marshal(stages.PDFJob(absPDF))
 	jobPath := filepath.Join(absDir, "job.json")
 	if err := writeFileAtomic(jobPath, string(job)); err != nil {
 		return nil, err
@@ -444,22 +460,64 @@ func (s *Server) runExtractPDF(ctx context.Context, dir, pdf string) ([]string, 
 	out := filepath.Join(absDir, "result.json")
 	tmp := out + ".tmp"
 	os.Remove(tmp)
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, py, script, "--in", jobPath, "--out", tmp)
+	var size int64
+	if fi, err := os.Stat(absPDF); err == nil {
+		size = fi.Size()
+	}
+	deadline := stages.NewPDFDeadline(ctx, size, syllabusPDFTimeout)
+	defer deadline.Stop()
+	cmd := exec.CommandContext(deadline.Context(), py, script, "--in", jobPath, "--out", tmp)
 	cmd.Dir = absDir
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUNBUFFERED=1")
+	cmd.Env = pyenv.Environ("PYTHONIOENCODING=utf-8", "PYTHONUNBUFFERED=1") // no usage reporting (pyenv)
 	cmd.WaitDelay = 3 * time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		os.Remove(tmp)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	proc, err := procutil.Start(cmd, stages.PDFLimits())
+	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
+		return nil, fmt.Errorf("无法启动 PDF 抽取进程：%v", err)
+	}
+	defer proc.Close()
+	var errName, errRaw string // the last ERROR_CODE line
+	sc := bufio.NewScanner(stdout)
+	sc.Buffer(make([]byte, 64*1024), 1<<20)
+	for sc.Scan() {
+		line := strings.TrimRight(sc.Text(), "\r")
+		if rest, ok := strings.CutPrefix(line, "STATUS "); ok {
+			deadline.Status(rest) // "pages n": the time limit grows with the page count
+		} else if rest, ok := strings.CutPrefix(line, "ERROR_CODE "); ok {
+			errName, errRaw, _ = strings.Cut(strings.TrimSpace(rest), " ")
+		}
+	}
+	_, _ = io.Copy(io.Discard, stdout) // a line longer than the buffer
+	werr := cmd.Wait()
+	if werr != nil || ctx.Err() != nil {
+		os.Remove(tmp)
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if err := deadline.Err(ctx); err != nil {
+		os.Remove(tmp)
+		return nil, err
+	}
+	if err := stages.PDFMemoryError(proc.Usage(), werr != nil); err != nil {
+		os.Remove(tmp)
+		return nil, err
+	}
+	if werr != nil {
 		msg := lastLine(strings.ToValidUTF8(stderr.String(), "�"))
 		if msg == "" {
-			msg = err.Error()
+			msg = werr.Error()
+		}
+		if code, params := stages.PDFErrorCode(errName, strings.TrimSpace(errRaw)); code != "" {
+			return nil, model.Errorf(code, params, errors.New(msg))
 		}
 		return nil, errors.New(msg)
 	}

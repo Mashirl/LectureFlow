@@ -35,25 +35,38 @@
 
 ### 打 tag 后（生成草稿 Release）
 
-1. tag 必须与应用版本一致：当前是 **`v3.1.0`**（见 `desktop/package.json` 的 `version`）。只推送这一个 tag：`git push origin v3.1.0`。
+1. tag 必须与应用版本一致：当前是 **`v3.2.0`**（见 `desktop/package.json` 的 `version`）。只推送这一个 tag：`git push origin v3.2.0`。
    **不要用 `git push --tags`**：仓库里已有 `v2`、`v3` 等旧 tag，它们也会触发发布流程，并在 “Tag matches the app version” 一步失败（这种失败可以忽略，但会造成干扰）。
-2. Actions 中应该出现工作流 **Release**，作业：`ffmpeg-windows` → `build (windows-latest)`、`build (macos-14)` → `draft-release`，全部为绿色。
+2. Actions 中应该出现工作流 **Release**，作业：`ffmpeg-windows` → `build (windows-latest)`、`build (macos-14)`，与之并行的 `sources`（收集对应源码），最后 `draft-release`，全部为绿色。
    `build` 作业里有一步 “Smoke test the packaged app”，它启动打包好的应用做冒烟测试，失败要回报。
-3. 打开仓库的 **Releases** 页面，应该看到一个标为 **Draft** 的 `LectureFlow 3.1.0`（草稿只有有写权限的人能看到，不会自动发布）。附件应包括：
-   - `LectureFlow-Setup-3.1.0-x64.exe`、`LectureFlow-3.1.0-x64-portable.exe`
-   - `LectureFlow-3.1.0-arm64.dmg` 与一个 `.zip`
+3. 打开仓库的 **Releases** 页面，应该看到一个标为 **Draft** 的 `LectureFlow 3.2.0`（草稿只有有写权限的人能看到，不会自动发布）。附件应包括：
+   - `LectureFlow-Setup-3.2.0-x64.exe`、`LectureFlow-3.2.0-x64-portable.exe`
+   - `LectureFlow-3.2.0-arm64.dmg` 与 `LectureFlow-3.2.0-arm64-mac.zip`
    - 若干 `.blockmap`
    - `size-report-Windows.md/.json`、`size-report-macOS.md/.json`
-   Release 正文是两份大小报告。安装包应**不超过 250 MB**；超过时报告里会列出最大的几项，把这部分抄进回报。
+   - `update.json`：CI 生成的应用内更新清单，**未签名**。维护者签名后再上传 `update.json.minisig`（见下面“应用内更新”），所以刚生成的草稿里还没有它
+   - 四个对应源码包（GPL / LGPL）：`LectureFlow-3.2.0-source-ffmpeg-windows-x64.tar`、`LectureFlow-3.2.0-source-ffmpeg-darwin-arm64.tar`、`LectureFlow-3.2.0-source-aria2c-windows-x64.tar`、`LectureFlow-3.2.0-source-aria2c-darwin-arm64.tar`
+   Release 正文是两份大小报告，后面附一节源码附件说明。安装包应**不超过 250 MB**；超过时报告里会列出最大的几项，把这部分抄进回报。
 4. 不要点 “Publish release”，由负责人决定。
 
-### 可选：开启自动更新
+### 应用内更新（3.2.0 起）
 
-默认构建出来的安装包**不检查更新**（日志里会写 automatic updates are off），这是预期行为。要开启：
+3.2.0 起，安装包里编进了更新签名公钥（minisign，key id `0FAC4F1B6C17636D`）：桌面版自己检查、下载并在下次启动时安装更新，不再加载 electron-updater。它每天最多请求一次 `https://github.com/<仓库>/releases/latest/download/update.json`（稳定渠道），只接受用这把密钥签过名的 `update.json`。所以每次发布：
 
-1. 仓库 **Settings → Secrets and variables → Actions → Variables**，新建变量 `LECTUREFLOW_UPDATE_REPO`，值为 `owner/仓库名`。
-2. 有 Windows 代码签名证书时，可再设 `LECTUREFLOW_PUBLISHER_NAME`（不设则取证书的名称）。
-3. 重新打一个**新版本号**的 tag（版本号要先在 `desktop/package.json` 里改好）。之后的草稿 Release 里应多出 `latest.yml`、`latest-mac.yml`。
+1. 草稿 Release 里已经有 CI 生成的、**未签名**的 `update.json`。
+2. 维护者在自己的电脑上签名（私钥文件和密码只在维护者的电脑上，不交给任何人，CI 也拿不到）：
+
+   ```
+   gh release download v3.2.0 --repo ShouldBeQuincy/LectureFlow --pattern update.json --dir release-v3.2.0
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release\sign-update.ps1 -SecretKey <私钥文件> -Manifest release-v3.2.0\update.json -PublicKey <公钥文件>
+   gh release upload v3.2.0 release-v3.2.0\update.json.minisig --repo ShouldBeQuincy/LectureFlow
+   ```
+
+   脚本用可信注释 `lectureflow update version:3.2.0` 签名，minisign 自己问密码，带 `-PublicKey` 时签完立即验证。签名之后不要再改 `update.json`：改一个字节，所有安装都会拒绝它。macOS / Linux 用 `scripts/release/sign-update.sh`，细节见 `scripts/release/README.md`。
+3. 把 Release **发布为正式版**，不要勾“预发布”：稳定渠道读的 `releases/latest/download/update.json` 不会指向草稿或预发布（预发布只有测试渠道能看到）。
+4. 检查：装着上一个版本（3.2.0 或更新）的电脑，在 **设置 → 应用 → 立即检查** 应显示“有新版本”；刚装好的这个版本应显示“已是最新版本”。没有上传 `.minisig` 或签错时，显示“检查更新失败”，详情里是签名问题。
+
+**旧版本的自动更新（electron-updater，只作说明）**：3.0.0、3.1.0 用的是 electron-updater，只有构建时在仓库变量里设了 `LECTUREFLOW_UPDATE_REPO`（Settings → Secrets and variables → Actions → Variables，值为 `owner/仓库名`；有 Windows 代码签名证书时可再设 `LECTUREFLOW_PUBLISHER_NAME`）的安装包才检查更新，读的是 Release 里的 `latest.yml`、`latest-mac.yml`。3.2.0 的发布构建不再加载 electron-updater；这个变量现在只决定安装包里有没有 `app-update.yml`、Release 里有没有 `latest*.yml`。3.1.0 的 Release 没有这两个文件，所以从 3.1.0 升级到 3.2.0 需要手动安装。
 
 ### English: GitHub CI
 
@@ -72,23 +85,38 @@
 
 **After a tag** (draft release)
 
-1. The tag must match the app version: **`v3.1.0`** (`version` in `desktop/package.json`). Push only that tag: `git push origin v3.1.0`. **Do not use `git push --tags`**: older tags such as `v2` and `v3` would also start the release workflow and fail at "Tag matches the app version" (harmless, but noisy).
-2. Workflow **Release** runs `ffmpeg-windows` → `build (windows-latest)` and `build (macos-14)` → `draft-release`, all green. Report a failure of the step "Smoke test the packaged app".
-3. **Releases** shows a **Draft** `LectureFlow 3.1.0` (visible only to people with write access; nothing is published automatically) with the Windows installer and portable `.exe`, `LectureFlow-3.1.0-arm64.dmg` plus a `.zip`, `.blockmap` files, and `size-report-Windows.*` / `size-report-macOS.*`. Installers should be **250 MB or less**; if not, copy the "largest items" part of the size report into your report.
+1. The tag must match the app version: **`v3.2.0`** (`version` in `desktop/package.json`). Push only that tag: `git push origin v3.2.0`. **Do not use `git push --tags`**: older tags such as `v2` and `v3` would also start the release workflow and fail at "Tag matches the app version" (harmless, but noisy).
+2. Workflow **Release** runs `ffmpeg-windows` → `build (windows-latest)` and `build (macos-14)`, with `sources` (collects the corresponding source) beside them, then `draft-release`, all green. Report a failure of the step "Smoke test the packaged app".
+3. **Releases** shows a **Draft** `LectureFlow 3.2.0` (visible only to people with write access; nothing is published automatically) with the Windows installer and portable `.exe`, `LectureFlow-3.2.0-arm64.dmg` plus `LectureFlow-3.2.0-arm64-mac.zip`, `.blockmap` files, `size-report-Windows.*` / `size-report-macOS.*`, the **unsigned** in-app update manifest `update.json` (the maintainer uploads `update.json.minisig` after signing it, see "In-app update" below, so a fresh draft does not have it yet), and the four corresponding-source archives (GPL / LGPL) `LectureFlow-3.2.0-source-ffmpeg-windows-x64.tar`, `…-source-ffmpeg-darwin-arm64.tar`, `…-source-aria2c-windows-x64.tar` and `…-source-aria2c-darwin-arm64.tar`. The release text is the two size reports followed by a section on the source archives. Installers should be **250 MB or less**; if not, copy the "largest items" part of the size report into your report.
 4. Do not click "Publish release"; the maintainer decides.
 
-**Optional: turn on automatic updates.** By default the installers never check for updates (expected). To turn updates on, add the Actions variable `LECTUREFLOW_UPDATE_REPO` = `owner/name` (Settings → Secrets and variables → Actions → Variables), optionally `LECTUREFLOW_PUBLISHER_NAME` for signed Windows builds, then tag a **new** version. The draft release then also contains `latest.yml` and `latest-mac.yml`.
+**In-app update (from 3.2.0 on).** The installers carry the update signing key (minisign, key id `0FAC4F1B6C17636D`): the desktop app checks, downloads and, at its next start, installs updates itself and no longer loads electron-updater. At most once a day it requests `https://github.com/<repo>/releases/latest/download/update.json` (stable channel) and accepts only an `update.json` signed with that key. So for every release:
+
+1. The draft release already has the **unsigned** `update.json` made by CI.
+2. The maintainer signs it on their own computer (the secret key file and its password stay there; nobody else, CI included, gets them):
+
+   ```
+   gh release download v3.2.0 --repo ShouldBeQuincy/LectureFlow --pattern update.json --dir release-v3.2.0
+   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release\sign-update.ps1 -SecretKey <secret key file> -Manifest release-v3.2.0\update.json -PublicKey <public key file>
+   gh release upload v3.2.0 release-v3.2.0\update.json.minisig --repo ShouldBeQuincy/LectureFlow
+   ```
+
+   The script signs with the trusted comment `lectureflow update version:3.2.0`, minisign asks for the password itself, and `-PublicKey` verifies the signature right away. Do not change `update.json` after signing: one changed byte and every installation refuses it. On macOS / Linux use `scripts/release/sign-update.sh`; details in `scripts/release/README.md`.
+3. Publish the release as a **full release**, not a pre-release: `releases/latest/download/update.json`, which the stable channel reads, never points at a draft or a pre-release (pre-releases are seen only by the beta channel).
+4. Check: a computer with the previous version (3.2.0 or later) shows "Version … is available" under **Settings → App → Check now**; the version just installed shows "LectureFlow is up to date (…)". Without the `.minisig`, or with a wrong signature, it shows "Checking for updates failed", with a signature problem in the details.
+
+**Automatic updates in older versions (electron-updater, for reference only).** 3.0.0 and 3.1.0 used electron-updater: only installers built with the Actions variable `LECTUREFLOW_UPDATE_REPO` = `owner/name` (Settings → Secrets and variables → Actions → Variables; optionally `LECTUREFLOW_PUBLISHER_NAME` for signed Windows builds) check for updates, reading `latest.yml` and `latest-mac.yml` from the release. Release builds of 3.2.0 no longer load electron-updater; the variable now only decides whether the installers contain `app-update.yml` and the release `latest*.yml`. The 3.1.0 release has neither, so going from 3.1.0 to 3.2.0 means installing by hand.
 
 ---
 
 ## 2. macOS 真机验收（Apple Silicon）
 
-**你需要准备什么**：一台 Apple 芯片（M1 或更新）的 Mac，macOS 12 以上，可用磁盘至少 10 GB，能接电源也能用电池（笔记本）；第 1 部分生成的 `LectureFlow-3.1.0-arm64.dmg`；一段约 10 分钟的英文讲座录音或视频（自己的、或公开授权的，**不要**用含他人隐私的素材）；可选：一个修复与翻译用的模型服务 API key（例如 DeepSeek）。没有 key 也能验收，选“只转写”档位即可。准备一个计时器，记下每步开始和结束的时间。
+**你需要准备什么**：一台 Apple 芯片（M1 或更新）的 Mac，macOS 13 以上，可用磁盘至少 10 GB，能接电源也能用电池（笔记本）；第 1 部分生成的 `LectureFlow-3.2.0-arm64.dmg`；一段约 10 分钟的英文讲座录音或视频（自己的、或公开授权的，**不要**用含他人隐私的素材）；可选：一个修复与翻译用的模型服务 API key（例如 DeepSeek）。没有 key 也能验收，选“只转写”档位即可。准备一个计时器，记下每步开始和结束的时间。
 
 ### 安装与启动
 
 1. **下载 dmg**：从草稿 Release 下载；或在 Release 工作流那次运行的页面底部 **Artifacts** 里下载 `installers-macOS`（zip，解压后得到 dmg）。
-   应该看到：文件 `LectureFlow-3.1.0-arm64.dmg`，约 150–250 MB。
+   应该看到：文件 `LectureFlow-3.2.0-arm64.dmg`，约 150–250 MB。
 2. **安装**：打开 dmg，把 LectureFlow 拖进“应用程序”。
 3. **第一次打开**：双击 LectureFlow。安装包未签名，系统会提示无法验证开发者：点 **完成**（不要点“移到废纸篓”），然后按 [docs/install.md](install.md#macos隐私与安全性) 在 **系统设置 → 隐私与安全性** 里点 **仍要打开**。
    应该看到：短暂的启动画面后，打开引导页（第一步“欢迎”）。截图：隐私与安全性里的“仍要打开”。
@@ -97,7 +125,7 @@
    `LECTUREFLOW_DATA_DIR="$HOME/lf-acceptance" /Applications/LectureFlow.app/Contents/MacOS/LectureFlow`
    （之后每次都用这条命令启动；验收完删掉 `~/lf-acceptance` 即可。）
 
-### 引导（7 步）
+### 引导（8 步；数据目录可以移动时 9 步）
 
 5. **欢迎 / 隐私**：界面语言按系统预选。点“开始”“知道了”。
 6. **你的电脑**：等待检测（几秒）。
@@ -107,7 +135,7 @@
 9. **下载**：下载在进入这一步时开始。
    应该看到：每个组件的进度条与总进度，结束时全部就绪、没有红色错误。记下开始与完成的时间。可以点“在后台继续，先去看看”，但请等下载完成再做下一步。
 10. **测试设备**：点 **测试这台设备**（Test this device），它会用应用附带的示例音频（约 1 分钟）。
-    应该看到：设备名包含 Apple 芯片 / GPU，结果表格里有 RTF（越小越快）和准确度。记下 RTF。可以点“使用推荐的组合”，也可以保持不变（在回报里写明选了哪个）。
+    应该看到：设备名包含 Apple 芯片 / GPU，页面给出一句推荐；RTF（越小越快）与准确度的表格在“到设置里查看结果”里。记下 RTF。可以点“使用推荐的组合”，也可以保持不变（在回报里写明选了哪个）。
 11. **第一门课**：点“添加第一门课”，填课程名（例如 `Acceptance`），其余可以跳过；在最后一步把讲座文件**拖进窗口**或用文件选择按钮添加，然后完成并点“启动”。
     应该看到：讲座进入处理，流水线依次经过预处理、转写（有 key 时还有摘要、修复、翻译）、导出。记下开始与完成的时间。
 
@@ -120,7 +148,7 @@
 14. **电池模式**：拔掉电源，等资源栏的电源状态变成“电池”（On battery）。再添加两段短录音（各 1–2 分钟即可）同时启动。
     应该看到：两节**不会同时**转写，第二节等第一节转写完才开始；鼠标悬停在“ASR 槽位”上，提示里“上限”为 **1**（英文：“Transcription slots: … limit 1”）。转写仍然使用 Apple 芯片，而不是停下来等电源。接回电源后上限恢复。
 15. **快捷键与菜单**：
-    - 屏幕左上角的应用菜单 **LectureFlow** 里应该有：关于 LectureFlow、设置…（`Cmd+,`）、隐藏、退出（`Cmd+Q`）。逐个点一下：关于显示版本 3.1.0；设置… 打开设置页。
+    - 屏幕左上角的应用菜单 **LectureFlow** 里应该有：关于 LectureFlow、设置…（`Cmd+,`）、隐藏、退出（`Cmd+Q`）。逐个点一下：关于显示版本 3.2.0；设置… 打开设置页。
     - `Cmd+C` / `Cmd+V` 能在输入框里复制粘贴；`Cmd+=` / `Cmd+-` / `Cmd+0` 缩放界面。
     - 窗口左上角绿色按钮（或“视图 → 进入全屏幕”、`Ctrl+Cmd+F`）进入**原生全屏**（独占一个桌面空间），再退出。
     - 界面里任何提示快捷键的地方应该写 `Cmd` 而不是 `Ctrl`。
@@ -133,11 +161,11 @@
 
 ### English: macOS acceptance (Apple silicon)
 
-**What you need**: an Apple silicon Mac (M1 or newer, macOS 12+), at least 10 GB free; the `LectureFlow-3.1.0-arm64.dmg` from part 1; an English lecture recording of about 10 minutes (your own or openly licensed; nothing with other people's private data); optionally an API key for a repair/translation service (e.g. DeepSeek). Without a key, choose the "Transcription only" tier. Note the start and end time of each step.
+**What you need**: an Apple silicon Mac (M1 or newer, macOS 13+), at least 10 GB free; the `LectureFlow-3.2.0-arm64.dmg` from part 1; an English lecture recording of about 10 minutes (your own or openly licensed; nothing with other people's private data); optionally an API key for a repair/translation service (e.g. DeepSeek). Without a key, choose the "Transcription only" tier. Note the start and end time of each step.
 
 **Install and start**
 
-1. Download the dmg from the draft release, or the `installers-macOS` artifact at the bottom of the Release workflow run. Expect `LectureFlow-3.1.0-arm64.dmg`, about 150–250 MB.
+1. Download the dmg from the draft release, or the `installers-macOS` artifact at the bottom of the Release workflow run. Expect `LectureFlow-3.2.0-arm64.dmg`, about 150–250 MB.
 2. Open it and drag LectureFlow to Applications.
 3. Open LectureFlow. It is unsigned: click **Done** (not "Move to Bin"), then **System Settings → Privacy & Security → Open Anyway** (see [docs/install.md](install.md#english)). Expect a short splash screen, then the setup guide ("Welcome"). Screenshot the "Open Anyway" step.
 4. Data folder: on a Mac that never ran LectureFlow, use the default `~/Library/Application Support/LectureFlow/`. Otherwise quit the app and start it from Terminal with a fresh folder: `LECTUREFLOW_DATA_DIR="$HOME/lf-acceptance" /Applications/LectureFlow.app/Contents/MacOS/LectureFlow` (delete `~/lf-acceptance` afterwards).
@@ -149,7 +177,7 @@
 7. Click **Install suggested**.
 8. **Translation**: with a key, choose "Standard", paste the key, "Test connection" should say it works; without one choose **Transcription only**. Apply the tier.
 9. **Download**: expect progress per component and no red errors at the end. Note the times. Wait for it to finish.
-10. **Test your devices**: click **Test this device** (uses the bundled sample audio, about 1 minute). Expect an Apple chip / GPU device and a result table with RTF (lower is faster) and accuracy. Note the RTF and whether you chose "Use the recommended combination".
+10. **Test your devices**: click **Test this device** (uses the bundled sample audio, about 1 minute). Expect an Apple chip / GPU device and a one-line recommendation; the table with RTF (lower is faster) and accuracy is under "See the results in Settings". Note the RTF and whether you chose "Use the recommended combination".
 11. **First course**: "Add first course", enter a name, skip the rest; at the last step drag the lecture file into the window (or use the file button), finish and start it. Expect the pipeline to run (prep, transcription, and with a key summary, repair, translation), then export. Note the times.
 
 **After processing**
@@ -157,7 +185,7 @@
 12. **Player**: on the course page click the lecture title, then play. Expect working video/audio, subtitles in sync at three different positions, and the transcript highlighting the current sentence. One screenshot (no personal data in it).
 13. **Resource bar**: expect the chip model (e.g. Apple M2) and memory use; GPU utilisation shows `--` when it cannot be read, and **no administrator password prompt**. Screenshot.
 14. **Battery**: unplug the power cable and wait until the power status says "On battery". Start two short recordings (1–2 minutes each). Expect only one to transcribe at a time; hovering "Transcription slots" shows "limit 1". Transcription keeps using the Apple chip. Plug in again: the limit goes back up.
-15. **Shortcuts and menus**: the **LectureFlow** application menu has About, Settings… (`Cmd+,`), Hide and Quit (`Cmd+Q`); About shows version 3.1.0, Settings… opens settings. `Cmd+C`/`Cmd+V` work in text fields, `Cmd+=`/`Cmd+-`/`Cmd+0` zoom. The green window button (or `Ctrl+Cmd+F`) enters **native full screen** (its own Space) and leaves it. Shortcut hints in the UI say `Cmd`, not `Ctrl`.
+15. **Shortcuts and menus**: the **LectureFlow** application menu has About, Settings… (`Cmd+,`), Hide and Quit (`Cmd+Q`); About shows version 3.2.0, Settings… opens settings. `Cmd+C`/`Cmd+V` work in text fields, `Cmd+=`/`Cmd+-`/`Cmd+0` zoom. The green window button (or `Ctrl+Cmd+F`) enters **native full screen** (its own Space) and leaves it. Shortcut hints in the UI say `Cmd`, not `Ctrl`.
 16. **Component sizes**: **Settings → Components** lists installed components, versions and sizes. Note them.
 17. **Diagnostics** (if something went wrong): **Settings → App → Logs and diagnostics → Export diagnostics** creates a zip (no lecture content, no API keys). Send it to the maintainer with your report.
 18. **Quit** from the application menu. The app should exit within a few seconds, with no LectureFlow or python processes left in Activity Monitor.

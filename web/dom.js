@@ -55,6 +55,54 @@ export function preserveFocus(fn) {
   }
 }
 
+// ---- texts that change by the second (3.2.0 L12) ----
+// everySecond(node, fn): fn() runs once a second while node is in the
+// document, until it returns false (nothing left to count) or
+// stopEverySecond(node). One timer serves them all, and it runs only while
+// there is one: a page without a countdown or an open card runs none. A
+// node out of the document for two ticks running (redrawn, the page left)
+// is dropped.
+const tickers = new Map(); // node → {fn, out}
+let tickTimer = 0;
+
+export function everySecond(node, fn) {
+  tickers.set(node, { fn, out: 0 });
+  if (!tickTimer) tickTimer = setInterval(tickAll, 1000);
+}
+
+export function stopEverySecond(node) {
+  tickers.delete(node);
+  if (!tickers.size && tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = 0;
+  }
+}
+
+// (for tests: how many nodes are ticking, and whether the timer runs)
+export function ticking() {
+  return { nodes: tickers.size, timer: !!tickTimer };
+}
+
+function tickAll() {
+  for (const [node, tk] of [...tickers]) {
+    let more = true;
+    if (!node.isConnected) more = ++tk.out < 2;
+    else {
+      tk.out = 0;
+      try {
+        more = tk.fn() !== false;
+      } catch {
+        more = false;
+      }
+    }
+    if (!more && tickers.get(node) === tk) tickers.delete(node);
+  }
+  if (!tickers.size && tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = 0;
+  }
+}
+
 // ---- buttons ----
 
 // btn(label, {icon: 'play', kind: 'primary'|'danger'|'ghost'|'quiet', size: 'sm', onclick, title, fkey})

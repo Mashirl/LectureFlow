@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import asr
 from asr import split_sentences
+from conftest import all_speech_vad
 
 
 def mk(texts, start=0.0, dur=0.3, gap=0.0, probs=None):
@@ -195,8 +196,9 @@ def W(text, t, dur=0.5):
     return {"word": " " + text, "start": float(t), "end": float(t) + dur, "probability": 0.9}
 
 
-def test_filtered_words_are_not_left_in_words():
+def test_filtered_words_are_not_left_in_words(monkeypatch):
     """Dropped segments and collapsed repeats leave no trace in words."""
+    all_speech_vad(monkeypatch, asr)          # the worker's VAD step: all of it is speech
     segs = [
         SimpleNamespace(start=0.0, end=2.0, no_speech_prob=0.1, avg_logprob=-0.2,
                         words=[W("We", 0), W("start", 1), W("now.", 2)]),
@@ -216,7 +218,7 @@ def test_filtered_words_are_not_left_in_words():
             return iter(segs), SimpleNamespace(duration=13.0, language="en")
 
     job = asr.Job("a.wav", "large-v3", "float16", "en", "", "cuda", 4)
-    result = asr.transcribe_job(Model(), [0.0] * 16000, job, lambda line: None,
+    result = asr.transcribe_job(Model(), [0.0] * (13 * 16000), job, lambda line: None,
                                 lambda text: len(text.split()))
     sentences = result["sentences"]
     assert [s["text"] for s in sentences] == ["We start now.", "Thank you.", "the end."]

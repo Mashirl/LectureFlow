@@ -1,0 +1,1058 @@
+{
+  "extName": {
+    "message": "Send to LectureFlow",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Finds the audio and video tracks of the lecture recording you’re watching and sends them to the LectureFlow desktop app (required).",
+    "description": "Store description"
+  },
+  "actionTitle": {
+    "message": "LectureFlow: tracks on this page",
+    "description": "Toolbar button tooltip"
+  },
+  "connChecking": {
+    "message": "Connecting…",
+    "description": "Native messaging state"
+  },
+  "connRecheck": {
+    "message": "Check again",
+    "description": "Button: retry connecting to LectureFlow"
+  },
+  "connConnected": {
+    "message": "LectureFlow connected"
+  },
+  "connConnectedVersion": {
+    "message": "LectureFlow $P1$",
+    "description": "Connected, with app version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "connUnavailable": {
+    "message": "Not connected"
+  },
+  "connNotRunning": {
+    "message": "LectureFlow could not be started. Open it, then check again."
+  },
+  "connNotInstalled": {
+    "message": "Install or open LectureFlow, then check again."
+  },
+  "detecting": {
+    "message": "Looking for tracks…"
+  },
+  "showTracks": {
+    "message": "Show",
+    "description": "Expand the track list"
+  },
+  "hideTracks": {
+    "message": "Hide tracks",
+    "description": "Closes the full track list"
+  },
+  "emptyHint": {
+    "message": "Open a recording and start playing it, then click again.",
+    "description": "Empty state"
+  },
+  "exportReport": {
+    "message": "Export detection report"
+  },
+  "grantSite": {
+    "message": "Detect automatically on this site",
+    "description": "Button: grant host permission"
+  },
+  "openOptions": {
+    "message": "Settings"
+  },
+  "notAPage": {
+    "message": "This page cannot be checked."
+  },
+  "noAccess": {
+    "message": "The extension cannot read this page."
+  },
+  "noTracks": {
+    "message": "No tracks found"
+  },
+  "tracksDetected": {
+    "message": "$P1$ tracks found",
+    "description": "Header with the track count",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "sourceProfile": {
+    "message": "Profile: $P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "sourceGeneric": {
+    "message": "Generic detection"
+  },
+  "unreviewed": {
+    "message": "Not reviewed",
+    "description": "Locally imported profile"
+  },
+  "reviewed": {
+    "message": "Reviewed"
+  },
+  "downloadDisabled": {
+    "message": "May be restricted",
+    "description": "Chip: the platform’s switch says the recording is restricted"
+  },
+  "protectedCount": {
+    "message": "$P1$ copyright protected (DRM)",
+    "description": "DRM tracks",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "protected": {
+    "message": "Copyright protected (DRM)",
+    "description": "DRM track"
+  },
+  "recommended": {
+    "message": "Recommended"
+  },
+  "unreadable": {
+    "message": "Manifest not readable"
+  },
+  "kind_video": {
+    "message": "Video"
+  },
+  "kind_audio": {
+    "message": "Audio"
+  },
+  "kind_unknown": {
+    "message": "Unknown type"
+  },
+  "format_file": {
+    "message": "File"
+  },
+  "format_hls": {
+    "message": "HLS"
+  },
+  "format_dash": {
+    "message": "DASH"
+  },
+  "source_element": {
+    "message": "page",
+    "description": "Detection route"
+  },
+  "source_performance": {
+    "message": "loaded resources",
+    "description": "Detection route"
+  },
+  "source_webrequest": {
+    "message": "network",
+    "description": "Detection route"
+  },
+  "sizeUnknown": {
+    "message": "size unknown"
+  },
+  "sizeAbout": {
+    "message": "about $P1$",
+    "description": "Estimated size",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reportBuilding": {
+    "message": "Preparing the report…"
+  },
+  "reportRefused": {
+    "message": "The report was not exported: it may contain personal data."
+  },
+  "reportFailed": {
+    "message": "The report could not be made for this page."
+  },
+  "reportSaved": {
+    "message": "Report saved. Read it before you share it."
+  },
+  "finding_email": {
+    "message": "Something looks like an email address."
+  },
+  "finding_identity_field": {
+    "message": "A field looks like a name, user or student ID."
+  },
+  "finding_student_id": {
+    "message": "A number looks like a student ID."
+  },
+  "finding_name": {
+    "message": "Part of an address looks like a person’s name."
+  },
+  "grantDone": {
+    "message": "Allowed. Reload the page so the extension sees the player’s requests from the start."
+  },
+  "grantFailed": {
+    "message": "The permission could not be requested."
+  },
+  "optionsTitle": {
+    "message": "LectureFlow extension settings"
+  },
+  "languageHeading": {
+    "message": "Interface language",
+    "description": "Settings section: the extension’s language"
+  },
+  "languageHint": {
+    "message": "Follows your browser unless you choose a language here, for example Cantonese, which browsers do not offer.",
+    "description": "Settings: under the language heading"
+  },
+  "languageAuto": {
+    "message": "Same as the browser",
+    "description": "Language choice: the browser’s language"
+  },
+  "profilesHeading": {
+    "message": "Platform profiles"
+  },
+  "profilesHint": {
+    "message": "Profiles name the tracks of a platform. Imported ones are marked “Not reviewed” and take precedence."
+  },
+  "importProfile": {
+    "message": "Import a local profile"
+  },
+  "importNotJson": {
+    "message": "This file is not JSON."
+  },
+  "importInvalid": {
+    "message": "The profile does not match the schema:"
+  },
+  "importBlocked": {
+    "message": "This profile cannot be imported: it matches $P1$.",
+    "description": "Settings: a local profile matching a do-not-handle site is refused; $1 = the host it matches. Followed by unsupportedYoutube or unsupportedCourses.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importDone": {
+    "message": "Imported $P1$.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "remove": {
+    "message": "Remove"
+  },
+  "sitesHeading": {
+    "message": "Sites"
+  },
+  "sitesHint": {
+    "message": "On these sites the extension counts tracks by itself and sees the player’s requests. Elsewhere it acts only when you click its icon."
+  },
+  "addSite": {
+    "message": "Allow site"
+  },
+  "siteInvalid": {
+    "message": "Enter an address starting with https://"
+  },
+  "privacyHeading": {
+    "message": "Privacy"
+  },
+  "privacyText": {
+    "message": "The extension talks only to LectureFlow on this computer. It reads cookies only when you send a lecture, and only those of the tracks’ sites. Nothing is uploaded.",
+    "description": "Options: privacy"
+  },
+  "versionLine": {
+    "message": "Version $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "redetect": {
+    "message": "Detect again",
+    "description": "Button: run detection again"
+  },
+  "unsupportedTitle": {
+    "message": "LectureFlow does not work on this site",
+    "description": "Do-not-handle site (YouTube)"
+  },
+  "unsupportedText": {
+    "message": "LectureFlow is for your school’s lecture recordings.",
+    "description": "Do-not-handle site"
+  },
+  "unsupportedYoutube": {
+    "message": "LectureFlow does not handle YouTube. It is for your school’s lecture recordings.",
+    "description": "Do-not-handle site: YouTube (src/lib/blocklist.js). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "unsupportedCourses": {
+    "message": "LectureFlow does not handle online course platforms (MOOCs and paid courses). It is for your school’s lecture recordings.",
+    "description": "Do-not-handle site: MOOCs and online / paid course platforms (Udemy, Coursera…). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "blockedEmbedNote": {
+    "message": "Embedded YouTube or online course platform content on this page was skipped: LectureFlow does not handle it.",
+    "description": "No tracks found, and the page embeds YouTube or a course platform, which detection skipped"
+  },
+  "disconnectedTitle": {
+    "message": "LectureFlow is not connected",
+    "description": "State: native host unreachable"
+  },
+  "discNotInstalled": {
+    "message": "LectureFlow was not found. Install it and open it once, then click “Check again”.",
+    "description": "Disconnected: host not registered"
+  },
+  "discNotRunning": {
+    "message": "LectureFlow did not start. Open it yourself, then click “Check again”.",
+    "description": "Disconnected: start failed"
+  },
+  "discProtocol": {
+    "message": "LectureFlow and the extension do not match. Update both to the latest version.",
+    "description": "Disconnected: protocol mismatch"
+  },
+  "discUnsupportedOs": {
+    "message": "LectureFlow runs on Windows and on Macs with Apple silicon only.",
+    "description": "Linux / ChromeOS note"
+  },
+  "getLectureFlow": {
+    "message": "Get LectureFlow",
+    "description": "Button: open the download page"
+  },
+  "titleGenerated": {
+    "message": "LectureFlow will name this lecture",
+    "description": "Generic detection reads no title"
+  },
+  "durationMinutes": {
+    "message": "$P1$ min",
+    "description": "Lecture length",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileChip": {
+    "message": "$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "downloadDisabledOverridden": {
+    "message": "May be restricted · confirmed",
+    "description": "Chip after the reminder was confirmed"
+  },
+  "observeNeedsGrant": {
+    "message": "Allow automatic detection on this site and reload the page to see the platform’s restriction setting and the full recording.",
+    "description": "Profile reads a page response; site not authorized"
+  },
+  "observeNeedsReload": {
+    "message": "Reload the recording page to see the platform’s restriction setting and the full recording.",
+    "description": "Profile reads a page response not seen yet"
+  },
+  "courseLabel": {
+    "message": "Course",
+    "description": "Course select label"
+  },
+  "courseNone": {
+    "message": "LectureFlow has no courses yet. Create one in LectureFlow first.",
+    "description": "No courses"
+  },
+  "sendButton": {
+    "message": "Send to LectureFlow",
+    "description": "The send button (user’s wording)"
+  },
+  "sending": {
+    "message": "Sending…",
+    "description": "Primary button while sending"
+  },
+  "dataNote": {
+    "message": "Sending gives the selected tracks’ addresses, this page’s address and the cookies those addresses need to LectureFlow on this computer. Nothing is uploaded.",
+    "description": "Data note under the popup’s button"
+  },
+  "selectHint": {
+    "message": "Select at least one track.",
+    "description": "Nothing selected"
+  },
+  "oneEach": {
+    "message": "One audio and one picture at most; two with Two cameras",
+    "description": "Selection rule"
+  },
+  "selectTrack": {
+    "message": "Select $P1$",
+    "description": "Checkbox label",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "blockedImported": {
+    "message": "This lecture is already in LectureFlow.",
+    "description": "Cannot send: imported"
+  },
+  "blockedProtected": {
+    "message": "This stream is protected by digital rights management (DRM). LectureFlow does not handle protected content.",
+    "description": "Cannot send: DRM"
+  },
+  "openInApp": {
+    "message": "Open in LectureFlow",
+    "description": "Button"
+  },
+  "opened": {
+    "message": "Opened in LectureFlow.",
+    "description": "After open"
+  },
+  "againFailed": {
+    "message": "The last fetch did not finish. You can send it again.",
+    "description": "Check: failed task"
+  },
+  "againCancelled": {
+    "message": "The last fetch was cancelled. You can send it again.",
+    "description": "Check: cancelled task"
+  },
+  "queuedTitle": {
+    "message": "Added to the queue",
+    "description": "Queued state title"
+  },
+  "state_queued": {
+    "message": "Queued",
+    "description": "Fetch task state"
+  },
+  "state_downloading": {
+    "message": "Fetching",
+    "description": "Fetch task state (main app: downloads.state.downloading)"
+  },
+  "state_merging": {
+    "message": "Merging",
+    "description": "Fetch task state"
+  },
+  "state_importing": {
+    "message": "Creating lecture",
+    "description": "Fetch task state"
+  },
+  "state_done": {
+    "message": "Done",
+    "description": "Fetch task state"
+  },
+  "state_failed": {
+    "message": "Fetch failed",
+    "description": "Fetch task state"
+  },
+  "state_needs_refresh": {
+    "message": "Needs refresh",
+    "description": "Fetch task state"
+  },
+  "state_cancelled": {
+    "message": "Cancelled",
+    "description": "Fetch task state"
+  },
+  "state_imported": {
+    "message": "Imported",
+    "description": "Check state"
+  },
+  "position": {
+    "message": "position $P1$",
+    "description": "Queue position",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "progress": {
+    "message": "$P1$% · $P2$ of $P3$",
+    "description": "Fetch progress",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "progressUnknown": {
+    "message": "$P1$ fetched",
+    "description": "Progress without a total",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "closeHint": {
+    "message": "You can close this window; fetching carries on in LectureFlow.",
+    "description": "Queued note"
+  },
+  "doneHint": {
+    "message": "Fetched. The lecture has been created and goes on to transcription.",
+    "description": "Done note"
+  },
+  "failedHint": {
+    "message": "Fetching did not finish. LectureFlow shows why and can retry it.",
+    "description": "Failed note"
+  },
+  "cancelledHint": {
+    "message": "This fetch was cancelled.",
+    "description": "Cancelled note"
+  },
+  "refreshText": {
+    "message": "Fetching this lecture stopped: its sign-in data has expired. Click “Resume” to continue with this page’s fresh sign-in data.",
+    "description": "needs_refresh view"
+  },
+  "refreshButton": {
+    "message": "Resume",
+    "description": "Primary button of the needs_refresh view"
+  },
+  "refreshing": {
+    "message": "Resuming…",
+    "description": "Primary button while resuming"
+  },
+  "cancel": {
+    "message": "Cancel",
+    "description": "Button"
+  },
+  "errCourseGone": {
+    "message": "This course no longer exists in LectureFlow. Choose another one.",
+    "description": "Error"
+  },
+  "errStale": {
+    "message": "The page has changed. Close this window and click the extension icon again.",
+    "description": "Error"
+  },
+  "errProtected": {
+    "message": "Copyright protected (DRM) tracks cannot be sent.",
+    "description": "Error"
+  },
+  "errNotRunning": {
+    "message": "LectureFlow is not responding. Open it and try again.",
+    "description": "Error"
+  },
+  "errTimeout": {
+    "message": "LectureFlow did not answer in time. Try again.",
+    "description": "Error"
+  },
+  "errRefreshGone": {
+    "message": "LectureFlow no longer has this fetch. You can send the lecture again.",
+    "description": "Error"
+  },
+  "errInvalid": {
+    "message": "LectureFlow refused this request ($P1$).",
+    "description": "Error with the field name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errSiteBlocked": {
+    "message": "LectureFlow refused this task: it does not handle YouTube or online course platforms, only your school’s lecture recordings.",
+    "description": "Error: LectureFlow refused the send (downloads.site_blocked): the page or a track is on YouTube or a course platform. Same text as LectureFlow’s errors.downloads.site_blocked."
+  },
+  "errGeneric": {
+    "message": "That did not work ($P1$). Try again.",
+    "description": "Error with its code",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileGrant": {
+    "message": "Allow these sites",
+    "description": "Options: grant a profile’s hosts"
+  },
+  "profileGranted": {
+    "message": "Sites allowed",
+    "description": "Options: profile hosts granted"
+  },
+  "reportsHeading": {
+    "message": "Detection reports",
+    "description": "Options section"
+  },
+  "reportsHint": {
+    "message": "Export a redacted detection report to write or improve a profile. A recording page appears here once you have clicked the extension icon on it.",
+    "description": "Options: reports"
+  },
+  "reportsEmpty": {
+    "message": "No pages to export yet.",
+    "description": "Options: reports"
+  },
+  "reportRow": {
+    "message": "$P1$ · $P2$ tracks",
+    "description": "Options: one page",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "exportOne": {
+    "message": "Export",
+    "description": "Options: export a report"
+  },
+  "profileHosts": {
+    "message": "Sites: $P1$",
+    "description": "Options: profile hosts",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmSend": {
+    "message": "Send",
+    "description": "The in-page card’s primary button"
+  },
+  "inpageNote": {
+    "message": "Cookies are read only when you click “Send”, and go only to LectureFlow on this computer",
+    "description": "Under the in-page card’s button"
+  },
+  "profileSource": {
+    "message": "$P1$ profile $P2$",
+    "description": "Lecture card: which profile named it",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "courseLast": {
+    "message": " (last used)",
+    "description": "Suffix of the course used last"
+  },
+  "close": {
+    "message": "Close",
+    "description": "Button"
+  },
+  "done": {
+    "message": "Done",
+    "description": "Button"
+  },
+  "rowDownloading": {
+    "message": "Fetching $P1$%",
+    "description": "List row: a lecture being fetched",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedChip": {
+    "message": "May be restricted",
+    "description": "Bulk row: skipped because restricted"
+  },
+  "restrictedNotice": {
+    "message": "This stream may be restricted by your lecturer’s or university’s policy. LectureFlow only fetches streams you have access to, to this computer, for your personal accessible learning (transcription/translation). Please make sure you follow your school’s rules. You will be reminded once more before sending.",
+    "description": "The user’s text, verbatim (it says 您)"
+  },
+  "restrictedTitle": {
+    "message": "This stream may be restricted",
+    "description": "Reminder dialog title"
+  },
+  "restrictedConfirm": {
+    "message": "LectureFlow only fetches streams you have access to, to this computer, for your personal accessible learning (transcription/translation). Please make sure you follow your school’s rules.",
+    "description": "Reminder dialog text"
+  },
+  "bulkRestrictedConfirm": {
+    "message": "$P1$ of them may be restricted by your lecturer’s or university’s policy. LectureFlow only fetches streams you have access to, to this computer, for your personal accessible learning (transcription/translation). Please make sure you follow your school’s rules.",
+    "description": "Bulk reminder dialog text",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedNoticeQuiet": {
+    "message": "This stream may be restricted by your lecturer’s or university’s policy. LectureFlow only fetches streams you have access to, to this computer, for your personal accessible learning (transcription/translation). Please make sure you follow your school’s rules.",
+    "description": "The restricted notice (the user’s own text) without its last sentence, shown when the reminder is off for this platform"
+  },
+  "restrictedRemember": {
+    "message": "Don’t remind me again for this platform ($P1$)",
+    "description": "Check box in the restricted reminder; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedRememberedNote": {
+    "message": "You turned off this reminder for $P1$. You can turn it back on in the extension settings.",
+    "description": "Line under the restricted notice when the reminder is off for this platform; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedHeading": {
+    "message": "Reminders for restricted recordings",
+    "description": "Settings: section heading"
+  },
+  "restrictedHint": {
+    "message": "Before you send a recording that may be restricted, the extension reminds you. Platforms for which you turned that reminder off are listed here; turn it back on to be reminded every time again.",
+    "description": "Settings: section text"
+  },
+  "restrictedEmpty": {
+    "message": "No platform: you are reminded every time.",
+    "description": "Settings: no platform listed"
+  },
+  "restrictedSince": {
+    "message": "Reminder off since $P1$",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedForget": {
+    "message": "Remind me again",
+    "description": "Settings: button that undoes “don’t remind me again”"
+  },
+  "sendAnyway": {
+    "message": "Send anyway",
+    "description": "Reminder dialog: confirm"
+  },
+  "contentLabel": {
+    "message": "Content",
+    "description": "Label of the three choices"
+  },
+  "presetMain": {
+    "message": "Main audio & video",
+    "description": "Choice: the full recording, or main audio + first picture"
+  },
+  "presetDual": {
+    "message": "Two cameras",
+    "description": "Choice: main audio + two pictures"
+  },
+  "presetAudio": {
+    "message": "Audio only",
+    "description": "Choice: main audio"
+  },
+  "presetMainNone": {
+    "message": "No track here can be sent",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetDualNone": {
+    "message": "Only one picture was found",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetAudioNone": {
+    "message": "There is no separate audio track",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "chooseContent": {
+    "message": "Choose what to send",
+    "description": "Nothing chosen yet"
+  },
+  "chooseTracks": {
+    "message": "Choose tracks… ($P1$)",
+    "description": "Opens the full track list",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerEmbedded": {
+    "message": "This page embeds $P1$. Allow $P1$ sites and reload the page to send from here.",
+    "description": "Popup: a platform frame not readable yet",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerOpaque": {
+    "message": "This page embeds content the extension cannot read. If it is $P1$ (for example ReCap in Canvas), allow $P1$ sites and reload the page.",
+    "description": "Popup: unreadable frames",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerGrant": {
+    "message": "Allow $P1$ sites",
+    "description": "Popup: grant a profile’s sites",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errInfoFailed": {
+    "message": "Could not read this lecture from the platform ($P1$).",
+    "description": "Error",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectRow": {
+    "message": "Select $P1$",
+    "description": "Row check box",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selBar": {
+    "message": "$P1$ selected",
+    "description": "Selection bar",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selClear": {
+    "message": "Clear",
+    "description": "Selection bar"
+  },
+  "selSend": {
+    "message": "Send $P1$ selected",
+    "description": "Selection bar button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkButton": {
+    "message": "Update this course in LectureFlow",
+    "description": "Folder list button (user’s wording)"
+  },
+  "bulkTitle": {
+    "message": "Update this course in LectureFlow",
+    "description": "Bulk card title"
+  },
+  "bulkSummary": {
+    "message": "$P1$ lectures: $P2$ already imported (matched by session and title), $P3$ being fetched, ",
+    "description": "Bulk card summary, first part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "bulkSummaryTo": {
+    "message": "$P1$ to send",
+    "description": "Bulk card summary, last part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkNew": {
+    "message": "New",
+    "description": "Bulk row"
+  },
+  "bulkQueued": {
+    "message": "Queued",
+    "description": "Bulk row"
+  },
+  "bulkFailed": {
+    "message": "Not sent",
+    "description": "Bulk row"
+  },
+  "bulkSkipped": {
+    "message": "Skipped",
+    "description": "Bulk row"
+  },
+  "bulkSend": {
+    "message": "Send $P1$",
+    "description": "Bulk card button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkReading": {
+    "message": "Reading $P1$ of $P2$…",
+    "description": "Bulk card button while reading",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkSending": {
+    "message": "Sending $P1$ of $P2$…",
+    "description": "Bulk card button while sending",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkQueueNote": {
+    "message": "Queued in order; how many are fetched at once is set in LectureFlow (3 by default)",
+    "description": "Bulk card note"
+  },
+  "bulkPageOnly": {
+    "message": "Only the lectures listed on this page; on other pages, click again there.",
+    "description": "Bulk card note"
+  },
+  "bulkSkipDisabled": {
+    "message": "Skip these $P1$",
+    "description": "Bulk reminder: skip",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkDone": {
+    "message": "$P1$ sent; $P2$ not sent.",
+    "description": "Bulk card result",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkNoTrack": {
+    "message": "No track matches the chosen content",
+    "description": "Bulk row error"
+  },
+  "grantCookieHosts": {
+    "message": "These tracks are on other sites. If fetching them needs those sites’ cookies, allow them too (optional):",
+    "description": "Popup: above check boxes, one per other host whose cookies a send would read"
+  },
+  "grantAllow": {
+    "message": "Allow",
+    "description": "Popup: button that asks the browser for the page’s site and the ticked hosts"
+  },
+  "trustedHeading": {
+    "message": "Trusted embedding sites",
+    "description": "Settings: section heading (sites the platform’s pages may be embedded in, with in-page confirmation)"
+  },
+  "trustedHint": {
+    "message": "When a recording platform’s page is embedded in one of these sites (your school’s Canvas, for example), you can confirm sending right on the page. Embedded in any other site, the button opens a LectureFlow confirmation window, so that another site cannot trick you into clicking.",
+    "description": "Settings: section text"
+  },
+  "trustedEmpty": {
+    "message": "No trusted sites yet: a button embedded in another site always opens the confirmation window.",
+    "description": "Settings: no site listed"
+  },
+  "trustedSince": {
+    "message": "Trusted since $P1$",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importReplaceConfirm": {
+    "message": "This file has the same id as the built-in profile “$P1$ $P2$”. Once imported, it replaces the built-in version and the card marks it “Not reviewed”. Replace it?",
+    "description": "Settings: an imported file has the id of a built-in profile; $1 its name, $2 its version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "importReplace": {
+    "message": "Replace the built-in version",
+    "description": "Settings: button, import the file in place of the built-in profile"
+  },
+  "profileReplaces": {
+    "message": "Replaces built-in version $P1$",
+    "description": "Settings: under a local profile that replaces a built-in one; $1 is the built-in version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileInactive": {
+    "message": "Not in use: same id as a built-in profile. Import it again and confirm.",
+    "description": "Settings: chip on a local profile with a built-in profile’s id that was never confirmed"
+  },
+  "embedWhy": {
+    "message": "This recording page is embedded in a page of $P1$. So that another site cannot trick you into clicking, confirm in this window.",
+    "description": "Confirmation window: why it opened; $1 is the site the recording page is embedded in (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedWhyUnknown": {
+    "message": "This recording page is embedded in another site’s page, and the browser did not tell the extension which site. So that another site cannot trick you into clicking, confirm in this window.",
+    "description": "Confirmation window: why it opened, when the browser does not tell the site"
+  },
+  "embedFrom": {
+    "message": "Recording page: $P1$",
+    "description": "Confirmation window: the recording page’s host; $1 is a host name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedTrust": {
+    "message": "From now on, confirm on the page itself in $P1$",
+    "description": "Confirmation window: check box; $1 is the site (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmGone": {
+    "message": "This confirmation window no longer works: the recording page was closed or reloaded. Go back to the page and click the button again.",
+    "description": "Confirmation window: the page it belonged to is gone"
+  },
+  "errConfirmWindow": {
+    "message": "Send from the LectureFlow confirmation window.",
+    "description": "Error: this frame must confirm in the extension’s window"
+  }
+}

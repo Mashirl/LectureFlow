@@ -1,4 +1,22 @@
 {
+  "angle.no_video": {
+    "zh": "这个文件里没有视频画面，不能作为第二视角",
+    "params": []
+  },
+  "angle.not_found": {
+    "zh": "这节课没有第二视角（{name}）",
+    "params": [
+      "name"
+    ]
+  },
+  "angle.remux_failed": {
+    "zh": "无法把这个文件保存为第二视角：只支持不重新编码就能放进 MP4 的视频（例如 H.264、HEVC 编码的 MP4、MOV、MKV）",
+    "params": []
+  },
+  "angle.write_failed": {
+    "zh": "无法保存第二视角的文件。如果正在播放第二视角，请先停止播放再试",
+    "params": []
+  },
   "api.not_found": {
     "zh": "没有这个接口：{method} {path}",
     "params": [
@@ -192,8 +210,145 @@
     "zh": "未检查：缺少 API key",
     "params": []
   },
+  "check.aria2c_external": {
+    "zh": "{version}，SHA-256 {sha256}（不是 LectureFlow 自带的 aria2c：{path}）",
+    "params": [
+      "version",
+      "sha256",
+      "path"
+    ]
+  },
+  "check.aria2c_mismatch": {
+    "zh": "aria2c 与安装包的清单不一致：SHA-256 {sha256}，应为 {expected}",
+    "params": [
+      "sha256",
+      "expected"
+    ]
+  },
+  "check.aria2c_missing": {
+    "zh": "没有找到 aria2c（{path}）。无法从录播平台刮削录像",
+    "params": [
+      "path"
+    ]
+  },
+  "check.aria2c_ok": {
+    "zh": "{version}，SHA-256 {sha256}",
+    "params": [
+      "version",
+      "sha256"
+    ]
+  },
+  "check.aria2c_verified": {
+    "zh": "{version}，SHA-256 {sha256}（与安装包的清单一致）",
+    "params": [
+      "version",
+      "sha256"
+    ]
+  },
+  "check.browser_ext_app_location": {
+    "zh": "LectureFlow 正从磁盘映像或临时位置运行，关闭后浏览器扩展无法自动打开它",
+    "params": []
+  },
+  "check.browser_ext_blocked": {
+    "zh": "macOS 不允许 LectureFlow 在 {browsers} 中登记，扩展无法连接",
+    "params": [
+      "browsers"
+    ]
+  },
+  "check.browser_ext_connected": {
+    "zh": "已在 {browsers} 中登记；最近一次扩展连接：{browser} 扩展 {version}，{at}",
+    "params": [
+      "browsers",
+      "browser",
+      "version",
+      "at"
+    ]
+  },
+  "check.browser_ext_host_missing": {
+    "zh": "浏览器登记的扩展宿主程序不存在：{path}",
+    "params": [
+      "path"
+    ]
+  },
+  "check.browser_ext_in_use": {
+    "zh": "另一个程序占用了 LectureFlow 的扩展连接，浏览器扩展无法连接到这个 LectureFlow",
+    "params": []
+  },
+  "check.browser_ext_listen_failed": {
+    "zh": "无法建立浏览器扩展的连接",
+    "params": []
+  },
+  "check.browser_ext_no_browser": {
+    "zh": "没有找到 Chrome、Edge 或 Firefox",
+    "params": []
+  },
+  "check.browser_ext_not_ready": {
+    "zh": "{browsers} 还没有打开过，LectureFlow 无法在其中登记",
+    "params": [
+      "browsers"
+    ]
+  },
+  "check.browser_ext_not_registered": {
+    "zh": "{browsers} 没有登记 LectureFlow，扩展无法连接",
+    "params": [
+      "browsers"
+    ]
+  },
+  "check.browser_ext_off": {
+    "zh": "浏览器扩展的连接已关闭（启动参数 -nm-endpoint off）",
+    "params": []
+  },
+  "check.browser_ext_protocol": {
+    "zh": "最近一次连接的 {browser} 扩展（{version}）与这个版本的 LectureFlow 不兼容",
+    "params": [
+      "browser",
+      "version"
+    ]
+  },
+  "check.browser_ext_registered": {
+    "zh": "已在 {browsers} 中登记；这次启动后还没有扩展连接过",
+    "params": [
+      "browsers"
+    ]
+  },
+  "check.browser_ext_unavailable": {
+    "zh": "浏览器扩展的连接服务没有启动",
+    "params": []
+  },
+  "check.browser_ext_unmanaged": {
+    "zh": "这个 LectureFlow 使用单独的连接端点，不登记浏览器",
+    "params": []
+  },
   "check.checking": {
     "zh": "正在检查…",
+    "params": []
+  },
+  "check.colab_auth_missing": {
+    "zh": "还没有授权 Google Colab，或授权已过期",
+    "params": []
+  },
+  "check.colab_auth_ok": {
+    "zh": "已授权",
+    "params": []
+  },
+  "check.colab_off": {
+    "zh": "Colab 远端转写没有启动",
+    "params": []
+  },
+  "check.colab_reach_failed": {
+    "zh": "无法连接 Google Colab：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.colab_reach_ok": {
+    "zh": "可以连接 Google Colab（{ms} ms），没有分配运行时",
+    "params": [
+      "ms"
+    ]
+  },
+  "check.colab_reach_skipped": {
+    "zh": "未检查：还没有授权",
     "params": []
   },
   "check.crashed": {
@@ -202,9 +357,88 @@
       "error"
     ]
   },
+  "check.credentials_dpapi": {
+    "zh": "保存的 API key 与 Colab 授权已加密，密钥由 Windows 数据保护（DPAPI）绑定在当前账户上",
+    "params": []
+  },
+  "check.credentials_file": {
+    "zh": "保存的 API key 与 Colab 授权已加密，但密钥只是数据目录里的文件 {path}（仅当前账户可读），没有系统凭据库保护",
+    "params": [
+      "path"
+    ]
+  },
+  "check.credentials_keychain": {
+    "zh": "保存的 API key 与 Colab 授权已加密，密钥保存在 macOS 钥匙串中",
+    "params": []
+  },
+  "check.credentials_none": {
+    "zh": "没能建立加密密钥，API key 与 Colab 授权以明文保存：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.credentials_replaced": {
+    "zh": "这台电脑或这个账户打不开原来的密钥文件，已生成新密钥（原文件保留为 {path}）；有 {n} 项保存的凭据需要重新输入",
+    "params": [
+      "path",
+      "n"
+    ]
+  },
+  "check.credentials_unavailable": {
+    "zh": "系统凭据库现在不可用（{error}）：本次没有使用已保存的 API key 与 Colab 授权，密钥文件保持不变，下次启动会再试；现在填写的 key 会以明文保存",
+    "params": [
+      "error"
+    ]
+  },
+  "check.credentials_unreadable": {
+    "zh": "有 {n} 项保存的凭据无法在这台电脑或这个账户上解密（数据目录可能来自别的电脑或账户），需要重新输入",
+    "params": [
+      "n"
+    ]
+  },
   "check.cuda_fake": {
     "zh": "测试模式（asr.fake_result），跳过推理自检",
     "params": []
+  },
+  "check.cudnn_failed": {
+    "zh": "无法加载 cuDNN：{error}",
+    "params": [
+      "error"
+    ]
+  },
+  "check.cudnn_ok": {
+    "zh": "cuDNN {version} 可以加载",
+    "params": [
+      "version"
+    ]
+  },
+  "check.data_dir_cloud_sync": {
+    "zh": "数据目录 {path} 在 {service} 的同步文件夹中：数据库（含加密后的 API key）与密钥文件会上传到云端并同步到其他设备",
+    "params": [
+      "path",
+      "service"
+    ]
+  },
+  "check.data_dir_no_acl": {
+    "zh": "数据目录 {path} 所在的磁盘是 {fs} 格式，这种格式不记录访问权限，本机的任何账户都能读取其中的文件",
+    "params": [
+      "path",
+      "fs"
+    ]
+  },
+  "check.data_dir_readable": {
+    "zh": "{path} 可写，但本机的其他账户也能读取其中的文件（{who}）",
+    "params": [
+      "path",
+      "who"
+    ]
+  },
+  "check.data_dir_shared": {
+    "zh": "{path} 可写，但本机的其他账户也能修改其中的文件（{who}）",
+    "params": [
+      "path",
+      "who"
+    ]
   },
   "check.dir_not_writable": {
     "zh": "{path} 不可写：{error}",
@@ -231,9 +465,23 @@
       "error"
     ]
   },
+  "check.fake_skipped": {
+    "zh": "测试模式（asr.fake_result），跳过这项检查",
+    "params": []
+  },
   "check.fw_not_installed": {
     "zh": "没有安装“NVIDIA 显卡转写”组件（faster-whisper）",
     "params": []
+  },
+  "check.gcloud_missing": {
+    "zh": "没有找到 Google Cloud CLI（gcloud）",
+    "params": []
+  },
+  "check.gcloud_ok": {
+    "zh": "已安装：{path}",
+    "params": [
+      "path"
+    ]
   },
   "check.gpu_fake": {
     "zh": "测试模式（asr.fake_result），不使用 GPU",
@@ -256,8 +504,70 @@
     "zh": "离线时转写仍可运行；联网后点击“重新检查”。若持续失败请检查 base_url、API key 和模型名",
     "params": []
   },
+  "check.hint_aria2c_desktop": {
+    "zh": "LectureFlow 自带的 aria2c 缺失或被改动，请重新安装 LectureFlow",
+    "params": []
+  },
+  "check.hint_aria2c_dev": {
+    "zh": "安装 aria2 并把 aria2c 加入 PATH，或在 config.toml 中设置 aria2c 的完整路径，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_browser_ext_dev": {
+    "zh": "开发版没有扩展宿主程序：先构建 lectureflow-nmhost（make.ps1 build），或安装 LectureFlow 桌面版",
+    "params": []
+  },
+  "check.hint_browser_ext_full_disk": {
+    "zh": "在“系统设置 › 隐私与安全性 › 完全磁盘访问权限”里允许 LectureFlow，然后点击“重新登记”",
+    "params": []
+  },
+  "check.hint_browser_ext_in_use": {
+    "zh": "关闭占用它的程序（例如另一个正在运行的 LectureFlow），然后重新启动 LectureFlow；仍然如此时重新启动电脑",
+    "params": []
+  },
+  "check.hint_browser_ext_move_app": {
+    "zh": "请把 LectureFlow 移到“应用程序”文件夹后再打开",
+    "params": []
+  },
+  "check.hint_browser_ext_open_browser": {
+    "zh": "先打开一次 {browsers}，再点击“重新登记”",
+    "params": [
+      "browsers"
+    ]
+  },
+  "check.hint_browser_ext_register": {
+    "zh": "点击“重新登记”；仍然不行时重新安装 LectureFlow",
+    "params": []
+  },
+  "check.hint_browser_ext_restart": {
+    "zh": "重新启动 LectureFlow",
+    "params": []
+  },
+  "check.hint_browser_ext_update": {
+    "zh": "把浏览器扩展和 LectureFlow 都更新到最新版本",
+    "params": []
+  },
+  "check.hint_colab_auth": {
+    "zh": "在设置的“Colab 远端转写”中登录 Google，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_colab_reach": {
+    "zh": "检查网络连接；仍然失败时在设置的“Colab 远端转写”中重新登录 Google，然后点击“重新检查”",
+    "params": []
+  },
   "check.hint_cpu": {
     "zh": "转写设备为 CPU：CPU 转写速度很慢，一节课可能需要数小时（可在设置页的“转写”中修改）",
+    "params": []
+  },
+  "check.hint_credentials_none": {
+    "zh": "查看日志 logs/lectureflow.log 中以 credentials 开头的记录，排除问题后重启 LectureFlow",
+    "params": []
+  },
+  "check.hint_credentials_reenter": {
+    "zh": "在设置页的“提供商”中为标有“需要重新输入”的提供商填写 API key；Colab 需要重新授权",
+    "params": []
+  },
+  "check.hint_cudnn": {
+    "zh": "在项目的 .venv 中执行 pip install -r worker/requirements.txt（含 nvidia-cudnn-cu12），然后点击“重新检查”",
     "params": []
   },
   "check.hint_data_dir": {
@@ -266,6 +576,14 @@
   },
   "check.hint_data_dir_desktop": {
     "zh": "检查数据目录所在的磁盘是否已连接、是否可写，或在设置中把数据目录移到别处",
+    "params": []
+  },
+  "check.hint_data_dir_move": {
+    "zh": "在设置页的“数据目录”中把它移到不会同步的本地 NTFS / APFS 磁盘（例如默认位置）",
+    "params": []
+  },
+  "check.hint_data_dir_restrict": {
+    "zh": "点击“收紧权限”，让数据目录只有你的账户（以及系统与管理员）可以访问",
     "params": []
   },
   "check.hint_disk_error": {
@@ -284,8 +602,20 @@
     "zh": "LectureFlow 自带的 ffmpeg 无法运行，请重新安装 LectureFlow",
     "params": []
   },
+  "check.hint_gcloud_dev": {
+    "zh": "安装 Google Cloud CLI，确认 gcloud 在 PATH 中，然后点击“重新检查”",
+    "params": []
+  },
   "check.hint_install_fw": {
     "zh": "需要用 NVIDIA 显卡或 CPU 转写时，在设置的“组件”中安装或修复“NVIDIA 显卡转写”",
+    "params": []
+  },
+  "check.hint_install_gcloud": {
+    "zh": "在设置的“组件”中安装“Google Cloud CLI（gcloud）”，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_install_local": {
+    "zh": "按推荐安装本地转写组件，装好后点击“重新检查”",
     "params": []
   },
   "check.hint_install_mlx": {
@@ -325,6 +655,10 @@
       "provider"
     ]
   },
+  "check.hint_local_dev": {
+    "zh": "按 worker/requirements-openvino.txt 在项目目录建立 .venv-ov（或按 worker/requirements.txt 建立 .venv），然后点击“重新检查”",
+    "params": []
+  },
   "check.hint_mlx_model_dev": {
     "zh": "把转换好的 MLX 模型（config.json 与 weights.safetensors）放到 {path}，或安装对应的模型组件",
     "params": [
@@ -351,6 +685,12 @@
     "zh": "需要 Intel 核显或 NPU 转写时，按 worker/requirements-openvino.txt 在项目目录建立 .venv-ov，然后点击“重新检查”",
     "params": []
   },
+  "check.hint_ov_model_dev": {
+    "zh": "把转换好的 OpenVINO 模型放到 {path}，或先在这台电脑上转写一节课（会自动准备模型），然后点击“重新检查”",
+    "params": [
+      "path"
+    ]
+  },
   "check.hint_pip": {
     "zh": "在项目的 .venv 中执行 pip install -r worker/requirements.txt",
     "params": []
@@ -361,6 +701,14 @@
   },
   "check.hint_python_version": {
     "zh": "需要 Python 3.10 或更新版本",
+    "params": []
+  },
+  "check.hint_repair_local": {
+    "zh": "在设置的“组件”中修复本地转写组件，然后点击“重新检查”",
+    "params": []
+  },
+  "check.hint_repair_openvino": {
+    "zh": "在设置的“组件”中修复“Intel 转写（OpenVINO）”，然后点击“重新检查”",
     "params": []
   },
   "check.hint_role_model_unlisted": {
@@ -483,6 +831,12 @@
     "zh": "没有安装“Intel 转写（OpenVINO）”组件。Intel 核显与 NPU 不可用，不影响其他设备转写",
     "params": []
   },
+  "check.openvino_venv_absent": {
+    "zh": "没有找到 OpenVINO 环境（{path}）。Intel 核显与 NPU 不可用",
+    "params": [
+      "path"
+    ]
+  },
   "check.openvino_venv_missing": {
     "zh": "没有找到 OpenVINO 环境（{path}）。Intel 核显与 NPU 不可用，不影响 CUDA 转写",
     "params": [
@@ -533,6 +887,17 @@
     "params": [
       "error"
     ]
+  },
+  "check.selftest_no_model": {
+    "zh": "未运行：没有 Whisper {model}（{precision}）的模型文件",
+    "params": [
+      "model",
+      "precision"
+    ]
+  },
+  "check.selftest_not_installed": {
+    "zh": "未运行：还没有安装本地转写组件",
+    "params": []
   },
   "check.selftest_ok": {
     "zh": "自检通过",
@@ -649,6 +1014,13 @@
       "max"
     ]
   },
+  "data_dir.restrict_failed": {
+    "zh": "没能收紧数据目录 {path} 的权限：{error}",
+    "params": [
+      "path",
+      "error"
+    ]
+  },
   "data_dir.same_dir": {
     "zh": "这就是现在的数据目录，请选择另一个文件夹",
     "params": []
@@ -681,6 +1053,13 @@
     "zh": "复制后的数据没有通过校验（{what}）。原来的数据没有改动，可以重试",
     "params": [
       "what"
+    ]
+  },
+  "data_import.network_path": {
+    "zh": "要导入的资料库里有 {count} 个文件路径指向网络共享或其他电脑（例如 {path}），不在这个数据目录之内。为了不让 LectureFlow 自动连接其他电脑，不能导入。如果这个数据目录本身就在网络共享上，请用当初使用的同一路径选择它",
+    "params": [
+      "count",
+      "path"
     ]
   },
   "data_import.not_fresh": {
@@ -952,9 +1331,21 @@
     "zh": "文件不完整或已损坏",
     "params": []
   },
+  "media.encoder_failed": {
+    "zh": "视频编码器在转码时出错（不是文件损坏），可以重试",
+    "params": [
+      "tried"
+    ]
+  },
   "media.failed": {
     "zh": "处理这个文件时出错",
     "params": []
+  },
+  "media.format_rejected": {
+    "zh": "媒体文件的实际格式（{format}）不是支持的音视频格式，可能会读取其他文件。为安全起见不处理这个文件，请先转换为 MP4、MKV、MP3 等常见格式后重新上传",
+    "params": [
+      "format"
+    ]
   },
   "media.generating": {
     "zh": "正在生成播放文件，完成前可以先用音频模式播放",
@@ -1101,6 +1492,30 @@
       "extra"
     ]
   },
+  "remote_server.busy": {
+    "zh": "这台远程服务器正在转写，请等它结束或先取消再改",
+    "params": []
+  },
+  "remote_server.credentials_unavailable": {
+    "zh": "本机的凭据存储不可用，无法为远程服务器生成或读取密钥。请查看“诊断”页",
+    "params": []
+  },
+  "remote_server.exists": {
+    "zh": "已经有一台同名（{id}）的远程服务器",
+    "params": [
+      "id"
+    ]
+  },
+  "remote_server.invalid": {
+    "zh": "远程服务器的设置无效（{field}）",
+    "params": [
+      "field"
+    ]
+  },
+  "remote_server.not_found": {
+    "zh": "找不到这台远程服务器（可能已被移除），请刷新页面",
+    "params": []
+  },
   "request.bad_json": {
     "zh": "请求格式错误：需要 JSON",
     "params": []
@@ -1123,6 +1538,27 @@
     "zh": "没有要修改的内容（{fields}）",
     "params": [
       "fields"
+    ]
+  },
+  "rerun.other_course": {
+    "zh": "这节讲座不属于这门课程",
+    "params": []
+  },
+  "rerun.skipped_busy": {
+    "zh": "{stage}正在运行，等它结束后才能重跑",
+    "params": [
+      "stage"
+    ]
+  },
+  "rerun.skipped_draft": {
+    "zh": "这节讲座还没有启动（草稿），不重跑",
+    "params": []
+  },
+  "rerun.skipped_status": {
+    "zh": "{stage}当前为{status}，只有已完成或已过期的阶段可以重跑",
+    "params": [
+      "stage",
+      "status"
     ]
   },
   "resume.bad_position": {
@@ -1356,6 +1792,20 @@
     "zh": "上传中断",
     "params": []
   },
+  "upload.media_format": {
+    "zh": "“{name}”的实际格式（{format}）不是支持的音视频格式，可能会读取其他文件。为安全起见不接受这个文件，请先转换为 MP4、MKV、MP3 等常见格式",
+    "params": [
+      "name",
+      "format"
+    ]
+  },
+  "upload.media_playlist": {
+    "zh": "“{name}”是播放列表或清单（{kind}），里面只是指向其他文件的路径，不是录音录像本身。为安全起见不接受这类文件，请上传实际的音频或视频文件",
+    "params": [
+      "name",
+      "kind"
+    ]
+  },
   "upload.multiple_files": {
     "zh": "一次只能上传一个文件",
     "params": []
@@ -1373,6 +1823,13 @@
     "params": [
       "free_bytes",
       "keep_bytes"
+    ]
+  },
+  "upload.not_media": {
+    "zh": "“{name}”不是支持的音频或视频文件。支持的扩展名：{exts}",
+    "params": [
+      "name",
+      "exts"
     ]
   },
   "upload.not_multipart": {
@@ -1413,6 +1870,29 @@
     "zh": "文件超过 {max_bytes} 上限",
     "params": [
       "max_bytes"
+    ]
+  },
+  "week_override.kind_invalid": {
+    "zh": "未知的归属方式：{kind}（应为 supplement 或 makeup）",
+    "params": [
+      "kind"
+    ]
+  },
+  "week_override.no_term_start": {
+    "zh": "这门课还没有开课日期，算不出教学周；请先在课程设置中填写开课日期",
+    "params": []
+  },
+  "week_override.not_material": {
+    "zh": "只有课程补充内容（补充材料、往期讲座等）可以挂到某一周下",
+    "params": [
+      "kind"
+    ]
+  },
+  "week_override.week_invalid": {
+    "zh": "周次 {week} 无效：应为 1–{max}",
+    "params": [
+      "week",
+      "max"
     ]
   }
 }

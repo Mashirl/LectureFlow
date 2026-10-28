@@ -13,7 +13,8 @@ const SECTIONS = [
   { id: 'sent', icon: 'server', items: 4 },
   { id: 'keys', icon: 'key-round', items: 2 },
   { id: 'downloads', icon: 'download', items: 2 },
-  { id: 'colab', icon: 'cpu', items: 1 },
+  { id: 'colab', icon: 'cpu', items: 2 },
+  { id: 'ext', icon: 'plug', items: 3 },
   { id: 'none', icon: 'shield-check', items: 3 },
   { id: 'delete', icon: 'trash-2', items: 2 },
 ];

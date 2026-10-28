@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,10 +16,20 @@ import (
 
 // SPDX header check (SPEC-v3 V7): every tracked source file must carry
 // "SPDX-License-Identifier: AGPL-3.0-or-later" in its first six lines.
+//
+// The identifier stays plain AGPL-3.0-or-later, also in the files that the
+// additional permission concerns: SPDX 2.x accepts only exceptions from the
+// SPDX list after WITH, and the permission (LICENSE-EXCEPTION.md) applies
+// to LectureFlow as a whole, so marking only some files with an SPDX 3
+// "WITH AdditionRef-" would suggest that the others lack it. Instead, the
+// Python sources of the transcription workers, which load the libraries
+// that the permission names, carry exceptionNotice as well
+// (CheckExceptionNotice; user decision 2026-10-27).
 
 const (
-	spdxTag       = "SPDX-License-Identifier: AGPL-3.0-or-later"
-	spdxHeadLines = 6
+	spdxTag         = "SPDX-License-Identifier: AGPL-3.0-or-later"
+	spdxHeadLines   = 6
+	exceptionNotice = "Additional permission under AGPL-3.0 section 7: see " + exceptionFile
 )
 
 var spdxExts = map[string]bool{
@@ -26,10 +37,13 @@ var spdxExts = map[string]bool{
 	".html": true, ".sql": true, ".ps1": true, ".sh": true,
 }
 
-// spdxExcluded: third-party code, fixtures and documentation.
+// spdxExcluded: third-party code, fixtures and documentation. The
+// extension's vendor directory holds third-party files only; the dependency
+// audit fails on any file there that packaging/licenses/extension.json does
+// not register (extension.go).
 func spdxExcluded(rel string) bool {
 	rel = filepath.ToSlash(rel)
-	for _, p := range []string{"web/vendor/", "docs/", "desktop/node_modules/"} {
+	for _, p := range []string{"web/vendor/", "docs/", "desktop/node_modules/", extVendorDir + "/"} {
 		if strings.HasPrefix(rel, p) {
 			return true
 		}
@@ -61,12 +75,38 @@ func gitTrackedFiles(root string) ([]string, error) {
 
 // CheckSPDX returns the source files (relative paths) without the header.
 func CheckSPDX(root string, files []string) ([]string, error) {
+	return checkHeads(root, files, func(rel string) bool {
+		return spdxExts[strings.ToLower(filepath.Ext(rel))] && !spdxExcluded(rel)
+	}, spdxTag)
+}
+
+// needsExceptionNotice: the Python sources of worker/, without the tests
+// (conftest.py, test_*.py, *_test.py), which are not part of the workers
+// that LectureFlow ships.
+func needsExceptionNotice(rel string) bool {
+	rel = filepath.ToSlash(rel)
+	if !strings.HasPrefix(rel, "worker/") || strings.ToLower(path.Ext(rel)) != ".py" || spdxExcluded(rel) {
+		return false
+	}
+	base := strings.ToLower(path.Base(rel))
+	return base != "conftest.py" && !strings.HasPrefix(base, "test_") && !strings.HasSuffix(base, "_test.py")
+}
+
+// CheckExceptionNotice returns the worker sources (relative paths) without
+// exceptionNotice in their first lines.
+func CheckExceptionNotice(root string, files []string) ([]string, error) {
+	return checkHeads(root, files, needsExceptionNotice, exceptionNotice)
+}
+
+// checkHeads returns the files selected by want whose first spdxHeadLines
+// lines do not contain tag. Files deleted in the working tree are skipped.
+func checkHeads(root string, files []string, want func(string) bool, tag string) ([]string, error) {
 	var missing []string
 	for _, rel := range files {
-		if !spdxExts[strings.ToLower(filepath.Ext(rel))] || spdxExcluded(rel) {
+		if !want(rel) {
 			continue
 		}
-		ok, err := hasSPDX(filepath.Join(root, filepath.FromSlash(rel)))
+		ok, err := headContains(filepath.Join(root, filepath.FromSlash(rel)), tag)
 		if os.IsNotExist(err) {
 			continue // deleted in the working tree
 		}
@@ -81,8 +121,8 @@ func CheckSPDX(root string, files []string) ([]string, error) {
 	return missing, nil
 }
 
-func hasSPDX(path string) (bool, error) {
-	f, err := os.Open(path)
+func headContains(file, tag string) (bool, error) {
+	f, err := os.Open(file)
 	if err != nil {
 		return false, err
 	}
@@ -97,7 +137,7 @@ func hasSPDX(path string) (bool, error) {
 		lines = lines[:spdxHeadLines]
 	}
 	for _, l := range lines {
-		if strings.Contains(l, spdxTag) {
+		if strings.Contains(l, tag) {
 			return true, nil
 		}
 	}

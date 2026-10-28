@@ -30,7 +30,7 @@
        "channel": "shell",
        "msg_type": "execute_request",
        "content_contains": {
-        "code": "colab_remote.py"
+        "code": "'--attach'"
        },
        "content": {
         "silent": false,
@@ -49,10 +49,13 @@
       }
      },
      {
+      "after": "upload job.json"
+     },
+     {
       "stdout_lines": [
        {
         "type": "stage",
-        "ts": 1793260800.0,
+        "ts": 1793260880.0,
         "stage": "check"
        }
       ]
@@ -61,6 +64,93 @@
       "stdout_raw": "Welcome to the lecture.\n"
      }
     ]
+   }
+  },
+  {
+   "name": "upload audio chunk 1",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload audio last chunk",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": -1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload job.json",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": null
+    }
    }
   },
   {
@@ -76,7 +166,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete audio.wav",
@@ -91,7 +182,8 @@
    },
    "response": {
     "status": 404
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete job.json",
@@ -106,7 +198,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json",
@@ -121,7 +214,8 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete result.json.tmp",
@@ -136,7 +230,8 @@
    },
    "response": {
     "status": 404
-   }
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete stderr.log",
@@ -151,7 +246,40 @@
    },
    "response": {
     "status": 204
-   }
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete events",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/events",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
+  },
+  {
+   "name": "cleanup: delete job.log",
+   "request": {
+    "method": "DELETE",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.log",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    }
+   },
+   "response": {
+    "status": 204
+   },
+   "group": "cleanup"
   },
   {
    "name": "cleanup: delete the job directory",

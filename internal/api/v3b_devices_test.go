@@ -851,7 +851,7 @@ func TestSystemDevicesAndOpenVINO(t *testing.T) {
 		names = append(names, c.Name)
 	}
 	joined := strings.Join(names, ",")
-	if !strings.Contains(joined, "gpu,cuda,openvino_venv,openvino,openvino_devices,npu_driver,") || !strings.HasSuffix(joined, ",disk") {
+	if !strings.Contains(joined, "gpu,cudnn,cuda,openvino_venv,openvino,openvino_devices,npu_driver,") || !strings.HasSuffix(joined, ",disk") { // ext-step1: cudnn
 		t.Fatalf("check order %s", joined)
 	}
 	by := checksByName(sys)
@@ -887,6 +887,9 @@ func TestOpenVINOCheckOutcomes(t *testing.T) {
 	}
 	set := func(det devices.Detection) map[string]SystemCheck {
 		t.Helper()
+		// ext-step1: the reference laptop's NVIDIA GPU still answers (a
+		// cuda:0 row alone no longer means an NVIDIA GPU)
+		det.CUDAName = nvidiaName
 		de.reg.mu.Lock()
 		de.reg.det = det
 		de.reg.mu.Unlock()

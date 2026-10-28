@@ -1871,7 +1871,12 @@ func TestSelfTestPreemptedByJobWithoutOtherDevice(t *testing.T) {
 	l := de.lectureOn(autoOn(igpu))
 	de.s.Kick()
 	de.waitRunningOn(l, model.DeviceOVGPU)
-	if d := time.Since(t0); d > time.Second {
+	// At once: the candidate never finishes by itself, so without the
+	// preemption the job would not start at all. The bound includes the
+	// lecture's launch, its prep and a few scans: 1 s was too tight on a
+	// loaded machine (a full go test round next to the load tests,
+	// 2026-10-28: 1.1 s).
+	if d := time.Since(t0); d > 3*time.Second {
 		t.Fatalf("the job waited %v for the self-test", d)
 	}
 	if st, _ := de.s.DeviceTest(model.DeviceOVGPU); st.State != DeviceTestWaiting {

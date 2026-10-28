@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "id": "panopto",
+  "version": "1.1.1",
+  "name": "Panopto",
+  "maintainers": ["@ShouldBeQuincy"],
+  "match": {
+    "hosts": [
+      "*.hosted.panopto.com",
+      "*.cloud.panopto.eu",
+      "*.ap.panopto.com",
+      "*.au.panopto.com",
+      "*.ca.panopto.com",
+      "*.panopto.com",
+      "*.panopto.eu"
+    ],
+    "pathPattern": "^/Panopto/Pages/(Viewer|Embed)\\.aspx$"
+  },
+  "session": {
+    "idFrom": { "query": "id" }
+  },
+  "lecture": {
+    "title": [
+      { "selector": "h1#deliveryTitle" },
+      { "selector": "h1#title .title-text" },
+      { "selector": "meta[property=\"og:title\"]", "attr": "content" },
+      { "selector": "title", "pattern": "^(?!Panopto Viewer$)(.+)$" },
+      { "observed": "sessionName" }
+    ],
+    "recordedAt": [
+      { "selector": "h1#deliveryTitle", "pattern": "([A-Z][a-z]{2} \\d{1,2} \\d{1,2}:\\d{2}(?::\\d{2})? [A-Z]{2,5} \\d{4})\\s*$" },
+      { "selector": "h1#title .title-text", "pattern": "([A-Z][a-z]{2} \\d{1,2} \\d{1,2}:\\d{2}(?::\\d{2})? [A-Z]{2,5} \\d{4})\\s*$" },
+      { "selector": "meta[property=\"og:title\"]", "attr": "content", "pattern": "([A-Z][a-z]{2} \\d{1,2} \\d{1,2}:\\d{2}(?::\\d{2})? [A-Z]{2,5} \\d{4})\\s*$" },
+      { "selector": "title", "pattern": "([A-Z][a-z]{2} \\d{1,2} \\d{1,2}:\\d{2}(?::\\d{2})? [A-Z]{2,5} \\d{4})\\s*$" },
+      { "observed": "sessionName", "pattern": "([A-Z][a-z]{2} \\d{1,2} \\d{1,2}:\\d{2}(?::\\d{2})? [A-Z]{2,5} \\d{4})\\s*$" }
+    ],
+    "durationSec": { "observed": "duration" }
+  },
+  "tracks": [
+    {
+      "role": "podcast",
+      "label": { "zh-CN": "完整录像（MP4）", "en": "Full recording (MP4)", "zh-TW": "完整錄影（MP4）", "yue-Hant-HK": "完整錄影（MP4）", "ru": "Полная запись (MP4)", "hi": "पूरी रिकॉर्डिंग (MP4)" },
+      "hint": { "zh-CN": "画面 + 声音，一个文件", "en": "Picture and sound in one file", "zh-TW": "畫面 + 聲音，一個檔案", "yue-Hant-HK": "畫面 + 聲音，一個檔案", "ru": "Видео и звук в одном файле", "hi": "वीडियो और आवाज़, एक ही फ़ाइल में" },
+      "detect": { "fromResponse": "podcastUrl", "kind": "video", "format": "file" },
+      "recommended": true,
+      "supersedes": ["primary-audio", "primary-video", "screen"]
+    },
+    {
+      "role": "primary-audio",
+      "label": { "zh-CN": "主讲音频", "en": "Lecture audio", "zh-TW": "主講音訊", "yue-Hant-HK": "主講聲音", "ru": "Аудио лекции", "hi": "लेक्चर का ऑडियो" },
+      "hint": { "zh-CN": "只要转写时最小", "en": "Smallest; enough to transcribe", "zh-TW": "檔案最小，轉錄用它就夠", "yue-Hant-HK": "檔案最細，轉錄有佢就夠", "ru": "Самый маленький; для расшифровки хватит", "hi": "सबसे छोटा; ट्रांसक्रिप्शन के लिए काफ़ी" },
+      "detect": {
+        "urlPattern": "/sessions/[0-9a-f-]{36}/[0-9a-f-]{36}(-[0-9a-f-]{36})?\\.hls/master\\.m3u8$",
+        "kind": "audio",
+        "format": "hls",
+        "fromResponse": "streamUrls",
+        "responseWhen": { "observed": "primaryAudioOnly", "equals": true }
+      },
+      "recommended": true
+    },
+    {
+      "role": "primary-video",
+      "label": { "zh-CN": "主讲视频", "en": "Lecture video", "zh-TW": "主講影片", "yue-Hant-HK": "主講影片", "ru": "Видео лекции", "hi": "लेक्चर का वीडियो" },
+      "detect": {
+        "urlPattern": "/sessions/[0-9a-f-]{36}/[0-9a-f-]{36}(-[0-9a-f-]{36})?\\.hls/master\\.m3u8$",
+        "kind": "video",
+        "format": "hls",
+        "fromResponse": "streamUrls",
+        "responseWhen": { "observed": "primaryAudioOnly", "equals": false }
+      },
+      "recommended": true
+    },
+    {
+      "role": "screen",
+      "label": { "zh-CN": "屏幕录像", "en": "Screen capture", "zh-TW": "螢幕錄影", "yue-Hant-HK": "螢幕錄影", "ru": "Запись экрана", "hi": "स्क्रीन रिकॉर्डिंग" },
+      "detect": {
+        "urlPattern": "/sessions/[0-9a-f-]{36}/[0-9a-f-]{36}\\.object\\.hls/master\\.m3u8$",
+        "kind": "video",
+        "format": "hls",
+        "fromResponse": "streamUrls"
+      },
+      "recommended": false
+    }
+  ],
+  "presets": { "full": ["podcast"], "audio": ["primary-audio"] },
+  "observe": [
+    {
+      "urlPattern": "/Panopto/Pages/Viewer/DeliveryInfo\\.aspx$",
+      "pointers": {
+        "downloadUrl": "/DownloadUrl",
+        "podcastUrl": "/Delivery/PodcastStreams/*/StreamUrl",
+        "streamUrls": "/Delivery/Streams/*/StreamUrl",
+        "primaryAudioOnly": "/Delivery/IsPrimaryAudioOnly",
+        "sessionName": "/Delivery/SessionName",
+        "duration": "/Delivery/Duration"
+      }
+    }
+  ],
+  "sessionInfo": {
+    "observe": 0,
+    "method": "POST",
+    "path": "/Panopto/Pages/Viewer/DeliveryInfo.aspx",
+    "form": {
+      "deliveryId": "{sessionId}",
+      "invocationId": "",
+      "isLiveNotes": "false",
+      "refreshAuthCookie": "true",
+      "isActiveBroadcast": "false",
+      "isEditing": "false",
+      "isKollectiveAgentInstalled": "false",
+      "isEmbed": "false",
+      "responseType": "json"
+    }
+  },
+  "inpage": {
+    "player": [
+      { "anchor": "#header-right-react", "position": "before" },
+      { "anchor": "h1#title", "position": "append", "compact": true }
+    ],
+    "list": {
+      "pathPattern": "^/Panopto/Pages/Sessions/List\\.aspx$",
+      "row": "tr.list-view-row",
+      "idAttr": "id",
+      "idPattern": "^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$",
+      "anchor": ".item-title",
+      "title": "a.detail-title",
+      "header": [{ "anchor": ".subscribe-button", "position": "before" }]
+    }
+  },
+  "downloadPolicy": {
+    "disabledWhen": { "observed": "downloadUrl", "empty": true }
+  },
+  "request": {
+    "sendReferer": true,
+    "cookieUrls": [],
+    "maxConnectionsPerFile": 4
+  },
+  "fixtures": "fixtures/panopto/"
+}

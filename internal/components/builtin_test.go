@@ -131,19 +131,23 @@ func TestBuiltinManifestOpens(t *testing.T) {
 }
 
 // Every preset provider names its limits and where they come from; DeepSeek
-// has those of the development configuration (config.example.toml: 8
-// concurrent requests, 300 per minute; V12.2 acceptance issue 2).
+// has those of the development configuration (config.example.toml: 64
+// concurrent requests, no per-minute limit; perf-llm, NOTES.md — was 8 / 300
+// since V12.2 acceptance issue 2). rpm 0 = no per-minute limit.
 func TestShippedPresetLimits(t *testing.T) {
 	m, err := LoadManifest(builtinManifest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, p := range m.Presets.Providers {
-		if p.MaxConcurrency < 1 || p.RPM < 1 || len(p.Refs) == 0 {
+		if p.MaxConcurrency < 1 || p.RPM < 0 || len(p.Refs) == 0 {
 			t.Errorf("%s: max_concurrency %d, rpm %d, refs %v", p.ID, p.MaxConcurrency, p.RPM, p.Refs)
 		}
-		if p.ID == "deepseek" && (p.MaxConcurrency != 8 || p.RPM != 300) {
-			t.Errorf("deepseek: %d / %d, want 8 / 300", p.MaxConcurrency, p.RPM)
+		if p.ID == "deepseek" && (p.MaxConcurrency != 64 || p.RPM != 0) {
+			t.Errorf("deepseek: %d / %d, want 64 / 0 (no per-minute limit)", p.MaxConcurrency, p.RPM)
+		}
+		if p.ID != "deepseek" && p.RPM < 1 {
+			t.Errorf("%s: free channels have per-minute limits (rpm %d)", p.ID, p.RPM)
 		}
 		if p.Free && p.MaxConcurrency > 2 {
 			t.Errorf("%s: a free channel should stay conservative (max_concurrency %d)", p.ID, p.MaxConcurrency)

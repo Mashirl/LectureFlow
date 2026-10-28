@@ -4,6 +4,7 @@
 package colab
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -14,6 +15,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"lectureflow/internal/procutil"
 )
 
 // The upload is the lecture's audio.wav (prep's 16 kHz mono PCM) re-encoded
@@ -29,7 +32,11 @@ func runFFmpeg(ctx context.Context, ffmpeg string, args []string) error {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ffmpeg, args...)
 	hideWindow(cmd)
-	out, err := cmd.CombinedOutput()
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	err := procutil.Run(cmd, procutil.Tied) // ends with LectureFlow, also on a crash (test-chaos 1)
+	out := buf.Bytes()
 	if err != nil {
 		if len(out) > 400 {
 			out = out[len(out)-400:]
@@ -79,14 +86,23 @@ func prepareAudio(ctx context.Context, run FFmpegRunner, ffmpeg, wav, workDir st
 			logf("colab: FLAC encoding failed; uploading the WAV", "err", err.Error())
 		}
 	}
+	// A FLAC that cannot be read back goes at once (the caller only
+	// removes the temporary file of an upload it got).
+	drop := func() {
+		if p.Temp {
+			_ = os.Remove(p.Path)
+		}
+	}
 	f, err := os.Open(p.Path)
 	if err != nil {
+		drop()
 		return preparedAudio{}, newErr(CodeAudioMissing, map[string]any{"file": filepath.Base(p.Path)}, kindLocal, "", err)
 	}
-	defer f.Close()
 	h := sha256.New()
 	data, err := io.ReadAll(io.TeeReader(f, h))
+	f.Close()
 	if err != nil {
+		drop()
 		return preparedAudio{}, err
 	}
 	p.Data = data

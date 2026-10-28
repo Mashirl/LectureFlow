@@ -23,6 +23,8 @@ var knownAccelerators = []string{"NONE", "G4", "T4", "L4", "A100", "H100", "V5E1
 
 // Tiers (V14.1): paid = compute units, the recommended use; free = best
 // effort (no balance check, the runtime may be taken back at any time).
+// colab-obs-core: the tier follows the account (account.go: paid with a
+// paid balance > 0, else free); the user no longer picks it.
 const (
 	TierPaid = "paid"
 	TierFree = "free"
@@ -35,9 +37,22 @@ const FairWindow = 4 * time.Hour
 
 // Settings of the Colab backend (kv colab.settings).
 type Settings struct {
-	// Accelerator requested from Colab (Accelerators).
+	// Accelerator requested from Colab (Accelerators). Until the user
+	// picks one (AcceleratorChosen) it follows the account's level: L4 when
+	// paid (user decision 2026-10-27 05:40: faster than a T4 at about the
+	// same cost per lecture), T4 when free (its only GPU); stored as T4.
+	// A pick the account does not allow (account.go) stays the user's
+	// choice while a T4 is borrowed.
 	Accelerator string `json:"accelerator"`
-	// Tier: TierPaid (balance checked before every lecture) or TierFree.
+	// AcceleratorChosen: the user picked Accelerator on the settings page;
+	// a choice is never replaced by the tier's default. Settings stored
+	// before this field existed count as not chosen.
+	AcceleratorChosen bool `json:"accelerator_chosen,omitempty"`
+	// Tier is the account's (colab-obs-core, user decision 2026-10-27: no
+	// switch any more): Backend.Settings and UserSettings report it, stored
+	// settings and PUT /api/colab/settings may carry it and it is ignored
+	// (always stored as ""). TierPaid: the balance is checked before every
+	// lecture; TierFree: best effort.
 	Tier string `json:"tier"`
 	// MaxQueueWaitMin: how long to wait for the accelerator before the
 	// lecture goes back to the local devices (V14.3 step 1). 1..720.
@@ -56,14 +71,40 @@ type Settings struct {
 	// the accelerators that only have one shape (upstream
 	// HIGH_MEM_ONLY_ACCELERATORS: L4).
 	HighMem bool `json:"high_mem"`
+	// FastMode is "极速模式" (user decision 2026-10-27 05:40, off by
+	// default): on the larger GPUs (L4, A100, G4, H100) each lecture is cut
+	// into parts at silences that transcribe at once; the result differs
+	// slightly from the whole lecture's (colab-prof §9.3). No effect on a
+	// T4. Off: the larger GPUs transcribe two lectures at once instead.
+	FastMode bool `json:"fast_mode,omitempty"`
+}
+
+// DefaultAccelerator is the accelerator of a tier (the account's level)
+// while the user has not picked one.
+func DefaultAccelerator(tier string) string {
+	if tier == TierFree {
+		return "T4"
+	}
+	return "L4"
 }
 
 // DefaultSettings are the settings without a stored value.
 func DefaultSettings() Settings {
 	return Settings{
-		Accelerator: "T4", Tier: TierPaid, MaxQueueWaitMin: 30, Model: "large-v3", ComputeType: "float16",
+		Accelerator: DefaultAccelerator(TierFree), MaxQueueWaitMin: 30, Model: "large-v3", ComputeType: "float16",
 		IdleReleaseMin: 5, WindowCooldownMin: 60,
 	}
+}
+
+// normalized is the stored form: no tier (the account's), an accelerator
+// the user has not picked stored as the free level's (Backend.UserSettings
+// shows the account level's default).
+func (s Settings) normalized() Settings {
+	s.Tier = ""
+	if !s.AcceleratorChosen {
+		s.Accelerator = DefaultAccelerator(TierFree)
+	}
+	return s
 }
 
 var (
@@ -81,7 +122,7 @@ func (s Settings) Validate() error {
 	switch {
 	case !slices.Contains(Accelerators, s.Accelerator):
 		return bad("accelerator")
-	case s.Tier != TierPaid && s.Tier != TierFree:
+	case s.Tier != "" && s.Tier != TierPaid && s.Tier != TierFree:
 		return bad("tier")
 	case s.MaxQueueWaitMin < 1 || s.MaxQueueWaitMin > 720:
 		return bad("max_queue_wait_min")
@@ -133,11 +174,12 @@ func LoadSettings(ctx context.Context, kv KV) (Settings, error) {
 			}
 		}
 	}
-	return s, nil
+	return s.normalized(), nil
 }
 
 // SaveSettings validates and stores s.
 func SaveSettings(ctx context.Context, kv KV, s Settings) error {
+	s = s.normalized()
 	if err := s.Validate(); err != nil {
 		return err
 	}

@@ -6,9 +6,12 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"log/slog"
 	"strings"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/secrets"
 )
 
 // v1.1 queries (migrations/003_v1_1.sql).
@@ -112,8 +115,11 @@ func scanProvider(sc interface{ Scan(...any) error }) (model.Provider, error) {
 	var in, hit, out sql.NullFloat64
 	var cur, tariff sql.NullString
 	var offpeak int
-	err := sc.Scan(&p.ID, &p.Name, &p.Type, &p.BaseURL, &p.APIKey, &p.MaxConcurrency, &p.RPM, &p.BalanceAPI,
+	var key string
+	err := sc.Scan(&p.ID, &p.Name, &p.Type, &p.BaseURL, &key, &p.MaxConcurrency, &p.RPM, &p.BalanceAPI,
 		&in, &hit, &out, &cur, &p.CreatedAt, &tariff, &offpeak)
+	// cred-enc (sealed.go): the plain key; "" when no key opens it
+	p.APIKey = openProviderKey(p.ID, key)
 	p.PriceInput, p.PriceCacheHit, p.PriceOutput, p.Currency = floatPtr(in), floatPtr(hit), floatPtr(out), strPtr(cur)
 	p.Tariff, p.OffpeakOnly = strPtr(tariff), offpeak != 0
 	return p, err
@@ -145,25 +151,118 @@ func (s *sqlStore) InsertProvider(ctx context.Context, p model.Provider) error {
 	if p.CreatedAt == "" {
 		p.CreatedAt = Now()
 	}
-	_, err := s.q.ExecContext(ctx, `INSERT INTO provider (`+providerCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		p.ID, p.Name, p.Type, p.BaseURL, p.APIKey, p.MaxConcurrency, p.RPM, p.BalanceAPI,
+	key, err := sealStored(p.APIKey) // cred-enc: stored sealed
+	if err != nil {
+		return err
+	}
+	_, err = s.q.ExecContext(ctx, `INSERT INTO provider (`+providerCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		p.ID, p.Name, p.Type, p.BaseURL, key, p.MaxConcurrency, p.RPM, p.BalanceAPI,
 		nullFloat(p.PriceInput), nullFloat(p.PriceCacheHit), nullFloat(p.PriceOutput), nullStr(p.Currency), p.CreatedAt,
 		nullStr(p.Tariff), boolInt(p.OffpeakOnly))
 	return duplicate(err)
 }
 
-func (s *sqlStore) UpdateProvider(ctx context.Context, p model.Provider) error {
-	res, err := s.q.ExecContext(ctx, `UPDATE provider SET name = ?, type = ?, base_url = ?, api_key = ?, max_concurrency = ?,
+// storedProviderKey is the provider's api_key column as stored (sealed).
+func (s *sqlStore) storedProviderKey(ctx context.Context, id string) (string, error) {
+	var v string
+	err := s.q.QueryRowContext(ctx, `SELECT api_key FROM provider WHERE id = ?`, id).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil // affectedOrNotFound reports the missing row
+	}
+	return v, err
+}
+
+const updateProviderSet = `UPDATE provider SET name = ?, type = ?, base_url = ?, max_concurrency = ?,
 		rpm = ?, balance_api = ?, price_input = ?, price_cache_hit = ?, price_output = ?, currency = ?,
-		tariff = ?, offpeak_only = ? WHERE id = ?`,
-		p.Name, p.Type, p.BaseURL, p.APIKey, p.MaxConcurrency, p.RPM, p.BalanceAPI,
+		tariff = ?, offpeak_only = ?`
+
+func updateProviderArgs(p model.Provider) []any {
+	return []any{p.Name, p.Type, p.BaseURL, p.MaxConcurrency, p.RPM, p.BalanceAPI,
 		nullFloat(p.PriceInput), nullFloat(p.PriceCacheHit), nullFloat(p.PriceOutput), nullStr(p.Currency),
-		nullStr(p.Tariff), boolInt(p.OffpeakOnly), p.ID)
+		nullStr(p.Tariff), boolInt(p.OffpeakOnly)}
+}
+
+// UpdateProvider writes p. cred-enc / sec2-app L5: an unchanged key keeps
+// its stored (sealed) value; a key that changes, or is removed, replaces
+// the old one on the secure path (secure_delete, VACUUM, TRUNCATE
+// checkpoint), so the old key leaves no copy in free pages or the WAL.
+// Inside a transaction (VACUUM cannot run there) it is a plain UPDATE.
+func (s *sqlStore) UpdateProvider(ctx context.Context, p model.Provider) error {
+	old, err := s.storedProviderKey(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	key := old
+	plainOld, unreadable := openStored(old)
+	// a plain stored key (written without a data key) is sealed now, also
+	// when it stays the same; its plain copy goes on the secure path
+	changed := unreadable || plainOld != p.APIKey || (old != "" && !secrets.IsSealed(old) && secrets.HasKey())
+	if changed {
+		if key, err = sealStored(p.APIKey); err != nil {
+			return err
+		}
+	}
+	args := append(updateProviderArgs(p), key, p.ID)
+	q := updateProviderSet + `, api_key = ? WHERE id = ?`
+	if !changed || old == "" || s.tx != nil {
+		res, err := s.q.ExecContext(ctx, q, args...)
+		return affectedOrNotFound(res, duplicate(err))
+	}
+	var res sql.Result
+	compactErr, err := secureWrite(ctx, s.db, func(ctx context.Context, c *sql.Conn) error {
+		var err error
+		res, err = c.ExecContext(ctx, q, args...)
+		return err
+	})
+	if err != nil {
+		return duplicate(err)
+	}
+	if compactErr != nil {
+		// The new key is stored; the old one may stay in the WAL until the
+		// next checkpoint (another connection was reading).
+		slog.Warn("db: the replaced API key may remain in the database's WAL until the next checkpoint", "provider", p.ID, "err", compactErr)
+	}
+	return affectedOrNotFound(res, nil)
+}
+
+// UpdateProviderKeepKey writes p except its key: the stored key stays as it
+// is, also one that cannot be decrypted here (settings: a provider whose key
+// has to be entered again keeps it while other fields change, so a key file
+// that is put back still opens it).
+func (s *sqlStore) UpdateProviderKeepKey(ctx context.Context, p model.Provider) error {
+	res, err := s.q.ExecContext(ctx, updateProviderSet+` WHERE id = ?`, append(updateProviderArgs(p), p.ID)...)
 	return affectedOrNotFound(res, duplicate(err))
 }
 
+// ProviderKeyKeeper is the optional Store method UpdateProviderKeepKey.
+type ProviderKeyKeeper interface {
+	UpdateProviderKeepKey(ctx context.Context, p model.Provider) error
+}
+
+// DeleteProvider deletes the provider; one with a key on the secure path
+// (L5) unless inside a transaction (the caller then runs
+// ScrubFreedSecrets after it).
 func (s *sqlStore) DeleteProvider(ctx context.Context, id string) error {
-	return affectedOrNotFound(s.q.ExecContext(ctx, `DELETE FROM provider WHERE id = ?`, id))
+	old, err := s.storedProviderKey(ctx, id)
+	if err != nil {
+		return err
+	}
+	if old == "" || s.tx != nil {
+		return affectedOrNotFound(s.q.ExecContext(ctx, `DELETE FROM provider WHERE id = ?`, id))
+	}
+	var res sql.Result
+	compactErr, err := secureWrite(ctx, s.db, func(ctx context.Context, c *sql.Conn) error {
+		var err error
+		res, err = c.ExecContext(ctx, `DELETE FROM provider WHERE id = ?`, id)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if compactErr != nil {
+		slog.Warn("db: the deleted API key may remain in the database's WAL until the next checkpoint", "provider", id, "err", compactErr)
+	}
+	return affectedOrNotFound(res, nil)
 }
 
 // ---------- role_setting ----------

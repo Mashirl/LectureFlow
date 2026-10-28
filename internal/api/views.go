@@ -430,6 +430,7 @@ func (s *Server) stageViews(scope string, jobs []model.Job, mediaDeleted bool, t
 			w := wait
 			v.WaitingFor = &w
 		}
+		v.AllowedActions = withUseColab(j, wait, v.AllowedActions)
 		switch j.Status {
 		case model.StatusDone, model.StatusFailed, model.StatusCancelled, model.StatusStale:
 			if j.Stats.DurationMS > 0 {
@@ -568,6 +569,20 @@ func (s *Server) lectureDir(l model.Lecture) string {
 	return model.LectureDir(s.dataDir, l.CourseID, l.ID)
 }
 
+// withUseColab adds model.ActionUseColab ("改用 Colab 处理") to a queued asr
+// stage's actions when the scheduler says it waits with
+// model.WaitRemoteFallback (Colab handed it back) or model.WaitRemoteHeld
+// (a shutdown holds the automatic dispatch) and no local device can take
+// it, so without the action it would wait for good (colabfix, colabfix2).
+// The front end sends it to POST /api/lectures/{id}/use-colab.
+func withUseColab(j model.Job, wait string, acts []string) []string {
+	if j.Stage != model.StageASR || j.Status != model.StatusQueued ||
+		(wait != model.WaitRemoteFallback && wait != model.WaitRemoteHeld) || slices.Contains(acts, model.ActionUseColab) {
+		return acts
+	}
+	return append(slices.Clone(acts), model.ActionUseColab)
+}
+
 // lectureActions are the lecture-level actions of v1.1 (A3, A2.3, A7):
 // launch for drafts; update when the earliest stale stage can be rerun now
 // (the rerun A2.3 performs — not offered while a downstream stage runs,
@@ -617,6 +632,9 @@ type lectureInfo struct {
 	boundBusy bool
 	num       lectureNumber
 	materials []MaterialUse
+	// counts: the lecture's counts read with its list (lecture_counts.go);
+	// nil = lectureViewJobs reads them.
+	counts *db.LectureCounts
 }
 
 // lectureView is GET /api/lectures/{id} (SPEC §8.1).
@@ -641,7 +659,12 @@ func (s *Server) lectureView(ctx context.Context, l model.Lecture) (Lecture, err
 	if err != nil {
 		return Lecture{}, err
 	}
-	return s.lectureViewJobs(ctx, l, lectureInfo{jobs: jobs, aux: aux, boundBusy: busy[l.ID], num: nums[l.ID], materials: mats[l.ID]})
+	counts, err := s.lectureCounts(ctx, []string{l.ID})
+	if err != nil {
+		return Lecture{}, err
+	}
+	return s.lectureViewJobs(ctx, l, lectureInfo{jobs: jobs, aux: aux, boundBusy: busy[l.ID], num: nums[l.ID], materials: mats[l.ID],
+		counts: countsFor(counts, l.ID)})
 }
 
 // courseMaterialUses is Lecture.materials of every lecture of a course
@@ -688,35 +711,43 @@ func (s *Server) lectureViewJobs(ctx context.Context, l model.Lecture, in lectur
 	}
 	v.Aux = s.auxViews(in.aux)
 	var err error
-	if v.Counts.Sentences, err = s.st.CountSentences(ctx, l.ID); err != nil {
-		return Lecture{}, err
+	cnt := in.counts
+	if cnt == nil {
+		c, err := s.lectureCountsOne(ctx, l.ID)
+		if err != nil {
+			return Lecture{}, err
+		}
+		cnt = &c
 	}
+	v.Counts.Sentences = cnt.Sentences
 	if d, ok := s.mediaDurationMS(l, jobs); ok {
 		v.DurationMS = &d // the media's length (audio.wav, media_duration.go)
 	}
 	if v.Counts.Sentences > 0 {
 		// idx runs 0..n-1: without audio.wav, the last sentence's end is the
 		// best known length (what was transcribed).
-		if last, err := s.st.GetSentence(ctx, l.ID, v.Counts.Sentences-1); err == nil {
+		if last := cnt.Last; last.Err != nil {
+			return Lecture{}, last.Err
+		} else if last.Found {
 			if v.DurationMS == nil {
 				d := last.EndMS
 				v.DurationMS = &d
 			}
-			v.HasWords = len(last.Words) > 0
-		} else if !errors.Is(err, db.ErrNotFound) {
-			return Lecture{}, err
+			v.HasWords = last.HasWords
 		}
 		// P4.2: only asr writes words, for every sentence of its result at
 		// once, so the first and the last sentence tell whether the
 		// transcript has them (without reading the whole lecture per view).
 		if !v.HasWords {
-			if first, err := s.st.GetSentence(ctx, l.ID, 0); err == nil {
-				v.HasWords = len(first.Words) > 0
-			} else if !errors.Is(err, db.ErrNotFound) {
-				return Lecture{}, err
+			if first := cnt.First; first.Err != nil {
+				return Lecture{}, first.Err
+			} else if first.Found {
+				v.HasWords = first.HasWords
 			}
 		}
 	}
+	// "修复断句" on a transcript worth repairing (textrepair.go)
+	s.withTextRepairAction(ctx, &v, l, jobs)
 	// a queued asr stage keeps its checkpoint's position (asr_checkpoint.go)
 	if ck := s.asrCheckpointView(l, jobs, v.DurationMS); ck != nil {
 		for i := range v.Stages {
@@ -726,18 +757,14 @@ func (s *Server) lectureViewJobs(ctx context.Context, l model.Lecture, in lectur
 		}
 	}
 	v.LectureActions = lectureActions(l, jobs, actions, s.roleConfigured(model.RoleOrganizer), v.Counts.Sentences > 0 && !v.HasWords)
-	if v.Counts.PatchesPending, err = s.st.CountPatches(ctx, l.ID, model.ReviewPending); err != nil {
-		return Lecture{}, err
-	}
-	zh, err := s.st.CountZh(ctx, l.ID)
-	if err != nil {
-		return Lecture{}, err
-	}
+	v.Counts.PatchesPending = cnt.PatchesPending
+	zh := cnt.Zh
 	v.Counts.ZhOK, v.Counts.ZhQAFailed, v.Counts.ZhStale = zh[model.ZhOK], zh[model.ZhQAFailed], zh[model.ZhStale]
 	v.Playable = playable(jobs) && v.Counts.Sentences > 0
 	if v.Stream, err = s.streamInfo(ctx, l, jobs, in.aux); err != nil {
 		return Lecture{}, err
 	}
+	v.Angles = s.lectureAngles(l)
 	return v, nil
 }
 
@@ -768,6 +795,7 @@ func (s *Server) calendarFields(v *Lecture, l model.Lecture, n lectureNumber) {
 		v.KindSource = viewKindSource(l, v.Kind)
 	}
 	v.KindN, v.KindCount, v.ShowN = n.KindN, n.KindCount, n.ShowN
+	v.WeekOverride = weekOverrideView(l, n) // course-ux
 	if !n.OK {
 		v.CalendarHint = n.Hint
 		if v.CalendarHint == "" {
@@ -957,10 +985,18 @@ func (s *Server) lectureViews(ctx context.Context, c model.Course) ([]Lecture, e
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]string, len(lecs))
+	for i, l := range lecs {
+		ids[i] = l.ID
+	}
+	counts, err := s.lectureCounts(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]Lecture, 0, len(lecs))
 	for _, l := range orderLectures(lecs, nums) {
 		v, err := s.lectureViewJobs(ctx, l, lectureInfo{jobs: ix.of(model.ScopeLecture, l.ID), aux: ix.aux(model.ScopeLecture, l.ID),
-			boundBusy: busy[l.ID], num: nums[l.ID], materials: mats[l.ID]})
+			boundBusy: busy[l.ID], num: nums[l.ID], materials: mats[l.ID], counts: countsFor(counts, l.ID)})
 		if err != nil {
 			return nil, err
 		}
@@ -1038,6 +1074,10 @@ func maxTime(cur string, ts ...*string) string {
 // the lecture's number of pending patches (filled here).
 func (s *Server) aggregate(ctx context.Context, c model.Course, lecs []model.Lecture, ix jobIndex, pending map[string]int) (courseAgg, error) {
 	a := courseAgg{lectures: len(lecs), lastActivity: c.CreatedAt}
+	pend, err := s.pendingPatchCounts(ctx, lecs)
+	if err != nil {
+		return a, err
+	}
 	for _, l := range lecs {
 		jobs := ix.of(model.ScopeLecture, l.ID)
 		if state.IsDraft(l) {
@@ -1052,10 +1092,7 @@ func (s *Server) aggregate(ctx context.Context, c model.Course, lecs []model.Lec
 		if e, ok := findJob(jobs, model.StageExport); ok && e.Status == model.StatusDone {
 			a.anyExportDone = true
 		}
-		n, err := s.st.CountPatches(ctx, l.ID, model.ReviewPending)
-		if err != nil {
-			return a, err
-		}
+		n := pend[l.ID]
 		if pending != nil {
 			pending[l.ID] = n
 		}
@@ -1147,11 +1184,11 @@ func (s *Server) courseViewJobs(ctx context.Context, c model.Course, ix jobIndex
 		}
 	}
 	v.GlossaryPending = pending
-	terms, err := s.st.ListTerms(ctx, c.ID)
+	terms, err := s.termCounts(ctx, []string{c.ID})
 	if err != nil {
 		return Course{}, err
 	}
-	v.TermCount = len(terms)
+	v.TermCount = terms[c.ID]
 	lecs, err := s.st.ListLectures(ctx, c.ID)
 	if err != nil {
 		return Course{}, err

@@ -5,6 +5,10 @@
 // characters; no thumbnails), marks for chapter starts, modified sentences
 // (thin grey) and pending review changes (amber) merged where they are too
 // dense, and dragging that updates the subtitles live and seeks on release.
+// ext web3 (user request 2026-10-27 no. 5): with chapters the track is
+// split into one segment per chapter (a small gap at each chapter start)
+// and the segment under the pointer is lifted; the preview names its
+// chapter. Without chapters the track is one piece, as before.
 
 import { h, clear } from './dom.js';
 import { t } from './i18n.js';
@@ -17,10 +21,11 @@ export function createTimeline(opts) {
   const buffered = h('div', { class: 'pl-tl-buffered' });
   const played = h('div', { class: 'pl-tl-played' });
   const marks = h('div', { class: 'pl-tl-marks', 'aria-hidden': 'true' });
-  const chapterMarks = h('div', { class: 'pl-tl-chapters', 'aria-hidden': 'true' });
+  const segHover = h('div', { class: 'pl-tl-seg', hidden: true, 'aria-hidden': 'true' });
+  const gaps = h('div', { class: 'pl-tl-gaps', 'aria-hidden': 'true' });
   const head = h('div', { class: 'pl-tl-head' });
   const hoverLine = h('div', { class: 'pl-tl-hoverline', hidden: true });
-  const track = h('div', { class: 'pl-tl-track' }, buffered, marks, played, hoverLine);
+  const track = h('div', { class: 'pl-tl-track' }, buffered, marks, played, segHover, gaps, hoverLine);
   const tipTime = h('span', { class: 'pl-tip-time' });
   const tipChapter = h('span', { class: 'pl-tip-chapter' });
   const tipText = h('span', { class: 'pl-tip-text', lang: 'en' });
@@ -36,7 +41,6 @@ export function createTimeline(opts) {
       'aria-valuemax': '0',
       'aria-valuenow': '0',
     },
-    chapterMarks,
     track,
     head,
     tip,
@@ -79,7 +83,7 @@ export function createTimeline(opts) {
 
   function drawMarks() {
     clear(marks);
-    clear(chapterMarks);
+    clear(gaps);
     const w = track.getBoundingClientRect().width;
     if (w <= 0 || dur <= 0) return;
     // sentences: one bucket per MERGE_PX; pending wins over modified
@@ -109,13 +113,31 @@ export function createTimeline(opts) {
       }
     }
     flush();
-    let lastX = -Infinity;
+    // chapters: a gap at every chapter start but the first (segments)
+    let lastX = 0;
     for (const c of data.chapters) {
       const x = frac(c.start_ms) * w;
-      if (x - lastX < MERGE_PX * 2) continue;
+      if (x - lastX < MERGE_PX * 2 || x > w - MERGE_PX * 2) continue;
       lastX = x;
-      chapterMarks.append(h('span', { class: 'pl-tl-chapter', style: { left: `${x}px` } }));
+      gaps.append(h('span', { class: 'pl-tl-gap', style: { left: `${x}px` } }));
     }
+  }
+
+  // The chapter segment under ms: [start, end) of its chapter.
+  function segmentAt(ms) {
+    const list = data.chapters;
+    if (!list.length || dur <= 0) return null;
+    let k = -1;
+    for (let i = 0; i < list.length && list[i].start_ms <= ms; i++) k = i;
+    const start = k < 0 ? 0 : list[k].start_ms;
+    const end = k + 1 < list.length ? list[k + 1].start_ms : dur;
+    return end > start ? { start, end } : null;
+  }
+
+  function showSegment(ms) {
+    const seg = ms == null ? null : segmentAt(ms);
+    segHover.hidden = !seg;
+    if (seg) Object.assign(segHover.style, { left: `${frac(seg.start) * 100}%`, width: `${(frac(seg.end) - frac(seg.start)) * 100}%` });
   }
 
   // ---- hover preview ----
@@ -135,11 +157,13 @@ export function createTimeline(opts) {
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, x - tw / 2))}px`;
     hoverLine.hidden = false;
     hoverLine.style.left = `${frac(ms) * 100}%`;
+    showSegment(ms);
   }
 
   function hideTip() {
     tip.hidden = true;
     hoverLine.hidden = true;
+    showSegment(null);
   }
 
   el.addEventListener('pointermove', (e) => {

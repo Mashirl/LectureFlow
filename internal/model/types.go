@@ -58,6 +58,12 @@ type Lecture struct {
 	// empty → lecture; the past-lecture rule).
 	Kind       string // lecture_kind.id ("" = NULL: not decided)
 	KindSource string // KindSource* ("" is read and written as none)
+
+	// WeekOverride is the lecture's row of lecture_week_override (course-ux,
+	// migration 011), read with the lecture by GetLecture and ListLectures;
+	// nil = none. Written only through Store.SetWeekOverride /
+	// DeleteWeekOverride (CreateLecture ignores it).
+	WeekOverride *WeekOverride
 }
 
 type Material struct {
@@ -244,6 +250,13 @@ type JobStats struct {
 	// (the colab.* error); the scheduler never sends that job to Colab
 	// automatically again (only "改用 Colab 处理" does).
 	RemoteFallback *ErrorInfo `json:"remote_fallback,omitempty"`
+
+	// ASRMode (textrepair-int, asr jobs only): ASRModeTextRepair for a
+	// "修复断句" run (the asr rerun with text_only: the stored transcript is
+	// repaired, nothing is transcribed); "" = a transcription. Written when
+	// the rerun creates the job (state.RerunOpts.TextRepair), kept by its
+	// retries.
+	ASRMode string `json:"asr_mode,omitempty"`
 }
 
 // Data directory layout (SPEC §1).

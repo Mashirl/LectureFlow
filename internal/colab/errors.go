@@ -26,6 +26,12 @@ const (
 	// Colab nor a local device can help by retrying; the scheduler treats it
 	// as an ordinary job error.
 	kindLocal
+	// kindBusy: the runtime could not take the lecture yet (it is being
+	// released or started, or another lecture still runs on it): nothing
+	// was tried, nothing failed. The lecture goes back to the queue and may
+	// go to Colab again (colabfix: a lecture dispatched while the runtime
+	// was being released must not be handed back for good).
+	kindBusy
 )
 
 // classified carries the failure kind and the waiting_for value inside the
@@ -82,6 +88,20 @@ func IsFallback(err error) bool {
 func IsRequeue(err error) bool {
 	c := classOf(err)
 	return c != nil && c.kind == kindRequeue
+}
+
+// IsBusy reports whether the runtime could not take the lecture yet
+// (CodeBusy: being released or started, or another lecture runs on it).
+// Nothing ran: the lecture goes back to the queue without counting as a
+// hand-back, and Colab may take it once CanDispatch says so.
+func IsBusy(err error) bool {
+	c := classOf(err)
+	return c != nil && c.kind == kindBusy
+}
+
+// busyErr is CodeBusy (IsBusy).
+func busyErr(cause error) error {
+	return newErr(CodeBusy, nil, kindBusy, "", cause)
 }
 
 // WaitingFor is the waiting_for value an error implies (model.WaitRemote*),

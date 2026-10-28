@@ -52,7 +52,7 @@ func (r *Registry) hiddenIDs(rows []model.ASRDevice) []string {
 	defer r.mu.RUnlock()
 	var out []string
 	for _, d := range rows {
-		if (isRemoteID(d.ID) && !r.remote) || r.hiddenLocked(d.ID) {
+		if r.remoteHiddenLocked(d.ID) || r.hiddenLocked(d.ID) {
 			out = append(out, d.ID)
 		}
 	}

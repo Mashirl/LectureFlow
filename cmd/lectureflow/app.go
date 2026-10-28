@@ -22,11 +22,14 @@ import (
 	"lectureflow/internal/config"
 	"lectureflow/internal/db"
 	"lectureflow/internal/devices"
+	"lectureflow/internal/dirperm"
+	"lectureflow/internal/fetch"
 	"lectureflow/internal/glossary"
 	"lectureflow/internal/llm"
 	"lectureflow/internal/model"
 	"lectureflow/internal/resources"
 	"lectureflow/internal/sched"
+	"lectureflow/internal/selfupdate"
 	"lectureflow/internal/settings"
 	"lectureflow/internal/stages"
 	"lectureflow/internal/state"
@@ -53,6 +56,12 @@ type App struct {
 	// built-in manifest is missing or the manager could not open (the
 	// service runs without it; the component endpoints answer 503).
 	Components *components.Manager
+	// Downloads is the browser extension's download queue (SPEC-ext,
+	// downloads.go); nil when it could not be built.
+	Downloads *fetch.Queue
+	// SelfUpdate is the in-app update (SPEC-ext 4, internal/selfupdate);
+	// it reports "not configured" until the public key is compiled in.
+	SelfUpdate *selfupdate.Updater
 
 	// redetect asks the detection goroutine for another device detection
 	// (a component changed the backend environments); compsUnsub ends that
@@ -95,13 +104,20 @@ type AppOptions struct {
 	Components func(*components.Options)
 	// Colab adjusts the Colab backend's options (tests: fake services).
 	Colab func(*colab.Options)
+	// Portable is the Windows portable build (-portable): the in-app update
+	// replaces the executable instead of running an installer.
+	Portable bool
+	// SelfUpdate adjusts the in-app update's options (tests: fake sources).
+	SelfUpdate func(*selfupdate.Options)
 }
 
 // buildApp opens the database, runs startup recovery (SPEC §4.7) and wires
 // every component. It does not start the scheduler (Start does, and runs
 // the first device detection).
 func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, error) {
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
+	state.SetDataDir(cfg.DataDir) // netpath-datadir: stored paths inside it are opened even on a share
+	// private from the start when created here (sec-update M2)
+	if _, err := dirperm.MkdirPrivate(cfg.DataDir); err != nil {
 		return nil, err
 	}
 	st, err := db.Open(filepath.Join(cfg.DataDir, "lectureflow.db"))
@@ -115,6 +131,7 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 	// After a data directory move: no Colab credential stays in the old
 	// directory's database (v3 Gate round 2).
 	scrubOldDataDir(ctx, st, cfg.DataDir)
+	scanNetworkPaths(ctx, st) // security review 2, M3: paths naming another computer are never opened
 
 	// Settings live in the database since v1.1 (A5.1): the first start
 	// imports the legacy config.toml fields once. Not in desktop mode
@@ -211,9 +228,11 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 	}
 	// The Colab backend (SPEC-v3 V14): colab:remote of the device table and
 	// the scheduler's remote device.
-	cb := newColab(cfg, st, o.Colab)
+	cb := newColab(cfg, st, func() { hub.Changed("colab", "") }, o.Colab)
+	soon := newDownloadSoon() // colab-batch: downloads about to become lectures (the queue comes below)
 	if cb != nil {
 		opts.Remote = cb
+		opts.RemoteSoon = soon.eta
 		opts.OnRemote = func(ctx context.Context, present bool, row model.ASRDevice) {
 			if err := reg.SetRemote(ctx, present, row); err != nil && ctx.Err() == nil {
 				slog.Warn("colab: updating the device table", "err", err)
@@ -239,6 +258,7 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 		hub.Changed("devices", "")
 		s.Kick()
 	})
+	wireSSH(ctx, cfg, st, reg, s, hub, o.Version) // ssh-mvp: the SSH inference servers (ssh.go)
 
 	// The component manager (SPEC-v3 V3, step 5): its environments and
 	// models take precedence over the configured paths from now on
@@ -323,7 +343,16 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 	}
 	res := resources.New(resDeps)
 	res.Start(ctx)
+	if cb != nil {
+		cb.SetViewers(res.Clients) // colab-obs-core: the runtime's resources only while a front end watches
+	}
 
+	// The browser extension's download queue (SPEC-ext, downloads.go).
+	dl, err := newDownloadQueue(cfg, st, hub)
+	if err != nil {
+		slog.Warn("download queue unavailable", "err", err)
+	}
+	soon.setQueue(dl)
 	deps := api.Deps{
 		Store:     st,
 		Sched:     s,
@@ -343,7 +372,31 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 	if cb != nil {
 		deps.Colab = cb.Backend
 	}
+	if dl != nil {
+		deps.Downloads = dl // a nil *Queue must not become a non-nil interface
+	}
+	// The in-app update (SPEC-ext 4): checks GitHub Releases at most once a
+	// day, only in desktop mode, and only once the public key is set.
+	suOpts := selfupdate.Options{DataDir: cfg.DataDir, Version: o.Version, KV: st,
+		Desktop: o.Desktop != nil, Portable: o.Portable, Log: slog.Default()}
+	if dl != nil {
+		suOpts.Downloader = updateDownloader(dl)
+	}
+	if o.SelfUpdate != nil {
+		o.SelfUpdate(&suOpts)
+	}
+	upd := selfupdate.New(suOpts)
+	upd.Startup(ctx)
+	go upd.Run(ctx)
+	deps.SelfUpdate = upd
 	srv := api.New(deps)
+	if dl != nil {
+		// Before the extension's endpoint serves (runMain starts it later):
+		// tasks left unfinished by the last run become needs_refresh.
+		if err := startDownloads(ctx, dl, srv); err != nil {
+			slog.Warn("download queue did not start", "err", err)
+		}
+	}
 	use.addPythons(serverPythons(srv.RunningPythons))
 	if o.Desktop != nil {
 		// The data directory move (SPEC-v3 V1.3): no new dispatches while
@@ -355,7 +408,7 @@ func buildApp(ctx context.Context, cfg *config.Config, o AppOptions) (*App, erro
 		})
 	}
 	return &App{Cfg: cfg, Store: st, Settings: set, Sched: s, Server: srv, Hub: hub, Resources: res, Devices: reg,
-		keepAwake: keepAwake, Components: comps, redetect: redetect, compsUnsub: compsUnsub, Colab: cb}, nil
+		keepAwake: keepAwake, Components: comps, redetect: redetect, compsUnsub: compsUnsub, Colab: cb, Downloads: dl, SelfUpdate: upd}, nil
 }
 
 // openComponents opens the component manager of cfg.DataDir (both modes),
@@ -512,7 +565,8 @@ const shutdownReserve = 2 * time.Second
 // Shutdown is the graceful stop (SPEC-v3 V1.1, v3-brief §1), in order:
 // stop dispatching and cancel the running jobs (their workers are killed)
 // and the device detection (and the start's manifest check), waiting for
-// them; stop the component manager (its running task stops where it is);
+// them, while the download queue stops its downloads and aria2c at the
+// same time; stop the component manager (its running task stops where it is);
 // release the power request;
 // wait for the pending invalidations; cancel the startup checks and wait
 // for them; stop the resource watcher; close the
@@ -540,8 +594,23 @@ func (a *App) shutdown(deadline time.Time, srv *http.Server) {
 	if a.compsUnsub != nil {
 		a.compsUnsub()
 	}
+	// Downloads stop where they are, alongside the scheduler (M1
+	// acceptance: one after the other could pass the 10 s of V1.1); the
+	// next start marks them needs_refresh (the cookies were only in
+	// memory).
+	var stopDL func(time.Duration) bool
+	if a.Downloads != nil {
+		stopDL = alongside(func() { stopDownloads(a.Downloads, remain(shutdownReserve)) })
+	}
 	if !a.Sched.Shutdown(remain(shutdownReserve)) {
 		slog.Warn("graceful stop: running jobs did not end in time; startup recovery handles them")
+	}
+	closeSSH(a.Sched) // ssh-mvp: after the runs ended (ssh.go)
+	if a.SelfUpdate != nil {
+		a.SelfUpdate.Close() // a running update download stops where it is
+	}
+	if stopDL != nil && !stopDL(remain(shutdownReserve)) {
+		slog.Warn("graceful stop: did not end in time", "what", "downloads")
 	}
 	for _, w := range []struct {
 		done chan struct{}
@@ -596,6 +665,24 @@ func (a *App) shutdown(deadline time.Time, srv *http.Server) {
 		cancel()
 	}
 	a.Store.Close()
+}
+
+// alongside runs fn in the background; the returned wait reports whether
+// it ended within d (graceful-stop steps that may run at the same time).
+func alongside(fn func()) (wait func(d time.Duration) bool) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fn()
+	}()
+	return func(d time.Duration) bool {
+		select {
+		case <-done:
+			return true
+		case <-time.After(d):
+			return false
+		}
+	}
 }
 
 // keepAwakeHook is sched.Options.KeepAwake over set (devices.KeepAwake.Set):

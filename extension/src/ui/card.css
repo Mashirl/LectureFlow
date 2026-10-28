@@ -1,0 +1,110 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* The send card (src/ui/sendcard.js) and the bulk card (src/ui/bulkcard.js):
+   in the popup and, inside a closed shadow DOM, on the platform's pages.
+   Flat, hairline borders, 8px controls, 12px cards, colours from tokens. */
+
+.lf-card { position: relative; display: flex; flex-direction: column; gap: var(--sp-5); }
+
+/* empty, unsupported, disconnected */
+.state { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+.state-icon { color: var(--text-3); }
+.state-icon .icon { width: 24px; height: 24px; }
+.state h1 { font-size: var(--fs-xl); }
+.btn-row { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.state .btn-row { margin-top: var(--sp-2); }
+.summary-line { font-size: var(--fs-sm); color: var(--text-2); }
+
+/* lecture card */
+.lecture { display: flex; flex-direction: column; gap: var(--sp-2); }
+.lec-title { font-size: var(--fs-lg); line-height: 1.35; overflow-wrap: anywhere; }
+.lec-title.generated { font-weight: 500; color: var(--text-2); }
+.lec-meta { font-size: var(--fs-sm); color: var(--text-2); overflow-wrap: anywhere; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.chips:empty { display: none; }
+.hint { font-size: var(--fs-sm); color: var(--text-2); }
+.hint .link-btn { margin-left: var(--sp-2); }
+.note-icon { display: inline-flex; vertical-align: -2px; margin-right: var(--sp-2); }
+.note-icon .icon { width: 14px; height: 14px; }
+
+/* track list */
+.sec { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
+.sec-head h2 { font-size: var(--fs-md); font-weight: 600; }
+.sec-note { font-size: var(--fs-xs); color: var(--text-3); }
+.tracks { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-1); }
+.track { border-bottom: 1px solid var(--border-1); }
+.track-row {
+  display: grid; grid-template-columns: 16px 1fr auto; gap: var(--sp-1) var(--sp-4); align-items: start;
+  padding: var(--sp-4) var(--sp-1);
+  cursor: pointer;
+}
+.track[data-disabled="true"] .track-row { cursor: not-allowed; }
+.track-row input { margin: 3px 0 0; width: 14px; height: 14px; }
+.track-text { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.track-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.track-name { font-weight: 500; overflow-wrap: anywhere; }
+.track[data-disabled="true"] .track-name { color: var(--text-3); }
+.track-sub { font-size: var(--fs-xs); color: var(--text-3); overflow-wrap: anywhere; }
+.track-size { font-size: var(--fs-sm); color: var(--text-2); white-space: nowrap; padding-top: 1px; }
+
+/* course and send */
+.field-inline { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--sp-5); }
+.field-label { font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); }
+.field-inline select { width: 100%; min-width: 0; }
+/* the three choices: beside their label while they fit, else on a line of their own */
+.field-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-5); }
+.field-wrap > .seg { flex: 1 1 250px; min-width: 0; }
+.send { display: flex; flex-direction: column; gap: var(--sp-4); }
+.btn-block { width: 100%; height: 36px; }
+.data-note { font-size: var(--fs-xs); color: var(--text-3); text-align: center; }
+
+/* queue status */
+.status { display: flex; flex-direction: column; gap: var(--sp-3); }
+.status-head { display: flex; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
+.status-head .pos { font-size: var(--fs-sm); color: var(--text-2); }
+.bar { height: 6px; border-radius: var(--r-pill); background: var(--st-running-track); overflow: hidden; }
+.bar-fill { height: 100%; width: 0; border-radius: var(--r-pill); background: var(--st-running); transition: width var(--dur); }
+.bar[data-indeterminate="true"] .bar-fill { width: 30%; }
+.status[data-state="done"] .bar { background: var(--ok-soft); }
+.status[data-state="done"] .bar-fill { background: var(--st-done); width: 100%; }
+.status[data-state="failed"] .bar,
+.status[data-state="cancelled"] .bar { display: none; }
+
+/* bulk card */
+.bulk-summary { font-size: var(--fs-sm); color: var(--text-2); }
+.bulk-summary strong { color: var(--text-1); font-weight: 600; }
+.bulk-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-1); max-height: 260px; overflow-y: auto; }
+.bulk-row {
+  display: grid; grid-template-columns: 16px 1fr auto; gap: var(--sp-1) var(--sp-4); align-items: center;
+  padding: var(--sp-3) var(--sp-1); border-bottom: 1px solid var(--border-1);
+  font-size: var(--fs-sm);
+}
+.bulk-row input { margin: 0; width: 14px; height: 14px; }
+.bulk-title { min-width: 0; overflow-wrap: anywhere; }
+.bulk-row[data-disabled="true"] .bulk-title { color: var(--text-3); }
+.bulk-error { grid-column: 2 / 4; font-size: var(--fs-xs); color: var(--err); }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--border-2); border-radius: var(--r-md); overflow: hidden; }
+.seg button {
+  min-height: 30px; padding: var(--sp-2) var(--sp-3); border: 0; border-left: 1px solid var(--border-2); background: var(--bg-card); color: var(--text-1);
+  font-size: var(--fs-sm); line-height: 1.25; overflow-wrap: anywhere; cursor: pointer;
+}
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.seg button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* the override warning: its own view over the card */
+.overlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: var(--sp-6) 0;
+  background: color-mix(in srgb, var(--bg-content) 86%, transparent);
+}
+.dialog { width: 100%; display: flex; flex-direction: column; gap: var(--sp-4); }
+.dialog-title { display: flex; align-items: center; gap: var(--sp-3); font-size: var(--fs-lg); color: var(--warn); }
+.dialog-icon .icon { width: 20px; height: 20px; }
+.dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-2); }
+/* "对这个平台不再提醒" inside the reminder */
+.check-line { display: grid; grid-template-columns: 16px 1fr; gap: var(--sp-3); align-items: start; font-size: var(--fs-sm); color: var(--text-2); cursor: pointer; }
+.check-line input { margin: 3px 0 0; width: 14px; height: 14px; }
+.link-btn:disabled { color: var(--text-3); cursor: default; }

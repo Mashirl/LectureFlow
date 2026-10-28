@@ -35,6 +35,11 @@ __pycache__/
 /web/i18n/_parts/
 /docs/screenshots/
 /scripts/shots/
+# The store listings' working notes (account details, review notes) and the
+# extension's development screenshots (LF_EXT_SCREENSHOTS=1); the store
+# pictures in extension/docs/store-assets/ are published.
+/docs/extension/store/
+/extension/docs/screenshots/
 # Benchmark spikes are process work, except the recommendation data the
 # device tests read.
 /spikes/*

@@ -420,7 +420,7 @@ export function mountTranscript(root, lecture, ctx) {
       if (lec.draft) state = U.waitingForText('not_started');
       else if (asr) {
         state = U.stageStatusText(asr);
-        if (asr.waiting_for) state = t('transcript.empty.state_wait', { state, wait: U.waitingForText(asr.waiting_for, ctx.system(), ctx.resources()) });
+        if (asr.waiting_for) state = t('transcript.empty.state_wait', { state, wait: U.stageWaitingText(asr, ctx.system(), ctx.resources()) });
       }
       text = t('transcript.empty.pending', { state });
     }

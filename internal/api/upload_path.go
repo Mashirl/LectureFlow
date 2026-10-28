@@ -119,72 +119,12 @@ func (s *Server) receivePath(w http.ResponseWriter, r *http.Request, dir, base s
 
 // copyFromPath copies the file at pr.path to dir/base+ext after the checks
 // of an HTTP upload. A cancelled ctx stops the copy within one buffer; no
-// file is left behind on any error.
+// file is left behind on any error. The checks and the copy are
+// importLocal's (import_internal.go), shared with the downloads' import.
 func (s *Server) copyFromPath(ctx context.Context, pr pathRequest, dir, base string, accept func(name string) error) (uploadResult, error) {
-	res := uploadResult{fields: pr.fields}
-	src, info, err := s.checkSourcePath(pr.path)
-	if err != nil {
-		return res, err
-	}
-	name := filepath.Base(pr.path)
-	if accept != nil {
-		if err := accept(name); err != nil {
-			return res, err
-		}
-	}
-	if info.Size() > s.maxUpload {
-		return res, apiErr(http.StatusRequestEntityTooLarge, "upload.too_large", map[string]any{"max_bytes": s.maxUpload})
-	}
-	if err := os.MkdirAll(s.dataDir, 0o755); err != nil {
-		return res, err
-	}
-	if free, err := s.freeSpace(s.dataDir); err == nil && free < s.minFree+info.Size() {
-		return res, apiErr(http.StatusInsufficientStorage, "upload.no_space", map[string]any{"free_bytes": free, "keep_bytes": s.minFree})
-	}
-	f, err := os.Open(src)
-	if err != nil {
-		return res, sourceOpenErr(pr.path, err)
-	}
-	defer f.Close()
-	// The file may have been swapped since the checks: check what was opened.
-	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
-		return res, apiErr(http.StatusBadRequest, "upload.path_not_file", map[string]any{"path": pr.path})
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return res, err
-	}
-	res.filename = name
-	res.path = filepath.Join(dir, base+strings.ToLower(filepath.Ext(name)))
-	tmp := res.path + ".tmp"
-	out, err := os.Create(tmp)
-	if err != nil {
-		return res, err
-	}
-	// writerOnly hides os.File.ReadFrom so that the copy goes through the
-	// buffer and the context check below.
-	n, err := io.CopyBuffer(writerOnly{out}, ctxReader{ctx, io.LimitReader(f, s.maxUpload+1)}, make([]byte, copyBufSize))
-	if cerr := out.Close(); err == nil {
-		err = cerr
-	}
-	if err == nil && n > s.maxUpload {
-		err = apiErr(http.StatusRequestEntityTooLarge, "upload.too_large", map[string]any{"max_bytes": s.maxUpload})
-	}
-	if err == nil {
-		err = ctx.Err()
-	}
-	if err == nil {
-		err = os.Rename(tmp, res.path)
-	}
-	if err != nil {
-		os.Remove(tmp)
-		var he *httpError
-		if errors.As(err, &he) || ctx.Err() != nil {
-			return res, err
-		}
-		return res, apiErrDetail(http.StatusInternalServerError, "upload.copy_failed", map[string]any{"path": pr.path}, err.Error())
-	}
-	res.size = n
-	return res, nil
+	res, err := s.importLocal(ctx, importSource{path: pr.path}, dir, base, accept)
+	res.fields = pr.fields
+	return res, err
 }
 
 // checkSourcePath validates a path sent by the desktop page: absolute, no

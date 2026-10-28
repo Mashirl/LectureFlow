@@ -1,0 +1,31 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* Popup: 360px wide, height follows the content (SPEC-ext 界面设计). The
+   card itself is styled by ui/card.css, shared with the in-page card. */
+
+body { width: 360px; background: var(--bg-content); }
+
+.hd {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6);
+  border-bottom: 1px solid var(--border-1);
+  background: var(--bg-card);
+}
+.brand { display: flex; align-items: center; gap: var(--sp-4); font-weight: 600; font-size: var(--fs-lg); }
+.logo { width: 20px; height: 20px; }
+.logo-bg { fill: var(--accent); }
+.logo-bars { stroke: var(--text-on-accent); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.conn { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+
+.body { padding: var(--sp-6); }
+.body .lf-card { min-height: 60px; }
+
+.ft {
+  display: flex; align-items: center; gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-6) var(--sp-5);
+  border-top: 1px solid var(--border-1);
+}
+.ft-spacer { flex: 1; }
+.grant-panel { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-5) var(--sp-6); border-top: 1px solid var(--border-1); }
+.grant-hosts { display: flex; flex-direction: column; gap: var(--sp-2); overflow-wrap: anywhere; }
+.foot-msg { margin: 0 var(--sp-6) var(--sp-5); }

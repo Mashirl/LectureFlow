@@ -1,0 +1,1058 @@
+{
+  "extName": {
+    "message": "傳送去 LectureFlow",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "搵出你睇緊嘅錄影入面嘅聲音同影片軌道，一按就交俾本機嘅 LectureFlow 桌面版，儲存到本機離線轉錄同翻譯。要先安裝 LectureFlow。",
+    "description": "Store description"
+  },
+  "actionTitle": {
+    "message": "LectureFlow：呢頁嘅軌道",
+    "description": "Toolbar button tooltip"
+  },
+  "connChecking": {
+    "message": "連線緊…",
+    "description": "Native messaging state"
+  },
+  "connRecheck": {
+    "message": "重新檢查",
+    "description": "Button: retry connecting to LectureFlow"
+  },
+  "connConnected": {
+    "message": "已連線 LectureFlow"
+  },
+  "connConnectedVersion": {
+    "message": "LectureFlow $P1$",
+    "description": "Connected, with app version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "connUnavailable": {
+    "message": "未連線"
+  },
+  "connNotRunning": {
+    "message": "啟動唔到 LectureFlow。請打開佢，然後再檢查一次。"
+  },
+  "connNotInstalled": {
+    "message": "請安裝或者打開 LectureFlow，然後再檢查一次。"
+  },
+  "detecting": {
+    "message": "偵測緊…"
+  },
+  "showTracks": {
+    "message": "展開",
+    "description": "Expand the track list"
+  },
+  "hideTracks": {
+    "message": "收埋軌道",
+    "description": "Closes the full track list"
+  },
+  "emptyHint": {
+    "message": "打開一個錄影，開始播放之後再按一次。",
+    "description": "Empty state"
+  },
+  "exportReport": {
+    "message": "匯出偵測報告"
+  },
+  "grantSite": {
+    "message": "喺呢個網站自動偵測",
+    "description": "Button: grant host permission"
+  },
+  "openOptions": {
+    "message": "設定"
+  },
+  "notAPage": {
+    "message": "呢個頁面偵測唔到。"
+  },
+  "noAccess": {
+    "message": "擴充功能讀唔到呢個頁面。"
+  },
+  "noTracks": {
+    "message": "偵測唔到軌道"
+  },
+  "tracksDetected": {
+    "message": "偵測到 $P1$ 條軌道",
+    "description": "Header with the track count",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "sourceProfile": {
+    "message": "對策檔案：$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "sourceGeneric": {
+    "message": "通用偵測"
+  },
+  "unreviewed": {
+    "message": "未審核",
+    "description": "Locally imported profile"
+  },
+  "reviewed": {
+    "message": "已審核"
+  },
+  "downloadDisabled": {
+    "message": "可能受政策限制",
+    "description": "Chip: the platform’s switch says the recording is restricted"
+  },
+  "protectedCount": {
+    "message": "$P1$ 條受版權保護（DRM）",
+    "description": "DRM tracks",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "protected": {
+    "message": "受版權保護（DRM）",
+    "description": "DRM track"
+  },
+  "recommended": {
+    "message": "推薦"
+  },
+  "unreadable": {
+    "message": "讀唔到播放清單"
+  },
+  "kind_video": {
+    "message": "影片"
+  },
+  "kind_audio": {
+    "message": "聲音"
+  },
+  "kind_unknown": {
+    "message": "未知類型"
+  },
+  "format_file": {
+    "message": "單一檔案"
+  },
+  "format_hls": {
+    "message": "HLS"
+  },
+  "format_dash": {
+    "message": "DASH"
+  },
+  "source_element": {
+    "message": "頁面元素",
+    "description": "Detection route"
+  },
+  "source_performance": {
+    "message": "已載入嘅資源",
+    "description": "Detection route"
+  },
+  "source_webrequest": {
+    "message": "網絡請求",
+    "description": "Detection route"
+  },
+  "sizeUnknown": {
+    "message": "大小未知"
+  },
+  "sizeAbout": {
+    "message": "大約 $P1$",
+    "description": "Estimated size",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reportBuilding": {
+    "message": "整緊報告…"
+  },
+  "reportRefused": {
+    "message": "報告冇匯出：入面可能有個人資料。"
+  },
+  "reportFailed": {
+    "message": "整唔到呢個頁面嘅報告。"
+  },
+  "reportSaved": {
+    "message": "報告已經儲存咗。分享之前請先睇一次。"
+  },
+  "finding_email": {
+    "message": "有內容似電郵地址。"
+  },
+  "finding_identity_field": {
+    "message": "有欄位似姓名、用戶名或者學生編號。"
+  },
+  "finding_student_id": {
+    "message": "有數字似學生編號。"
+  },
+  "finding_name": {
+    "message": "網址入面有一段似人名。"
+  },
+  "grantDone": {
+    "message": "已經允許咗。重新載入頁面之後，擴充功能就可以由頭睇到播放器嘅請求。"
+  },
+  "grantFailed": {
+    "message": "申請唔到權限。"
+  },
+  "optionsTitle": {
+    "message": "LectureFlow 擴充功能設定"
+  },
+  "languageHeading": {
+    "message": "介面語言",
+    "description": "Settings section: the extension’s language"
+  },
+  "languageHint": {
+    "message": "預設跟瀏覽器；你都可以喺度揀一種語言，例如瀏覽器冇提供嘅粵語。",
+    "description": "Settings: under the language heading"
+  },
+  "languageAuto": {
+    "message": "跟瀏覽器",
+    "description": "Language choice: the browser’s language"
+  },
+  "profilesHeading": {
+    "message": "對策檔案"
+  },
+  "profilesHint": {
+    "message": "對策檔案幫平台嘅軌道改名。由本機匯入嘅會標住「未審核」，而且會優先用。"
+  },
+  "importProfile": {
+    "message": "匯入本機對策檔案"
+  },
+  "importNotJson": {
+    "message": "呢個檔案唔係 JSON。"
+  },
+  "importInvalid": {
+    "message": "對策檔案唔符合格式："
+  },
+  "importBlocked": {
+    "message": "唔可以匯入呢個對策檔案：佢涵蓋咗 $P1$。",
+    "description": "Settings: a local profile matching a do-not-handle site is refused; $1 = the host it matches. Followed by unsupportedYoutube or unsupportedCourses.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importDone": {
+    "message": "已經匯入 $P1$。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "sitesHeading": {
+    "message": "網站"
+  },
+  "sitesHint": {
+    "message": "喺呢啲網站，擴充功能會自動數軌道，亦睇得到播放器嘅請求；其他網站要你按圖示先會偵測。"
+  },
+  "addSite": {
+    "message": "允許網站"
+  },
+  "siteInvalid": {
+    "message": "請輸入用 https:// 開頭嘅網址"
+  },
+  "privacyHeading": {
+    "message": "私隱"
+  },
+  "privacyText": {
+    "message": "擴充功能只會同本機嘅 LectureFlow 通訊。只有喺你傳送講座嘅時候先會讀取 Cookie，而且只讀軌道所在網域嘅 Cookie。唔會上載任何內容。",
+    "description": "Options: privacy"
+  },
+  "versionLine": {
+    "message": "版本 $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "redetect": {
+    "message": "再偵測一次",
+    "description": "Button: run detection again"
+  },
+  "unsupportedTitle": {
+    "message": "LectureFlow 唔支援呢個網站",
+    "description": "Do-not-handle site (YouTube)"
+  },
+  "unsupportedText": {
+    "message": "LectureFlow 只會處理學校嘅講座錄影。",
+    "description": "Do-not-handle site"
+  },
+  "unsupportedYoutube": {
+    "message": "LectureFlow 唔處理 YouTube，只會處理學校嘅講座錄影。",
+    "description": "Do-not-handle site: YouTube (src/lib/blocklist.js). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "unsupportedCourses": {
+    "message": "LectureFlow 唔處理網上課程平台（MOOC、付費課程），只會處理學校嘅講座錄影。",
+    "description": "Do-not-handle site: MOOCs and online / paid course platforms (Udemy, Coursera…). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "blockedEmbedNote": {
+    "message": "呢頁嵌入咗 YouTube 或者網上課程平台嘅內容，已經略過咗，因為 LectureFlow 唔處理呢類內容。",
+    "description": "No tracks found, and the page embeds YouTube or a course platform, which detection skipped"
+  },
+  "disconnectedTitle": {
+    "message": "LectureFlow 未連線",
+    "description": "State: native host unreachable"
+  },
+  "discNotInstalled": {
+    "message": "搵唔到 LectureFlow。請安裝 LectureFlow 並打開一次，然後按「重新檢查」。",
+    "description": "Disconnected: host not registered"
+  },
+  "discNotRunning": {
+    "message": "LectureFlow 啟動唔到。請自己打開佢，然後按「重新檢查」。",
+    "description": "Disconnected: start failed"
+  },
+  "discProtocol": {
+    "message": "LectureFlow 同擴充功能嘅版本唔兼容。請將兩樣都更新到最新版本。",
+    "description": "Disconnected: protocol mismatch"
+  },
+  "discUnsupportedOs": {
+    "message": "LectureFlow 只支援 Windows 同用 Apple 晶片嘅 Mac。",
+    "description": "Linux / ChromeOS note"
+  },
+  "getLectureFlow": {
+    "message": "取得 LectureFlow",
+    "description": "Button: open the download page"
+  },
+  "titleGenerated": {
+    "message": "標題會由 LectureFlow 生成",
+    "description": "Generic detection reads no title"
+  },
+  "durationMinutes": {
+    "message": "$P1$ 分鐘",
+    "description": "Lecture length",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileChip": {
+    "message": "$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "downloadDisabledOverridden": {
+    "message": "可能受政策限制 · 已確認",
+    "description": "Chip after the reminder was confirmed"
+  },
+  "observeNeedsGrant": {
+    "message": "允許喺呢個網站自動偵測，再重新載入頁面之後，就讀到平台嘅限制設定同完整錄影。",
+    "description": "Profile reads a page response; site not authorized"
+  },
+  "observeNeedsReload": {
+    "message": "重新載入錄影頁面之後，就讀到平台嘅限制設定同完整錄影。",
+    "description": "Profile reads a page response not seen yet"
+  },
+  "courseLabel": {
+    "message": "課程",
+    "description": "Course select label"
+  },
+  "courseNone": {
+    "message": "LectureFlow 入面仲未有課程。請先喺 LectureFlow 新增一個課程。",
+    "description": "No courses"
+  },
+  "sendButton": {
+    "message": "傳送去 LectureFlow",
+    "description": "The send button (user’s wording)"
+  },
+  "sending": {
+    "message": "傳送緊…",
+    "description": "Primary button while sending"
+  },
+  "dataNote": {
+    "message": "傳送嘅時候，揀咗嘅軌道網址、呢頁嘅網址，同埋呢啲網址需要嘅 Cookie 會交俾本機嘅 LectureFlow，唔會上載。",
+    "description": "Data note under the popup’s button"
+  },
+  "selectHint": {
+    "message": "請最少剔一條軌道。",
+    "description": "Nothing selected"
+  },
+  "oneEach": {
+    "message": "最多一條聲音、一個畫面；雙機位可以兩個畫面",
+    "description": "Selection rule"
+  },
+  "selectTrack": {
+    "message": "揀 $P1$",
+    "description": "Checkbox label",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "blockedImported": {
+    "message": "呢堂已經喺 LectureFlow 入面。",
+    "description": "Cannot send: imported"
+  },
+  "blockedProtected": {
+    "message": "呢條媒體串流受數碼版權保護（DRM），LectureFlow 唔會處理受保護嘅內容。",
+    "description": "Cannot send: DRM"
+  },
+  "openInApp": {
+    "message": "喺 LectureFlow 打開",
+    "description": "Button"
+  },
+  "opened": {
+    "message": "已經喺 LectureFlow 打開咗。",
+    "description": "After open"
+  },
+  "againFailed": {
+    "message": "上次擷取冇完成，可以再傳送一次。",
+    "description": "Check: failed task"
+  },
+  "againCancelled": {
+    "message": "上次嘅擷取取消咗，可以再傳送一次。",
+    "description": "Check: cancelled task"
+  },
+  "queuedTitle": {
+    "message": "已經排隊",
+    "description": "Queued state title"
+  },
+  "state_queued": {
+    "message": "排緊隊",
+    "description": "Fetch task state"
+  },
+  "state_downloading": {
+    "message": "擷取緊",
+    "description": "Fetch task state (main app: downloads.state.downloading)"
+  },
+  "state_merging": {
+    "message": "合併緊",
+    "description": "Fetch task state"
+  },
+  "state_importing": {
+    "message": "建立緊講座",
+    "description": "Fetch task state"
+  },
+  "state_done": {
+    "message": "完成咗",
+    "description": "Fetch task state"
+  },
+  "state_failed": {
+    "message": "擷取失敗",
+    "description": "Fetch task state"
+  },
+  "state_needs_refresh": {
+    "message": "要重新載入",
+    "description": "Fetch task state"
+  },
+  "state_cancelled": {
+    "message": "取消咗",
+    "description": "Fetch task state"
+  },
+  "state_imported": {
+    "message": "已匯入",
+    "description": "Check state"
+  },
+  "position": {
+    "message": "第 $P1$ 位",
+    "description": "Queue position",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "progress": {
+    "message": "$P1$% · $P2$ / $P3$",
+    "description": "Fetch progress",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "progressUnknown": {
+    "message": "擷取咗 $P1$",
+    "description": "Progress without a total",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "closeHint": {
+    "message": "你可以閂咗呢個視窗，擷取會喺 LectureFlow 繼續。",
+    "description": "Queued note"
+  },
+  "doneHint": {
+    "message": "擷取完成，講座已經建立咗，跟住會開始轉錄。",
+    "description": "Done note"
+  },
+  "failedHint": {
+    "message": "擷取冇完成。你可以喺 LectureFlow 睇原因同重試。",
+    "description": "Failed note"
+  },
+  "cancelledHint": {
+    "message": "今次擷取已經取消咗。",
+    "description": "Cancelled note"
+  },
+  "refreshText": {
+    "message": "呢堂嘅擷取停咗：登入資料已經失效。按「繼續擷取」，用呢個頁面嘅新登入資料接住擷取。",
+    "description": "needs_refresh view"
+  },
+  "refreshButton": {
+    "message": "繼續擷取",
+    "description": "Primary button of the needs_refresh view"
+  },
+  "refreshing": {
+    "message": "繼續擷取緊…",
+    "description": "Primary button while resuming"
+  },
+  "cancel": {
+    "message": "取消",
+    "description": "Button"
+  },
+  "errCourseGone": {
+    "message": "呢個課程喺 LectureFlow 已經唔存在，請重新揀。",
+    "description": "Error"
+  },
+  "errStale": {
+    "message": "頁面已經變咗。請閂咗呢個視窗，再按一次擴充功能圖示。",
+    "description": "Error"
+  },
+  "errProtected": {
+    "message": "受版權保護（DRM）嘅軌道唔可以傳送。",
+    "description": "Error"
+  },
+  "errNotRunning": {
+    "message": "LectureFlow 冇回應。請打開佢再試。",
+    "description": "Error"
+  },
+  "errTimeout": {
+    "message": "LectureFlow 冇及時回應，請再試。",
+    "description": "Error"
+  },
+  "errRefreshGone": {
+    "message": "LectureFlow 入面搵唔到呢個擷取工作，可以再傳送一次。",
+    "description": "Error"
+  },
+  "errInvalid": {
+    "message": "LectureFlow 拒絕咗今次請求（$P1$）。",
+    "description": "Error with the field name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errSiteBlocked": {
+    "message": "LectureFlow 拒絕咗呢個網站嘅擷取工作：佢唔處理 YouTube 同網上課程平台，只會處理學校嘅講座錄影。",
+    "description": "Error: LectureFlow refused the send (downloads.site_blocked): the page or a track is on YouTube or a course platform. Same text as LectureFlow’s errors.downloads.site_blocked."
+  },
+  "errGeneric": {
+    "message": "做唔到（$P1$）。請再試。",
+    "description": "Error with its code",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileGrant": {
+    "message": "允許呢啲網站",
+    "description": "Options: grant a profile’s hosts"
+  },
+  "profileGranted": {
+    "message": "已經允許網站",
+    "description": "Options: profile hosts granted"
+  },
+  "reportsHeading": {
+    "message": "偵測報告",
+    "description": "Options section"
+  },
+  "reportsHint": {
+    "message": "匯出已經去除個人資料嘅偵測報告，用嚟寫或者改進對策檔案。喺錄影頁面按一次擴充功能圖示之後，嗰個頁面就會喺呢度列出。",
+    "description": "Options: reports"
+  },
+  "reportsEmpty": {
+    "message": "仲未有可以匯出嘅頁面。",
+    "description": "Options: reports"
+  },
+  "reportRow": {
+    "message": "$P1$ · $P2$ 條軌道",
+    "description": "Options: one page",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "exportOne": {
+    "message": "匯出",
+    "description": "Options: export a report"
+  },
+  "profileHosts": {
+    "message": "網站：$P1$",
+    "description": "Options: profile hosts",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmSend": {
+    "message": "確認傳送",
+    "description": "The in-page card’s primary button"
+  },
+  "inpageNote": {
+    "message": "Cookie 只會喺你按「確認傳送」嘅時候讀取，只會交俾本機嘅 LectureFlow",
+    "description": "Under the in-page card’s button"
+  },
+  "profileSource": {
+    "message": "$P1$ 對策檔案 $P2$",
+    "description": "Lecture card: which profile named it",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "courseLast": {
+    "message": "（上次）",
+    "description": "Suffix of the course used last"
+  },
+  "close": {
+    "message": "關閉",
+    "description": "Button"
+  },
+  "done": {
+    "message": "完成",
+    "description": "Button"
+  },
+  "rowDownloading": {
+    "message": "擷取緊 $P1$%",
+    "description": "List row: a lecture being fetched",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedChip": {
+    "message": "可能受政策限制",
+    "description": "Bulk row: skipped because restricted"
+  },
+  "restrictedNotice": {
+    "message": "偵測到呢條媒體串流可能受講師或者大學嘅政策限制。LectureFlow 只會將你有權存取嘅媒體串流擷取到本機，用嚟做個人無障礙學習（轉錄／翻譯）。請確保你遵守學校規定。傳送之前會再提你一次。",
+    "description": "The user’s text, verbatim (it says 您)"
+  },
+  "restrictedTitle": {
+    "message": "呢條媒體串流可能受政策限制",
+    "description": "Reminder dialog title"
+  },
+  "restrictedConfirm": {
+    "message": "LectureFlow 只會將你有權存取嘅媒體串流擷取到本機，用嚟做個人無障礙學習（轉錄／翻譯）。請確保你遵守學校規定。",
+    "description": "Reminder dialog text"
+  },
+  "bulkRestrictedConfirm": {
+    "message": "入面有 $P1$ 個可能受講師或者大學嘅政策限制。LectureFlow 只會將你有權存取嘅媒體串流擷取到本機，用嚟做個人無障礙學習（轉錄／翻譯）。請確保你遵守學校規定。",
+    "description": "Bulk reminder dialog text",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedNoticeQuiet": {
+    "message": "偵測到呢條媒體串流可能受講師或者大學嘅政策限制。LectureFlow 只會將你有權存取嘅媒體串流擷取到本機，用嚟做個人無障礙學習（轉錄／翻譯）。請確保你遵守學校規定。",
+    "description": "The restricted notice (the user’s own text) without its last sentence, shown when the reminder is off for this platform"
+  },
+  "restrictedRemember": {
+    "message": "呢個平台（$P1$）以後唔使再提我",
+    "description": "Check box in the restricted reminder; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedRememberedNote": {
+    "message": "你已經對 $P1$ 閂咗呢個提醒，可以喺擴充功能設定度開返。",
+    "description": "Line under the restricted notice when the reminder is off for this platform; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedHeading": {
+    "message": "受限錄影嘅提醒",
+    "description": "Settings: section heading"
+  },
+  "restrictedHint": {
+    "message": "傳送可能受政策限制嘅錄影之前，擴充功能會先提你。喺提醒入面揀咗唔使再提醒嘅平台會列喺下面；開返提醒之後，每次傳送之前都會再提你。",
+    "description": "Settings: section text"
+  },
+  "restrictedEmpty": {
+    "message": "冇閂咗提醒嘅平台：每次都會提你。",
+    "description": "Settings: no platform listed"
+  },
+  "restrictedSince": {
+    "message": "由 $P1$ 起唔再提醒",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedForget": {
+    "message": "開返提醒",
+    "description": "Settings: button that undoes “don’t remind me again”"
+  },
+  "sendAnyway": {
+    "message": "照樣傳送",
+    "description": "Reminder dialog: confirm"
+  },
+  "contentLabel": {
+    "message": "內容",
+    "description": "Label of the three choices"
+  },
+  "presetMain": {
+    "message": "主要影音",
+    "description": "Choice: the full recording, or main audio + first picture"
+  },
+  "presetDual": {
+    "message": "雙機位",
+    "description": "Choice: main audio + two pictures"
+  },
+  "presetAudio": {
+    "message": "只要聲音",
+    "description": "Choice: main audio"
+  },
+  "presetMainNone": {
+    "message": "呢頁冇可以傳送嘅軌道",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetDualNone": {
+    "message": "只偵測到一個畫面",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetAudioNone": {
+    "message": "冇獨立嘅聲音軌道",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "chooseContent": {
+    "message": "揀一樣要傳送嘅內容",
+    "description": "Nothing chosen yet"
+  },
+  "chooseTracks": {
+    "message": "揀軌道…（$P1$ 條）",
+    "description": "Opens the full track list",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerEmbedded": {
+    "message": "呢頁嵌入咗 $P1$。允許存取 $P1$ 網站，再重新載入頁面之後，就可以喺度傳送。",
+    "description": "Popup: a platform frame not readable yet",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerOpaque": {
+    "message": "呢頁有擴充功能讀唔到嘅嵌入內容。如果入面係 $P1$（例如 Canvas 入面嘅 ReCap），請允許存取 $P1$ 網站，再重新載入頁面。",
+    "description": "Popup: unreadable frames",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerGrant": {
+    "message": "允許 $P1$ 網站",
+    "description": "Popup: grant a profile’s sites",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errInfoFailed": {
+    "message": "讀唔到錄影平台上面呢堂嘅資料（$P1$）。",
+    "description": "Error",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectRow": {
+    "message": "揀 $P1$",
+    "description": "Row check box",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selBar": {
+    "message": "揀咗 $P1$ 個",
+    "description": "Selection bar",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selClear": {
+    "message": "清除",
+    "description": "Selection bar"
+  },
+  "selSend": {
+    "message": "傳送揀咗嘅 $P1$ 個",
+    "description": "Selection bar button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkButton": {
+    "message": "將呢個課程更新到 LectureFlow",
+    "description": "Folder list button (user’s wording)"
+  },
+  "bulkTitle": {
+    "message": "將呢個課程更新到 LectureFlow",
+    "description": "Bulk card title"
+  },
+  "bulkSummary": {
+    "message": "共 $P1$ 個：$P2$ 個已經匯入（按錄影同標題去重），$P3$ 個擷取緊，",
+    "description": "Bulk card summary, first part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "bulkSummaryTo": {
+    "message": "$P1$ 個會傳送",
+    "description": "Bulk card summary, last part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkNew": {
+    "message": "新",
+    "description": "Bulk row"
+  },
+  "bulkQueued": {
+    "message": "已經排隊",
+    "description": "Bulk row"
+  },
+  "bulkFailed": {
+    "message": "冇傳送",
+    "description": "Bulk row"
+  },
+  "bulkSkipped": {
+    "message": "略過咗",
+    "description": "Bulk row"
+  },
+  "bulkSend": {
+    "message": "傳送 $P1$ 個",
+    "description": "Bulk card button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkReading": {
+    "message": "讀緊 $P1$ / $P2$…",
+    "description": "Bulk card button while reading",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkSending": {
+    "message": "傳送緊 $P1$ / $P2$…",
+    "description": "Bulk card button while sending",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkQueueNote": {
+    "message": "會順序排隊；同時擷取幾多個可以喺 LectureFlow 設定度改（預設 3 個）",
+    "description": "Bulk card note"
+  },
+  "bulkPageOnly": {
+    "message": "只包括呢一頁列出嘅講座；如果仲有其他頁，轉頁之後再按一次。",
+    "description": "Bulk card note"
+  },
+  "bulkSkipDisabled": {
+    "message": "略過呢 $P1$ 個",
+    "description": "Bulk reminder: skip",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkDone": {
+    "message": "傳送咗 $P1$ 個；$P2$ 個冇傳送。",
+    "description": "Bulk card result",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkNoTrack": {
+    "message": "冇符合所揀內容嘅軌道",
+    "description": "Bulk row error"
+  },
+  "grantCookieHosts": {
+    "message": "呢啲軌道喺其他網站。如果擷取要用呢啲網站嘅 Cookie，可以一齊允許（唔揀都得）：",
+    "description": "Popup: above check boxes, one per other host whose cookies a send would read"
+  },
+  "grantAllow": {
+    "message": "允許",
+    "description": "Popup: button that asks the browser for the page’s site and the ticked hosts"
+  },
+  "trustedHeading": {
+    "message": "信任嘅嵌入網站",
+    "description": "Settings: section heading (sites the platform’s pages may be embedded in, with in-page confirmation)"
+  },
+  "trustedHint": {
+    "message": "錄影平台嘅頁面嵌喺呢啲網站入面嗰陣（例如學校嘅 Canvas），可以直接喺頁面度確認傳送。嵌喺其他網站入面嗰陣，個掣會開 LectureFlow 嘅確認視窗，以免其他網站呃你按。",
+    "description": "Settings: section text"
+  },
+  "trustedEmpty": {
+    "message": "未有信任嘅網站：嵌喺其他網站入面嘅掣都會開確認視窗。",
+    "description": "Settings: no site listed"
+  },
+  "trustedSince": {
+    "message": "由 $P1$ 起信任",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importReplaceConfirm": {
+    "message": "呢個檔案同內置嘅對策檔案「$P1$ $P2$」同名。匯入之後會取代內置版本，卡片上會標住「未審核」。要唔要取代？",
+    "description": "Settings: an imported file has the id of a built-in profile; $1 its name, $2 its version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "importReplace": {
+    "message": "取代內置版本",
+    "description": "Settings: button, import the file in place of the built-in profile"
+  },
+  "profileReplaces": {
+    "message": "取代內置嘅 $P1$ 版",
+    "description": "Settings: under a local profile that replaces a built-in one; $1 is the built-in version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileInactive": {
+    "message": "未啟用：同內置嘅對策檔案同名，要重新匯入再確認",
+    "description": "Settings: chip on a local profile with a built-in profile’s id that was never confirmed"
+  },
+  "embedWhy": {
+    "message": "呢個錄影頁面嵌喺 $P1$ 嘅網頁入面。為咗防止其他網站呃你按，請喺呢個視窗度確認。",
+    "description": "Confirmation window: why it opened; $1 is the site the recording page is embedded in (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedWhyUnknown": {
+    "message": "呢個錄影頁面嵌喺另一個網站嘅網頁入面，瀏覽器冇話俾擴充功能知係邊個網站。為咗防止其他網站呃你按，請喺呢個視窗度確認。",
+    "description": "Confirmation window: why it opened, when the browser does not tell the site"
+  },
+  "embedFrom": {
+    "message": "錄影頁面：$P1$",
+    "description": "Confirmation window: the recording page’s host; $1 is a host name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedTrust": {
+    "message": "以後喺 $P1$ 直接喺頁面度確認",
+    "description": "Confirmation window: check box; $1 is the site (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmGone": {
+    "message": "呢個確認視窗已經用唔到：錄影頁面已經閂咗或者重新載入咗。請返去頁面再按一次個掣。",
+    "description": "Confirmation window: the page it belonged to is gone"
+  },
+  "errConfirmWindow": {
+    "message": "請喺 LectureFlow 嘅確認視窗度傳送。",
+    "description": "Error: this frame must confirm in the extension’s window"
+  }
+}

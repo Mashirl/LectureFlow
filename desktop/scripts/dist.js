@@ -7,7 +7,8 @@
 //   3. licence audit (go run ./scripts/licaudit -check): a violation fails the build
 //   4. electron-builder: Windows NSIS + portable, or macOS arm64 dmg (+ zip)
 //   5. update feed check: app-update.yml only when LECTUREFLOW_UPDATE_REPO is set
-//      (scripts/lib/updaterepo.js); a mismatch fails the build
+//      (scripts/lib/updaterepo.js); a mismatch fails the build. The summary
+//      line also says whether the in-app update's minisign key is built in.
 //   6. size report: dist/size-report.{md,json} (over 250 MB is reported, not fatal)
 //
 // Usage: node scripts/dist.js [--skip-stage] [--skip-audit] [--publish never|always] [--out DIR]
@@ -19,7 +20,7 @@ const path = require('node:path');
 const { iconPng } = require('../src/main/lib/pngicon');
 const { stage } = require('./stage');
 const { signingFrom, dropEmptySigning } = require('./lib/signing');
-const { updateBuildConfig, checkUpdateFeed } = require('./lib/updaterepo');
+const { updateBuildConfig, checkUpdateFeed, builtinUpdateKey } = require('./lib/updaterepo');
 const { walk, buildSizeReport, renderMarkdown, mb } = require('./lib/sizereport');
 
 const DESKTOP = path.resolve(__dirname, '..');
@@ -68,8 +69,9 @@ async function main() {
   const platform = process.platform;
   if (platform !== 'win32' && platform !== 'darwin') throw new Error('installers are built on Windows or macOS');
   const pkg = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8'));
-  // Before anything slow: a malformed LECTUREFLOW_UPDATE_REPO fails here.
-  const updates = updateBuildConfig(process.env, { winCert: signingFrom(process.env).winCert });
+  // Before anything slow: a malformed LECTUREFLOW_UPDATE_REPO (or an
+  // unreadable internal/selfupdate/keys.go) fails here.
+  const updates = updateBuildConfig(process.env, { winCert: signingFrom(process.env).winCert, inAppKey: builtinUpdateKey(REPO) });
   console.log(updates.summary);
   fs.mkdirSync(path.join(DESKTOP, 'build'), { recursive: true });
   fs.writeFileSync(path.join(DESKTOP, 'build', 'icon.png'), iconPng(512));

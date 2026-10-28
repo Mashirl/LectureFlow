@@ -10,6 +10,16 @@
 //   crash      error page (Try again starts it again)
 //   close      ask / background / quit by the service's settings
 //   quit       graceful stop of the service (≤ 10 s, then forced)
+//   background started by the browser extension's host (--background):
+//              no window until the user opens it (tray / Dock) or the
+//              extension asks to open a page (lib/nmhost.js)
+//   updates    before every start of the service, a pending in-app update
+//              is installed (the app quits for it) and a freshly installed
+//              version is on probation: healthy = service ready and the
+//              window loaded the app; a failure is retried once, then the
+//              previous version is put back (selfupdate.js). Which update
+//              mechanism checks for new versions is decided once the
+//              service is ready (updatepath.js).
 'use strict';
 
 const fs = require('node:fs');
@@ -19,7 +29,7 @@ const {
 } = require('electron');
 
 const { resolveDataDir } = require('./lib/datadir');
-const { buildServerArgs, resolveServerCommand, EXIT_RESTART } = require('./lib/serverutil');
+const { buildServerArgs, resolveServerCommand, serviceEnv, EXIT_RESTART } = require('./lib/serverutil');
 const { decideClose, interpretCloseDialog, wantSleepBlock, runningCount } = require('./lib/policy');
 const { isServerUrl, isExternalWebUrl } = require('./lib/security');
 const { iconPng } = require('./lib/pngicon');
@@ -28,12 +38,17 @@ const { ServerProcess, StartError, pickFreePort, isPortFree } = require('./serve
 const { PORT_FILE, readPortMemo, writePortMemo, makePortPicker } = require('./lib/portmemo');
 const { setLocationAside } = require('./lib/location');
 const { UpdateController } = require('./updates');
+const { UpdatePathChooser } = require('./updatepath');
+const { startFailureReason } = require('./selfupdate');
+const { startFailureText, isEnvironmentFailure } = require('./lib/startfail');
 const { createApiClient } = require('./apiclient');
 const { SleepGuard } = require('./sleepguard');
 const { TrayController } = require('./tray');
 const { registerIpc } = require('./ipc');
 const { writeLocaleMemo } = require('./lib/i18n');
 const { hardenSession, hardenWebContents } = require('./websecurity');
+const { launcherFor, launcherBlocked, isPortable } = require('./lib/nmhost');
+const { shellLogFile, mkdirLeaf } = require('./logger');
 
 const SHELL_ROOT = path.resolve(__dirname, '..');
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
@@ -48,6 +63,9 @@ const POLL_MS = 5000;
 const STOP_TIMEOUT_MS = 10000;
 const RESTART_WINDOW_MS = 60000;
 const MAX_RESTARTS = 3;
+// A freshly installed version counts as healthy this long after the window
+// loaded the app (the service must still be running).
+const PROBATION_GRACE_MS = 3000;
 const BACKGROUND = { light: '#eef0f4', dark: '#0e1013' }; // --bg-app
 
 /** appDataRoot: the platform's appData; tests of the unpackaged app may move it. */
@@ -69,8 +87,12 @@ class Shell {
    * translator: createShellTranslator(); its t is handed to the tray and IPC
    * and follows the app's language choice (poll), which is remembered in
    * localeFile; onLocaleChange() rebuilds the application menu.
+   * loadUpdater() → { updater, note }: electron-updater (or a test stand-in),
+   * loaded only when the service says in-app updates are not configured.
+   * selfUpdateFor(dataDir) → a SelfUpdateApplier, or null when this copy is
+   * never updated in place (development).
    */
-  constructor({ translator, localeFile = null, onLocaleChange = () => {}, log, isDev, updater = null, updateNote = null }) {
+  constructor({ translator, localeFile = null, onLocaleChange = () => {}, log, isDev, loadUpdater = null, selfUpdateFor = null, background = false }) {
     this.translator = translator;
     this.t = translator.t;
     this.localeFile = localeFile;
@@ -95,10 +117,26 @@ class Shell {
     this.lastError = null; // kind of the error page on screen ('location_invalid' offers "use the default location")
     this.locationFile = null;
     this.installingUpdate = false;
-    this.updateNote = updateNote; // written to desktop.log once the log file is open
+    // In-app update: the applier of the current data dir; probation while a
+    // freshly installed version starts (see the file header).
+    this.selfUpdateFor = selfUpdateFor;
+    this.applier = null;
+    this.probation = false;
+    this.probationFailing = false;
+    this.probationTimer = null;
+    // Started with --background: the window stays hidden until shown.
+    this.startHidden = background;
+    // A route the browser extension asked for ("open") before the app page
+    // could show it; loadApp goes there.
+    this.pendingRoute = null;
 
     this.api = createApiClient({ getServer: () => this._serverForApi() });
-    this.updates = updater ? new UpdateController({ updater, api: this.api, log }) : null;
+    this.updatePath = loadUpdater ? new UpdatePathChooser({
+      api: this.api,
+      loadUpdater,
+      createController: (updater) => new UpdateController({ updater, api: this.api, log }),
+      log,
+    }) : null;
     this.sleepGuard = new SleepGuard({ blocker: powerSaveBlocker, log });
     this.tray = new TrayController({
       t: this.t,
@@ -131,6 +169,8 @@ class Shell {
       log: this.log,
     });
     this.createWindow();
+    // Without a window, the tray icon is the way in (macOS: the Dock).
+    if (this.startHidden && this.platform !== 'darwin') this.tray.show();
     this.startServer('starting');
   }
 
@@ -177,6 +217,11 @@ class Shell {
     };
   }
 
+  /** updates: the electron-updater controller, once that path was chosen. */
+  get updates() {
+    return this.updatePath ? this.updatePath.controller : null;
+  }
+
   port() {
     return this.server && this.server.ready ? this.server.port : null;
   }
@@ -220,7 +265,7 @@ class Shell {
       webPreferences: this.webPreferences(),
     });
     win.once('ready-to-show', () => {
-      if (!this.quitting) win.show();
+      if (!this.quitting && !this.startHidden) win.show();
     });
     win.on('close', (event) => {
       if (this.quitting) return;
@@ -231,11 +276,27 @@ class Shell {
     wc.on('did-fail-load', (event, code, description, url, isMainFrame) => {
       if (!isMainFrame || code === -3 /* ERR_ABORTED: replaced by another load */) return;
       if (!isServerUrl(url, this.port())) return;
+      if (this.probation) {
+        this._probationFailed(`the window did not load the app: ${description} (${code})`);
+        return;
+      }
       this.showError({ title: 'error.page.title', body: this.t('error.page.body'), detail: `${description} (${code})` });
     });
+    wc.on('did-finish-load', () => {
+      if (this.probation && this.phase === 'ready' && isServerUrl(wc.getURL(), this.port())) this._probationLoaded();
+      this._reportVisibility(win); // a page loaded while the window is hidden (background start)
+    });
+    // perf-fix: the service samples the GPU only for a window someone can
+    // see (web/api.js, internal/api/visibility.go); hidden to the tray or
+    // minimized counts as not seen, whatever the page's own visibility says.
+    for (const name of ['show', 'hide', 'minimize', 'restore']) win.on(name, () => this._reportVisibility(win));
     wc.on('render-process-gone', (event, details) => {
       if (this.quitting || details.reason === 'clean-exit') return;
       this.log.error(`renderer gone: ${details.reason} (${details.exitCode})`);
+      if (this.probation) {
+        this._probationFailed(`the window's page process ended (${details.reason})`);
+        return;
+      }
       this.showError({ title: 'error.page.title', body: this.t('error.page.body'), detail: this.t('reason.renderer', { reason: details.reason }) });
     });
     this.win = win;
@@ -245,6 +306,20 @@ class Shell {
   _ensureWindow() {
     if (!this.win || this.win.isDestroyed()) this.createWindow();
     return this.win;
+  }
+
+  /**
+   * _reportVisibility tells the app page whether its window is shown (not
+   * hidden, not minimized): a "lectureflow:window-visibility" event with
+   * {detail: {visible}}, which web/api.js reports to the service. Nothing
+   * for the splash or error page.
+   */
+  _reportVisibility(win) {
+    if (!win || win.isDestroyed()) return;
+    const wc = win.webContents;
+    if (!isServerUrl(wc.getURL(), this.port())) return;
+    const visible = win.isVisible() && !win.isMinimized();
+    wc.executeJavaScript(`window.dispatchEvent(new CustomEvent('lectureflow:window-visibility', { detail: { visible: ${visible} } }))`).catch(() => {});
   }
 
   // ---- pages ----
@@ -257,6 +332,7 @@ class Shell {
   }
 
   showSplash(state) {
+    this.splashState = state;
     this._loadShellPage({ state, lang: this.translator.locale, status: this.t(`splash.${state}`) });
   }
 
@@ -280,9 +356,30 @@ class Shell {
 
   loadApp() {
     const win = this._ensureWindow();
-    win.loadURL(`${this.server.origin}/`).catch(() => {
+    const route = this.pendingRoute || '';
+    this.pendingRoute = null;
+    win.loadURL(`${this.server.origin}/${route}`).catch(() => {
       // reported by did-fail-load
     });
+  }
+
+  /**
+   * openRoute: the browser extension's "在 LectureFlow 中打开" (a
+   * "LECTUREFLOW_OPEN #/lecture/ID" line of the service, validated by
+   * lib/nmhost.parseOpenLine): show and focus the window on that route.
+   */
+  openRoute(route) {
+    if (this.quitting) return;
+    this.log.info(`open requested by the browser extension: ${route}`);
+    const win = this.win;
+    const onApp = this.phase === 'ready' && win && !win.isDestroyed() && isServerUrl(win.webContents.getURL(), this.port());
+    if (!onApp) {
+      this.pendingRoute = route; // the next loadApp goes there
+      this.showMainWindow();
+      return;
+    }
+    this.showMainWindow();
+    win.webContents.executeJavaScript(`location.hash = ${JSON.stringify(route)}`).catch(() => {});
   }
 
   /** openSettings: "Settings…" (Cmd+,) of the macOS application menu. */
@@ -307,10 +404,17 @@ class Shell {
     if (previous) this.log.removeSecret(previous.token);
     if (gen !== this.generation) return;
 
-    const fail = (opts) => {
+    // reason: English, for result.json when a freshly installed version fails.
+    const fail = (opts, reason = null) => {
       if (gen !== this.generation || this.quitting) return;
+      if (this.probation && reason) {
+        this._probationFailed(reason);
+        return;
+      }
       this.phase = 'failed';
       this.showError(opts);
+      // A start in the background must not fail unseen.
+      if (this.startHidden) this.showMainWindow();
     };
 
     // The data dir is resolved again on every start: after exit code 3 the
@@ -327,22 +431,22 @@ class Shell {
       });
     }
     const { dataDir } = resolved;
-    if (resolved.source === 'location') {
-      if (!isDir(dataDir)) {
-        this.log.setFile(path.join(resolved.profileDir, 'logs', 'desktop.log'));
-        return fail({ title: 'error.data_dir.title', body: this.t('error.data_dir.body', { path: dataDir }) });
-      }
-    } else {
-      try {
-        fs.mkdirSync(dataDir, { recursive: true });
-      } catch (err) {
-        this.log.setFile(path.join(resolved.profileDir, 'logs', 'desktop.log'));
-        return fail({ title: 'error.start.title', body: this.t('error.start.body'), detail: `${this.t('reason.unwritable', { path: dataDir })}\n${err.code || err.message}` });
-      }
+    if (resolved.source === 'location' && !isDir(dataDir)) {
+      this.log.setFile(path.join(resolved.profileDir, 'logs', 'desktop.log'));
+      return fail({ title: 'error.data_dir.title', body: this.t('error.data_dir.body', { path: dataDir }) });
     }
+    // The shell never creates the data dir (sec-update M2, datadir-ui): the
+    // service does, private from the start (internal/dirperm); one made here
+    // would get the default permissions of where it lies. Until it exists
+    // the shell logs into its profile (logger.js shellLogFile).
+    const dataDirMissing = !isDir(dataDir);
     this.dataDir = dataDir;
-    this.log.setFile(path.join(dataDir, 'logs', 'desktop.log'));
-    this.log.info(`data dir ${dataDir} (${resolved.source}); app ${app.getVersion()}`);
+    this.log.setFile(shellLogFile({ dataDir, profileDir: resolved.profileDir, isDir }));
+    this.log.info(`data dir ${dataDir} (${resolved.source}${dataDirMissing ? ', not created yet: the service creates it' : ''}); app ${app.getVersion()}`);
+
+    // The service is not running here (nor any task in it): the only moment
+    // an update is installed.
+    if ((await this._selfUpdateAtStart(dataDir, gen)) === 'stop') return;
 
     const cmd = resolveServerCommand({
       isPackaged: app.isPackaged,
@@ -354,7 +458,7 @@ class Shell {
     });
     const program = cmd.prefixArgs[0] || cmd.command;
     if (!fs.existsSync(program)) {
-      return fail({ title: 'error.start.title', body: this.t('error.start.body'), detail: this.t('reason.not_found', { path: program }) });
+      return fail({ title: 'error.start.title', body: this.t('error.start.body'), detail: this.t('reason.not_found', { path: program }) }, `the service program is missing: ${program}`);
     }
 
     const portFile = path.join(app.getPath('userData'), PORT_FILE);
@@ -369,13 +473,25 @@ class Shell {
         appVersion: app.getVersion(),
         configFile: path.join(dataDir, 'config.toml'),
         locationFile: resolved.source === 'env' ? null : resolved.locationFile,
+        launcher: launcherFor({ isPackaged: app.isPackaged, platform: this.platform, execPath: process.execPath, env: process.env }),
+        launcherBlocked: launcherBlocked({ isPackaged: app.isPackaged, platform: this.platform, execPath: process.execPath }),
+        portable: isPortable({ isPackaged: app.isPackaged, platform: this.platform, env: process.env }),
       }),
-      env: { ...process.env, ...cmd.extraEnv },
-      cwd: isDir(cmd.resourcesDir) ? cmd.resourcesDir : dataDir,
+      env: serviceEnv(process.env, cmd.extraEnv), // no usage reporting (serverutil NO_TELEMETRY_ENV)
+      // (a data dir the service has yet to create cannot be the working directory)
+      cwd: [cmd.resourcesDir, dataDir].find(isDir) || path.dirname(program),
       log: this.log,
     });
     this.server = server;
     server.on('exit', (info) => this.onServerExit(server, info));
+    server.on('open', (route) => {
+      if (server === this.server) this.openRoute(route);
+    });
+    // a long step before the ready line (the backup and migrations of an
+    // upgrade, test-upgrade F3): the splash says the data is being upgraded
+    server.on('starting', () => {
+      if (server === this.server && gen === this.generation && this.phase === 'starting' && this.splashState !== 'upgrading') this.showSplash('upgrading');
+    });
 
     try {
       await server.start();
@@ -385,24 +501,116 @@ class Shell {
         this.restartRequested();
         return;
       }
-      fail(this._startErrorPage(err, program));
+      const page = this._startErrorPage(err, program);
+      // the service could not create the data dir (the shell leaves that to it)
+      if (dataDirMissing && !isDir(dataDir)) page.detail = [this.t('reason.unwritable', { path: dataDir }), page.detail].filter(Boolean).join('\n');
+      // another LectureFlow on the data folder is not this version's fault:
+      // no probation failure (no rollback); the error page and "Try again"
+      fail(page, err instanceof StartError && isEnvironmentFailure(err.failure) ? null : startFailureReason(err));
       return;
     }
     if (gen !== this.generation || this.quitting) {
       server.stop({ timeoutMs: STOP_TIMEOUT_MS }).catch(() => {});
       return;
     }
+    // the service has created the data dir: the shell's log moves next to the service's
+    if (dataDirMissing) {
+      this.log.info(`the service created the data dir; the log continues in ${path.join(dataDir, 'logs')}`);
+      this.log.setFile(shellLogFile({ dataDir, profileDir: resolved.profileDir, isDir }));
+      this.log.info(`data dir ${dataDir} (${resolved.source}, created by the service); app ${app.getVersion()}`);
+    }
     this.log.addSecret(server.token);
     if (readPortMemo(portFile) !== server.port) writePortMemo(portFile, server.port);
     this.phase = 'ready';
     this.lastError = null;
     this.loadApp();
+    // The first poll decides the update mechanism (updatepath.js) and starts
+    // electron-updater's checks when that is the one; after a restart
+    // sync() reports again.
     this.startPolling();
-    if (this.updateNote) {
-      this.log.info(this.updateNote);
-      this.updateNote = null;
+  }
+
+  // ---- in-app update: install at start, probation of a new version ----
+
+  /**
+   * _selfUpdateAtStart: install a pending update (→ 'stop': the app quits
+   * for it) or begin the probation of a freshly installed version.
+   */
+  async _selfUpdateAtStart(dataDir, gen) {
+    this._endProbation();
+    if (!this.selfUpdateFor) return 'go';
+    if (!this.applier || this.applier.dataDir !== dataDir) this.applier = this.selfUpdateFor(dataDir);
+    const r = await this.applier.atStart({ background: this.startHidden });
+    if (gen !== this.generation || this.quitting) return 'stop';
+    if (r.action === 'exit') {
+      this._quitForUpdate();
+      return 'stop';
     }
-    if (this.updates) this.updates.start(); // once; after a restart sync() reports again
+    this.probation = r.action === 'probation';
+    return 'go';
+  }
+
+  _endProbation() {
+    if (this.probationTimer) clearTimeout(this.probationTimer);
+    this.probationTimer = null;
+    this.probation = false;
+  }
+
+  /** _probationLoaded: the window loaded the app; healthy if the service still runs a moment later. */
+  _probationLoaded() {
+    if (this.probationTimer) return;
+    this.probationTimer = setTimeout(() => {
+      this.probationTimer = null;
+      if (!this.probation || this.probationFailing || this.quitting) return;
+      if (this.phase !== 'ready' || !this.server || !this.server.alive) return;
+      this.probation = false;
+      this.applier.healthy().catch((err) => this.log.warn(`selfupdate: ${err.message}`));
+    }, PROBATION_GRACE_MS);
+  }
+
+  /**
+   * _probationFailed(reason): the freshly installed version did not start.
+   * The service is stopped first (the database may be put back); then the
+   * applier retries once, or starts the previous version (the app quits),
+   * or gives up (error page).
+   */
+  async _probationFailed(reason) {
+    if (!this.probation || this.probationFailing || this.quitting) return;
+    this.probationFailing = true;
+    if (this.probationTimer) clearTimeout(this.probationTimer);
+    this.probationTimer = null;
+    this.generation++; // ends a start in progress
+    this.phase = 'failed';
+    this.stopPolling();
+    this.sleepGuard.release();
+    const server = this.server;
+    if (server && server.alive) await server.stop({ timeoutMs: STOP_TIMEOUT_MS }).catch(() => {});
+    let r;
+    try {
+      r = await this.applier.failed(reason);
+    } catch (err) {
+      r = { action: 'giveup', error: String(err && err.message) };
+    }
+    this.probation = false;
+    this.probationFailing = false;
+    if (this.quitting) return;
+    if (r.action === 'retry') {
+      this.startServer('restarting');
+      return;
+    }
+    if (r.action === 'exit') {
+      this._quitForUpdate();
+      return;
+    }
+    this.showError({ title: 'error.start.title', body: this.t('error.start.body'), detail: r.error || reason });
+    if (this.startHidden) this.showMainWindow();
+  }
+
+  /** _quitForUpdate: an installer or the other version takes over. */
+  _quitForUpdate() {
+    this.log.info('quitting for the application update');
+    this.showSplash('restarting');
+    setImmediate(() => app.quit());
   }
 
   /**
@@ -441,6 +649,10 @@ class Shell {
   _startErrorPage(err, program) {
     const page = { title: 'error.start.title', body: this.t('error.start.body') };
     if (!(err instanceof StartError)) return { ...page, detail: String(err && err.message) };
+    // a failure the service named (lib/startfail.js): what to do, in the
+    // interface language; its ERROR line (Chinese and English) as details
+    const text = startFailureText(err.failure, this.t);
+    if (text) return { ...page, body: text, detail: err.reason || '' };
     switch (err.kind) {
       case 'spawn_failed':
         return { ...page, detail: this.t('reason.spawn_failed', { code: err.reason, path: program }) };
@@ -460,6 +672,10 @@ class Shell {
   onServerExit(server, info) {
     if (server !== this.server || this.quitting || info.expected) return;
     if (this.phase !== 'ready') return; // still starting: start() reports it
+    if (this.probation && info.code !== EXIT_RESTART) {
+      this._probationFailed(`the service stopped unexpectedly (${info.reason || `exit code ${info.code === null ? info.signal : info.code}`})`);
+      return;
+    }
     this.phase = 'failed';
     this.stopPolling();
     this.sleepGuard.release();
@@ -502,9 +718,12 @@ class Shell {
   }
 
   openLogs() {
-    const dir = this.dataDir ? path.join(this.dataDir, 'logs') : path.join(app.getPath('userData'), 'logs');
+    // the folder of the shell's log: the data dir's logs (with the
+    // service's), or the profile's while the data dir does not exist —
+    // never creating the data dir (sec-update M2: the service does)
+    const dir = this.log.file ? path.dirname(this.log.file) : path.join(app.getPath('userData'), 'logs');
     try {
-      fs.mkdirSync(dir, { recursive: true });
+      mkdirLeaf(dir);
     } catch {
       // openPath reports it
     }
@@ -548,6 +767,7 @@ class Shell {
     if (this.polling || this.phase !== 'ready') return;
     this.polling = true;
     try {
+      if (this.updatePath && !this.updatePath.decided) await this.updatePath.decide().catch(() => {});
       if (this.updates) await this.updates.sync().catch(() => {});
       const activity = await this.api.activity().catch(() => null);
       let settings = this.lastSettings;
@@ -624,10 +844,11 @@ class Shell {
 
   showMainWindow() {
     if (this.quitting) return;
+    this.startHidden = false;
     if (!this.win || this.win.isDestroyed()) {
       this.createWindow();
       if (this.phase === 'ready') this.loadApp();
-      else if (this.phase === 'starting') this.showSplash('starting');
+      else if (this.phase === 'starting') this.showSplash(this.splashState === 'upgrading' ? 'upgrading' : 'starting');
       else this.retry();
     }
     if (this.win.isMinimized()) this.win.restore();

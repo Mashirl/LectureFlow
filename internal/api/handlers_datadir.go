@@ -150,7 +150,7 @@ func relocateStatus(code string) int {
 		return http.StatusConflict
 	case relocate.CodePathInvalid, relocate.CodePathTooLong, relocate.CodeSameDir, relocate.CodeTargetNotEmpty, relocate.CodeTargetInside,
 		relocate.CodeTargetContains, relocate.CodeTargetNotWritable, relocate.CodeNotLectureFlow, relocate.CodeTooNew,
-		relocate.CodeImportSameDir:
+		relocate.CodeImportSameDir, codeImportNetworkPath:
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
@@ -506,10 +506,11 @@ func (s *Server) runMove(run *dataDirRun, hooks RelocateHooks, move func(context
 
 // POST /api/app/import {"path"}: the same refusals as the move (no
 // env_override: an import stays in the current data directory), 400
-// data_import.not_lectureflow / too_new / same_dir, 409 data_import.not_fresh
-// {courses, lectures}; else 202 and the staging copy runs in the
-// background, followed by the restart (cmd applies it before the database
-// opens: relocate.ApplyStaged).
+// data_import.not_lectureflow / too_new / same_dir, 400
+// data_import.network_path {count, path} (import_paths.go), 409
+// data_import.not_fresh {courses, lectures}; else 202 and the staging copy
+// runs in the background, followed by the restart (cmd applies it before
+// the database opens: relocate.ApplyStaged).
 func (s *Server) postImport(w http.ResponseWriter, r *http.Request) {
 	if !s.desktopOnly(w, r) {
 		return
@@ -539,6 +540,10 @@ func (s *Server) postImport(w http.ResponseWriter, r *http.Request) {
 		refuse(model.Errorf(relocate.CodeImportSameDir, nil, nil))
 		return
 	}
+	if err := checkImportPaths(ctx, filepath.Join(info.Dir, relocate.DBName), info.Dir); err != nil {
+		refuse(err)
+		return
+	}
 	if err := s.libraryFresh(ctx); err != nil {
 		refuse(err)
 		return
@@ -551,6 +556,9 @@ func (s *Server) postImport(w http.ResponseWriter, r *http.Request) {
 		err := stage(context.Background(), relocate.ImportOptions{
 			Src: info.Dir, DataDir: dataDir, Fresh: s.libraryFresh, Progress: progress,
 		})
+		if err == nil {
+			err = checkStagedPaths(context.Background(), dataDir)
+		}
 		if err != nil {
 			slog.Error("data import: staging failed", "from", info.Dir, "err", err)
 		}
@@ -682,8 +690,9 @@ func (s *Server) deleteOldDataDir(w http.ResponseWriter, r *http.Request) {
 }
 
 // removeOldDataDir deletes dir; when it is the default data directory
-// (where location.json lives) it keeps location.json and the shell's
-// electron/ profile and empties the rest.
+// (where location.json lives) it keeps the installation's entries
+// (location.json, the shell's electron/ profile, the native messaging
+// nmhost/ and run/) and empties the rest.
 func removeOldDataDir(dir, locationFile string) error {
 	if locationFile == "" || !samePathOS(dir, filepath.Dir(locationFile)) {
 		return os.RemoveAll(dir)
@@ -695,7 +704,7 @@ func removeOldDataDir(dir, locationFile string) error {
 	var firstErr error
 	for _, e := range ents {
 		n := e.Name()
-		if strings.EqualFold(n, relocate.LocationName) || strings.EqualFold(n, relocate.ShellProfileDir) {
+		if relocate.IsInstallationEntry(n) {
 			continue
 		}
 		if err := os.RemoveAll(filepath.Join(dir, n)); err != nil && firstErr == nil {

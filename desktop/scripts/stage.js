@@ -5,32 +5,50 @@
 // extraResources) into desktop/build/resources:
 //
 //   bin/lectureflow(.exe)   go build -trimpath -ldflags "-s -w -X main.version=V"
+//   bin/lectureflow-nmhost(.exe)  the browser extension's Native Messaging host
+//                           (./cmd/lectureflow-nmhost, built like the server)
 //   bin/ffmpeg, ffprobe     LGPL build from pinned sources (packaging/third-party.json;
 //                           Windows: scripts/build-ffmpeg-windows.sh, macOS:
 //                           scripts/build-ffmpeg-macos.sh), configure line and ffmpeg -L checked
 //   bin/uv                  pinned release
+//   bin/aria2c(.exe)        aria2 1.37.0 (SPEC-ext, ext-brief §6.1): Windows the pinned
+//                           official build (its SHA-256 is also in components.json, core
+//                           component), macOS built from the pinned source by
+//                           packaging/aria2c/build-aria2c-macos.sh
 //   worker/*.py             the runtime scripts, no tests
 //   components.json, locks/ packaging/components/components.json and its lock files
 //   sample/                 assets/sample (sample lecture, reference text, licence)
-//   LICENSE, LICENSE-EXCEPTION.md, THIRD_PARTY_NOTICES.md, licenses/{ffmpeg,uv}/
+//   LICENSE, LICENSE-EXCEPTION.md, THIRD_PARTY_NOTICES.md, licenses/{ffmpeg,uv,aria2}/
+//                           (licenses/{ffmpeg,aria2}/SOURCE.txt: the corresponding source is
+//                           the release attachment of scripts/sources.js)
+//
+// macOS: every Mach-O file in resources/ must run on the app's minimum macOS
+// (third-party.json macos.minimum_system_version, = electron-builder's
+// mac.minimumSystemVersion): its LC_BUILD_VERSION (or LC_VERSION_MIN_MACOSX)
+// minos is not newer, and it has an arm64 slice. Otherwise staging fails.
 //
 // Usage: node scripts/stage.js [--platform win32|darwin]
 'use strict';
 
 const { execFileSync, spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { fetchPinned, extract, globFiles, sha256File } = require('./lib/fetch');
+const { assetName, assetURL, releaseRepo, releaseURL } = require('./sources');
 
 const DESKTOP = path.resolve(__dirname, '..');
 const REPO = path.resolve(DESKTOP, '..');
 const CACHE = path.join(DESKTOP, '.cache');
 const OUT = path.join(DESKTOP, 'build', 'resources');
 const MANIFEST = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'packaging', 'third-party.json'), 'utf8'));
+const APP_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8')).version;
 
-// Python scripts the service runs (no tests, no conftest).
-const WORKER_FILES = ['asr.py', 'asr_common.py', 'asr_openvino.py', 'asr_mlx.py', 'extract_pdf.py'];
-const WORKER_OPTIONAL = ['colab_remote.py'];
+// Python scripts the service runs (no tests, no conftest). colab_remote.py
+// is uploaded to the Colab runtime with asr.py, asr_common.py and
+// textrepair.py (internal/colab/backend.go workerFiles); it was optional
+// until the Colab backend shipped (3.2.0), now a missing one fails staging.
+const WORKER_FILES = ['asr.py', 'asr_common.py', 'asr_openvino.py', 'asr_mlx.py', 'textrepair.py', 'extract_pdf.py', 'colab_remote.py'];
 const SAMPLE_FILES = ['sample-lecture.flac', 'reference.txt', 'LICENSE', 'SOURCE.md'];
 
 function targetKey(platform) {
@@ -95,15 +113,71 @@ function checkConfigure(line, forbidden) {
   return forbidden.filter((f) => flags.includes(f));
 }
 
-function goBuild(platform, version) {
-  const exe = platform === 'win32' ? 'lectureflow.exe' : 'lectureflow';
+// The Go programs in resources/bin: the server and the Native Messaging host
+// that browsers start for the extension (ext-brief §4). Both are pure Go
+// (CGO_ENABLED=0), cross-compiled for the target.
+const GO_PROGRAMS = [
+  { name: 'lectureflow', pkg: './cmd/lectureflow' },
+  { name: 'lectureflow-nmhost', pkg: './cmd/lectureflow-nmhost' },
+];
+
+function goBuild(platform, version, { name, pkg } = GO_PROGRAMS[0]) {
+  const exe = platform === 'win32' ? `${name}.exe` : name;
   const out = path.join(OUT, 'bin', exe);
+  if (!fs.existsSync(path.join(REPO, ...pkg.split('/')))) throw new Error(`${pkg} is missing: the installer needs ${exe}`);
   const env = { ...process.env, CGO_ENABLED: '0', GOOS: platform === 'win32' ? 'windows' : 'darwin', GOARCH: platform === 'win32' ? 'amd64' : 'arm64' };
-  console.log(`go build ${env.GOOS}/${env.GOARCH} version ${version}`);
-  execFileSync('go', ['build', '-trimpath', '-ldflags', `-s -w -X main.version=${version}`, '-o', out, './cmd/lectureflow'], { cwd: REPO, env, stdio: 'inherit' });
+  console.log(`go build ${pkg} ${env.GOOS}/${env.GOARCH} version ${version}`);
+  execFileSync('go', ['build', '-trimpath', '-ldflags', `-s -w -X main.version=${version}`, '-o', out, pkg], { cwd: REPO, env, stdio: 'inherit' });
+  return out;
 }
 
-async function stageFfmpeg(platform, key) {
+/**
+ * sourceSection(program, key, version, repo) → the "Corresponding source
+ * code" lines of SOURCE.txt: the release attachment (scripts/sources.js),
+ * then the upstream locations of the same tarballs and what is not
+ * attached, with the reason.
+ */
+function sourceSection(program, key, version, repo) {
+  const spec = MANIFEST[program][key];
+  const id = `${program}-${key}`;
+  const script = (spec.build_scripts || []).find((s) => s.endsWith('.sh'));
+  const out = [
+    'Corresponding source code:',
+    `attached to the LectureFlow ${version} release, next to the installers, as ${assetName(version, id)}`,
+    `  ${assetURL(version, id, repo)}`,
+    `  (release page: ${releaseURL(version, repo)})`,
+    'It holds the upstream source tarballs listed below, unchanged and checked by SHA-256,',
+    `${script ? `the build script (${script}), ` : ''}LectureFlow's pins (desktop/packaging/third-party.json) and a README.txt on how this binary was built.`,
+    '',
+    'Upstream locations of the same tarballs:',
+    ...spec.source_code.filter((s) => !s.release_asset && !s.not_attached).map((s) => `- ${s.what}: ${s.url}`),
+  ];
+  const left = spec.source_code.filter((s) => s.not_attached);
+  if (left.length) out.push('', 'Not attached (no source obligation):', ...left.flatMap((s) => [`- ${s.what}: ${s.url}`, `  ${s.not_attached}`]));
+  return out;
+}
+
+/** ffmpegSourceText(key, version, repo) → resources/licenses/ffmpeg/SOURCE.txt (LGPL: where the corresponding source is). */
+function ffmpegSourceText(key, version = APP_VERSION, repo = releaseRepo()) {
+  const f = MANIFEST.ffmpeg;
+  const spec = f[key];
+  const win = key === 'windows-x64';
+  const out = [
+    win
+      ? `FFmpeg ${f.version}: resources/bin/ffmpeg.exe, ffprobe.exe and the FFmpeg DLLs next to them (av*.dll, sw*.dll) are an LGPL build of FFmpeg ${f.version}. The DLLs can be replaced with your own build of the same FFmpeg version.`
+      : `FFmpeg ${f.version}: resources/bin/ffmpeg and ffprobe are an LGPL build of FFmpeg ${f.version} for macOS ${MANIFEST.macos.minimum_system_version} or later (static executables: to change FFmpeg, rebuild them from the source below and replace both files).`,
+    `License: ${f.license} (COPYING.LGPLv2.1, LICENSE.md). The libraries linked in are listed in THIRD_PARTY_NOTICES.md; their license texts are in this directory. CONFIGURE.txt has the configure flags, BUILDINFO.txt the build environment.`,
+    '',
+    ...sourceSection('ffmpeg', key, version, repo),
+    '',
+    `Build: ${spec.build}.`,
+  ];
+  if (spec.toolchain) out.push('', 'Toolchain:', ...Object.entries(spec.toolchain).map(([k, v]) => `- ${k} ${v}`));
+  out.push('');
+  return out.join('\n');
+}
+
+async function stageFfmpeg(platform, key, version = APP_VERSION) {
   const spec = MANIFEST.ffmpeg[key];
   let root;
   if (platform === 'win32') {
@@ -154,6 +228,7 @@ async function stageFfmpeg(platform, key) {
   fs.mkdirSync(path.join(OUT, 'licenses', 'ffmpeg'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'licenses', 'ffmpeg', 'CONFIGURE.txt'),
     `FFmpeg ${MANIFEST.ffmpeg.version} (${spec.build || spec.url}), LGPL build. Configure flags:\n${configure.split(' ').join('\n')}\n`);
+  fs.writeFileSync(path.join(OUT, 'licenses', 'ffmpeg', 'SOURCE.txt'), ffmpegSourceText(key, version));
   return { configure, licenseChecks: checks };
 }
 
@@ -174,11 +249,288 @@ async function stageUv(platform, key) {
   }
 }
 
+/**
+ * checkAria2cVersion(text, version, key) → problems with the output of
+ * aria2c --version: the pinned version, HTTPS, never OpenSSL or GnuTLS
+ * (license_note); on macOS AppleTLS and none of the libraries and features
+ * build-aria2c-macos.sh turns off.
+ */
+function checkAria2cVersion(text, version, key) {
+  const lines = String(text).split(/\r?\n/);
+  const field = (name) => (lines.find((l) => l.startsWith(`${name}:`)) || '').slice(name.length + 1).trim();
+  const libs = field('Libraries');
+  const features = field('Enabled Features').split(/,\s*/).filter(Boolean);
+  const problems = [];
+  if (lines[0].trim() !== `aria2 version ${version}`) problems.push(`version line "${lines[0].trim()}", expected "aria2 version ${version}"`);
+  if (!features.includes('HTTPS')) problems.push(`HTTPS is not enabled (features: ${features.join(', ') || 'none'})`);
+  if (/OpenSSL|GnuTLS/i.test(libs)) problems.push(`links OpenSSL or GnuTLS: ${libs}`);
+  if (key === 'darwin-arm64') {
+    if (!/\bAppleTLS\b/.test(libs)) problems.push(`AppleTLS missing: ${libs || 'no libraries'}`);
+    const bad = libs.split(/\s+/).filter((l) => /^(nettle|GMP|libgcrypt|libxml2|expat|sqlite3|libssh2|c-ares)\b/i.test(l));
+    if (bad.length) problems.push(`libraries the macOS build turns off: ${bad.join(' ')}`);
+    const off = features.filter((f) => ['BitTorrent', 'Metalink', 'SFTP', 'Firefox3 Cookie', 'XML-RPC', 'Async DNS'].includes(f));
+    if (off.length) problems.push(`features the macOS build turns off: ${off.join(', ')}`);
+  }
+  return problems;
+}
+
+/** aria2cSourceText(key, version, repo) → resources/licenses/aria2/SOURCE.txt (GPL: where the corresponding source is). */
+function aria2cSourceText(key, version = APP_VERSION, repo = releaseRepo()) {
+  const a = MANIFEST.aria2c;
+  const spec = a[key];
+  const out = [
+    spec.bin_sha256
+      ? `aria2 ${a.version}: resources/bin/aria2c.exe is aria2's official Windows build, unchanged (SHA-256 ${spec.bin_sha256}).`
+      : `aria2 ${a.version}: resources/bin/aria2c is built from the aria2 source (BUILDINFO.txt) and signed with the application.`,
+    `License: ${a.license}. ${a.license_note}`,
+    '',
+    ...sourceSection('aria2c', key, version, repo),
+    '',
+    `Build: ${spec.build}.`,
+  ];
+  if (spec.configure) {
+    out.push('', `Built by packaging/aria2c/build-aria2c-macos.sh of the LectureFlow source (https://github.com/${repo})`,
+      `for macOS ${MANIFEST.macos.minimum_system_version} or later with these configure flags (BUILDINFO.txt has the compiler and SDK):`,
+      ...spec.configure.map((f) => `  ${f}`));
+  }
+  if (spec.toolchain) out.push('', 'Toolchain:', ...Object.entries(spec.toolchain).map(([k, v]) => `- ${k} ${v}`));
+  out.push('', 'License texts: COPYING (GNU GPL version 2), LICENSE.OpenSSL (the OpenSSL linking permission), thirdparty/ (the libraries linked in).', '');
+  return out.join('\n');
+}
+
+/**
+ * extractOnce(archive, dir, members): unpacks the archive (only members,
+ * when given) into dir unless dir exists. It unpacks into dir.partial and
+ * renames that when complete, so an interrupted run never leaves a dir
+ * that looks finished.
+ */
+function extractOnce(archive, dir, members = []) {
+  if (fs.existsSync(dir)) return;
+  const part = `${dir}.partial`;
+  fs.rmSync(part, { recursive: true, force: true });
+  fs.mkdirSync(part, { recursive: true });
+  const tar = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  execFileSync(tar, ['-xf', archive, '-C', part, ...members], { stdio: 'inherit' });
+  fs.renameSync(part, dir);
+}
+
+async function stageAria2c(platform, key, version = APP_VERSION) {
+  const a = MANIFEST.aria2c;
+  const spec = a[key];
+  const downloads = path.join(CACHE, 'downloads');
+  const exe = platform === 'win32' ? 'aria2c.exe' : 'aria2c';
+  const licDir = path.join(OUT, 'licenses', 'aria2');
+  let root;
+  if (platform === 'win32') {
+    // aria2's own Windows build, pinned by the SHA-256 of the zip and of aria2c.exe.
+    const archive = await fetchPinned(spec, downloads);
+    const dir = path.join(CACHE, 'extract', `aria2-${spec.sha256.slice(0, 12)}`);
+    extractOnce(archive, dir);
+    root = path.join(dir, spec.root);
+  } else {
+    // No upstream macOS binary: built from the pinned source (CI: macos-14, cached).
+    root = path.join(CACHE, `aria2c-macos-${a.version}`);
+    if (!fs.existsSync(path.join(root, spec.bin))) {
+      if (process.platform !== 'darwin') throw new Error('the macOS aria2c is built on macOS (packaging/aria2c/build-aria2c-macos.sh)');
+      execFileSync('bash', [path.join(REPO, 'packaging', 'aria2c', 'build-aria2c-macos.sh')], { cwd: REPO, stdio: 'inherit' });
+    }
+  }
+  const src = path.join(root, spec.bin);
+  if (!fs.existsSync(src)) throw new Error(`aria2c: ${spec.bin} missing in ${root}`);
+  const dest = path.join(OUT, 'bin', exe);
+  copy(src, dest);
+  if (platform !== 'win32') fs.chmodSync(dest, 0o755);
+  const sha256 = sha256File(dest);
+  const size = fs.statSync(dest).size;
+  if (spec.bin_sha256 && (sha256 !== spec.bin_sha256 || size !== spec.bin_size)) {
+    throw new Error(`aria2c: ${exe} has SHA-256 ${sha256} (${size} bytes), third-party.json pins ${spec.bin_sha256} (${spec.bin_size} bytes)`);
+  }
+  for (const pattern of spec.licenses) {
+    const files = globFiles(root, pattern);
+    if (!files.length && !pattern.includes('*')) throw new Error(`aria2c: ${pattern} missing in ${root}`);
+    for (const f of files) copy(f, path.join(licDir, path.relative(root, f)));
+  }
+  // Windows: the license texts of the libraries aria2's build linked in,
+  // from their pinned source tarballs, and of the toolchain runtimes.
+  for (const d of spec.deps || []) {
+    if (!d.licenses.length) continue;
+    const archive = await fetchPinned(d, downloads);
+    const members = d.licenses.map((l) => `${d.root}/${l}`);
+    // Keyed by the archive and the members: the aria2 source gives wslay's license.
+    const dir = path.join(CACHE, 'extract', `aria2-lic-${crypto.createHash('sha256').update(`${d.sha256} ${members.join(' ')}`).digest('hex').slice(0, 12)}`);
+    extractOnce(archive, dir, members);
+    for (const l of d.licenses) copy(path.join(dir, d.root, l), path.join(licDir, 'thirdparty', `${d.name}-${path.basename(l)}.txt`));
+  }
+  for (const t of spec.license_texts || []) {
+    const f = await fetchPinned(t, downloads);
+    copy(f, path.join(licDir, 'thirdparty', t.name));
+  }
+  fs.writeFileSync(path.join(licDir, 'SOURCE.txt'), aria2cSourceText(key, version));
+  const checks = [spec.bin_sha256 ? 'SHA-256 of the official build' : 'built from the pinned source'];
+  if (process.platform === platform) {
+    const r = spawnSync(dest, ['--version'], { encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`aria2c --version failed: ${r.stderr || r.error}`);
+    const problems = checkAria2cVersion(r.stdout, a.version, key);
+    if (problems.length) throw new Error(`aria2c --version: ${problems.join('; ')}`);
+    checks.push(`aria2c --version: ${a.version}, HTTPS${key === 'darwin-arm64' ? ' (AppleTLS)' : ''}, no OpenSSL`);
+  }
+  console.log(`aria2c ${a.version}: ${sha256} (${checks.join('; ')})`);
+  return { version: a.version, sha256, size, checks };
+}
+
+/**
+ * bundledFileProblems(manifest, key, file) → why the shipped
+ * components.json disagrees with a staged binary ({name, sha256, size,
+ * required}). The core component lists the bundled third-party binaries
+ * whose SHA-256 is known before packaging (Windows: aria2's official
+ * aria2c.exe, {name: "bin/aria2c.exe", url: "", sha256, size}); the
+ * diagnostics compare the file in resources/ with that entry. macOS has no
+ * entry: aria2c is built in CI, and electron-builder signs every Mach-O in
+ * the app again, which changes its bytes (ad hoc as well as with a
+ * Developer ID), so the diagnostics show the file's own SHA-256 there.
+ */
+function bundledFileProblems(manifest, key, file) {
+  const core = ((manifest && manifest.components) || []).find((c) => c.id === 'core' && c.bundled);
+  if (!core) return ['components.json has no bundled core component'];
+  const b = (core.platforms || {})[key];
+  const entry = b && (b.files || []).find((f) => f.name === file.name);
+  if (!entry) return file.required ? [`the core component records no ${file.name} for ${key}`] : [];
+  const problems = [];
+  if (entry.sha256 !== file.sha256 || entry.size !== file.size) {
+    problems.push(`the core component records ${file.name} for ${key} as ${entry.sha256} (${entry.size} bytes), the staged file is ${file.sha256} (${file.size} bytes)`);
+  }
+  if (entry.url !== '') problems.push(`${file.name}: a bundled file has no download URL`);
+  return problems;
+}
+
+// --- minimum macOS of the Mach-O files (third-party.json macos) -------------------
+
+const MH_MAGIC = 0xfeedface;
+const MH_MAGIC_64 = 0xfeedfacf;
+const FAT_MAGIC = 0xcafebabe;
+const FAT_MAGIC_64 = 0xcafebabf;
+const LC_VERSION_MIN_MACOSX = 0x24;
+const LC_BUILD_VERSION = 0x32;
+const PLATFORM_MACOS = 1;
+const CPU_TYPE_ARM64 = 0x0100000c;
+
+/** machoVersion(v) → "13.0" or "13.0.1" for a Mach-O version (xxxx.yy.zz nibbles). */
+function machoVersion(v) {
+  const s = `${v >>> 16}.${(v >>> 8) & 0xff}`;
+  return v & 0xff ? `${s}.${v & 0xff}` : s;
+}
+
+/** compareVersions("13.0", "12.6.1") → 1; numeric, missing parts are 0. */
+function compareVersions(a, b) {
+  const x = String(a).split('.').map(Number);
+  const y = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return Math.sign(d);
+  }
+  return 0;
+}
+
+/** machoSlice(read, off) → {cpu, platform, minos} of the thin Mach-O at off, or null. */
+function machoSlice(read, off) {
+  const h = read(off, 32);
+  if (h.length < 28) return null;
+  const magic = h.readUInt32LE(0);
+  if (magic !== MH_MAGIC && magic !== MH_MAGIC_64) return null;
+  const headerSize = magic === MH_MAGIC_64 ? 32 : 28;
+  const ncmds = h.readUInt32LE(16);
+  const cmds = read(off + headerSize, Math.min(h.readUInt32LE(20), 1 << 24));
+  const slice = { cpu: h.readInt32LE(4), platform: null, minos: null };
+  for (let i = 0, p = 0; i < ncmds && p + 8 <= cmds.length; i++) {
+    const cmd = cmds.readUInt32LE(p);
+    const size = cmds.readUInt32LE(p + 4);
+    if (cmd === LC_BUILD_VERSION && p + 16 <= cmds.length) {
+      slice.platform = cmds.readUInt32LE(p + 8);
+      slice.minos = machoVersion(cmds.readUInt32LE(p + 12));
+    } else if (cmd === LC_VERSION_MIN_MACOSX && p + 12 <= cmds.length && slice.minos === null) {
+      slice.platform = PLATFORM_MACOS;
+      slice.minos = machoVersion(cmds.readUInt32LE(p + 8));
+    }
+    if (size < 8) break;
+    p += size;
+  }
+  return slice;
+}
+
+/**
+ * machoSlices(read) → the slices of a Mach-O file ({cpu, platform, minos}
+ * each; a universal file has several), or null when it is not one.
+ * read(offset, length) → Buffer (shorter at the end of the file).
+ */
+function machoSlices(read) {
+  const h = read(0, 8);
+  if (h.length < 8) return null;
+  const magic = h.readUInt32BE(0);
+  if (magic === FAT_MAGIC || magic === FAT_MAGIC_64) {
+    const n = h.readUInt32BE(4);
+    if (n === 0 || n > 32) return null; // Java class files start with CAFEBABE too
+    const size = magic === FAT_MAGIC ? 20 : 32;
+    const table = read(8, n * size);
+    const slices = [];
+    for (let i = 0; i < n; i++) {
+      const offset = magic === FAT_MAGIC ? table.readUInt32BE(i * size + 8) : Number(table.readBigUInt64BE(i * size + 8));
+      slices.push(machoSlice(read, offset) || { cpu: table.readInt32BE(i * size), platform: null, minos: null });
+    }
+    return slices;
+  }
+  const s = machoSlice(read, 0);
+  return s && [s];
+}
+
+function machoSlicesOfFile(file) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    return machoSlices((off, len) => {
+      const b = Buffer.alloc(len);
+      return b.subarray(0, fs.readSync(fd, b, 0, len, off));
+    });
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * macMinimumCheck(dir, minimum, key) → {files: [{path, minos}], problems}:
+ * every Mach-O file under dir must be built for macOS, at most for the
+ * minimum macOS the app declares, and (darwin-arm64) have an arm64 slice.
+ * The darwin-arm64 resources must contain Mach-O files at all (the Go
+ * programs), so a check that sees none has looked in the wrong place.
+ * Reads the load commands itself: otool cannot open files whose names end
+ * in "(…)", which it takes for archive members.
+ */
+function macMinimumCheck(dir, minimum, key) {
+  const files = [];
+  const problems = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.isFile()) {
+        const slices = machoSlicesOfFile(p);
+        if (!slices) continue;
+        const rel = path.relative(dir, p).split(path.sep).join('/');
+        files.push({ path: rel, minos: slices.map((s) => s.minos).join(', ') });
+        for (const s of slices) {
+          if (s.minos === null) problems.push(`${rel}: records no minimum macOS (LC_BUILD_VERSION)`);
+          else if (s.platform !== PLATFORM_MACOS) problems.push(`${rel}: built for platform ${s.platform}, not macOS`);
+          else if (compareVersions(s.minos, minimum) > 0) problems.push(`${rel} needs macOS ${s.minos}, the app declares ${minimum} (build it with MACOSX_DEPLOYMENT_TARGET=${minimum}, or raise macos.minimum_system_version)`);
+        }
+        if (key === 'darwin-arm64' && !slices.some((s) => s.cpu === CPU_TYPE_ARM64)) problems.push(`${rel}: no arm64 code`);
+      }
+    }
+  };
+  walk(dir);
+  if (key === 'darwin-arm64' && !files.length) problems.push(`no Mach-O file found in ${dir}`);
+  return { files: files.sort((a, b) => a.path.localeCompare(b.path)), problems };
+}
+
 function stageFiles() {
   for (const f of WORKER_FILES) copy(path.join(REPO, 'worker', f), path.join(OUT, 'worker', f));
-  for (const f of WORKER_OPTIONAL) {
-    if (fs.existsSync(path.join(REPO, 'worker', f))) copy(path.join(REPO, 'worker', f), path.join(OUT, 'worker', f));
-  }
   copy(path.join(REPO, 'packaging', 'components', 'components.json'), path.join(OUT, 'components.json'));
   // The components manager looks for the lock files next to components.json.
   const locks = path.join(REPO, 'packaging', 'components', 'locks');
@@ -196,23 +548,44 @@ async function stage({ platform = process.platform, version } = {}) {
   version = version || JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8')).version;
   fs.rmSync(OUT, { recursive: true, force: true });
   fs.mkdirSync(OUT, { recursive: true });
-  goBuild(platform, version);
-  const ff = await stageFfmpeg(platform, key);
+  const [server, nmhost] = GO_PROGRAMS.map((p) => goBuild(platform, version, p));
+  const ff = await stageFfmpeg(platform, key, version);
   await stageUv(platform, key);
+  const aria2c = await stageAria2c(platform, key, version);
   stageFiles();
+  // The diagnostics compare aria2c with the SHA-256 the core component
+  // records (Windows); the shipped manifest must agree with the staged file.
+  const manifest = JSON.parse(fs.readFileSync(path.join(OUT, 'components.json'), 'utf8'));
+  const bad = bundledFileProblems(manifest, key, {
+    name: `bin/${platform === 'win32' ? 'aria2c.exe' : 'aria2c'}`, sha256: aria2c.sha256, size: aria2c.size, required: Boolean(MANIFEST.aria2c[key].bin_sha256),
+  });
+  if (bad.length) throw new Error(`packaging/components/components.json: ${bad.join('; ')}`);
+  // Nothing in resources/ may need a newer macOS than the app declares
+  // (electron-builder writes the same value into LSMinimumSystemVersion).
+  const minimum = MANIFEST.macos.minimum_system_version;
+  const mac = macMinimumCheck(OUT, minimum, key);
+  if (mac.problems.length) throw new Error(`minimum macOS ${minimum} (third-party.json macos.minimum_system_version): ${mac.problems.join('; ')}`);
+  if (mac.files.length) console.log(`Mach-O files run on macOS ${minimum}: ${mac.files.map((f) => `${f.path} (${f.minos})`).join(', ')}`);
   const info = {
     version,
     platform: key,
+    macos: { minimum_system_version: minimum, macho: mac.files },
     ffmpeg: { version: MANIFEST.ffmpeg.version, url: MANIFEST.ffmpeg[key].url, sha256: MANIFEST.ffmpeg[key].sha256, configure: ff.configure, license_checks: ff.licenseChecks },
     uv: { version: MANIFEST.uv.version, url: MANIFEST.uv[key].url, sha256: MANIFEST.uv[key].sha256 },
-    server_sha256: sha256File(path.join(OUT, 'bin', platform === 'win32' ? 'lectureflow.exe' : 'lectureflow')),
+    aria2c: { version: aria2c.version, url: MANIFEST.aria2c[key].url, url_sha256: MANIFEST.aria2c[key].sha256, sha256: aria2c.sha256, size: aria2c.size, checks: aria2c.checks },
+    server_sha256: sha256File(server),
+    nmhost_sha256: sha256File(nmhost),
   };
   fs.writeFileSync(path.join(DESKTOP, 'build', 'stage-info.json'), `${JSON.stringify(info, null, 2)}\n`);
   console.log(`staged ${OUT}`);
   return info;
 }
 
-module.exports = { stage, checkConfigure, checkLicenseText, gplFree, gplComponents, targetKey, WORKER_FILES, OUT };
+module.exports = {
+  stage, stageAria2c, checkConfigure, checkLicenseText, gplFree, gplComponents, targetKey, checkAria2cVersion, aria2cSourceText, ffmpegSourceText, bundledFileProblems,
+  machoSlices, machoVersion, compareVersions, macMinimumCheck,
+  WORKER_FILES, GO_PROGRAMS, OUT,
+};
 
 if (require.main === module) {
   const i = process.argv.indexOf('--platform');

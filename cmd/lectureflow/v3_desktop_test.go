@@ -30,6 +30,7 @@ import (
 	"lectureflow/internal/db"
 	"lectureflow/internal/model"
 	"lectureflow/internal/sched"
+	"lectureflow/internal/selfupdate"
 	"lectureflow/internal/state"
 )
 
@@ -189,8 +190,26 @@ type syncBuf struct {
 func (s *syncBuf) Write(p []byte) (int, error) { s.mu.Lock(); defer s.mu.Unlock(); return s.b.Write(p) }
 func (s *syncBuf) String() string              { s.mu.Lock(); defer s.mu.Unlock(); return s.b.String() }
 
+// offlineSelfUpdate gives the in-app update a client that refuses every
+// request. Since the maintainer's key is built in (2026-10-27), a desktop
+// instance with a release version ("-app-version 3.2.0-test") has updates
+// configured and would ask GitHub two minutes after its start; tests never
+// reach the network.
+func offlineSelfUpdate(o *selfupdate.Options) {
+	o.Client = &http.Client{Transport: refuseTransport{}}
+}
+
+type refuseTransport struct{}
+
+func (refuseTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("no network in tests: %s", r.URL.Host)
+}
+
 func startProc(t *testing.T, args []string, stdin string, opts AppOptions) *proc {
 	t.Helper()
+	if opts.SelfUpdate == nil {
+		opts.SelfUpdate = offlineSelfUpdate
+	}
 	pr, pw := io.Pipe()
 	outR, outW := io.Pipe()
 	p := &proc{t: t, stdinW: pw, sigc: make(chan os.Signal, 1), lines: make(chan string, 1000), stderr: &syncBuf{},

@@ -19,6 +19,7 @@ import (
 
 	"lectureflow/internal/config"
 	"lectureflow/internal/db"
+	"lectureflow/internal/dirperm"
 	"lectureflow/internal/llm"
 	"lectureflow/internal/llm/llmtest"
 	"lectureflow/internal/model"
@@ -84,6 +85,12 @@ func newEnvWith(t *testing.T, ec envConfig) *env {
 	fake := llmtest.New(t)
 	cfg := config.Default()
 	cfg.DataDir = filepath.Join(dir, "data")
+	// as the application creates it (cmd: private from the start; the
+	// system's temporary directory may let other accounts in, which the
+	// data_dir row would report)
+	if _, err := dirperm.MkdirPrivate(cfg.DataDir); err != nil {
+		t.Fatal(err)
+	}
 	fake.Configure(cfg) // BEFORE settings.Open: the import must never see a real endpoint or key
 	set, err := settings.Open(ctx, st, cfg)
 	if err != nil {
@@ -165,6 +172,8 @@ func fakeCmd(_ context.Context, name string, args ...string) (string, string, er
 		return "", "FutureWarning: something\n", nil
 	case len(args) > 1 && args[1] == "--selftest":
 		return "SELFTEST ok device=cuda compute_type=float16 load_s=1.0 transcribe_s=0.10 segments=0\n", "", nil
+	case len(args) == 2 && args[1] == "--check-cudnn": // ext-step1
+		return "CUDNN ok version=9.1.0\n", "", nil
 	}
 	return "", "unknown", errUnknownCmd
 }

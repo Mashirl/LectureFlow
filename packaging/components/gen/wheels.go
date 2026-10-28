@@ -123,9 +123,39 @@ func tagScore(py, abi, plat string, t wheelTarget) int {
 			return 0
 		}
 		platScore = 2
+	case t.platform == "linux-x64":
+		// ssh-mvp: the SSH servers' target; glibc 2.28 like the locks
+		// (refresh-locks.ps1: x86_64-manylinux_2_28).
+		if glibc, ok := manylinuxGlibc(plat); ok && glibc <= 28 {
+			platScore = 2
+		}
 	}
 	if platScore == 0 {
 		return 0
 	}
 	return platScore*10 + abiScore
+}
+
+// manylinuxGlibc is the glibc minor version an x86_64 manylinux tag needs
+// (manylinux_2_28_x86_64 → 28; the legacy aliases manylinux1 = 2.5,
+// manylinux2010 = 2.12, manylinux2014 = 2.17).
+func manylinuxGlibc(plat string) (int, bool) {
+	switch plat {
+	case "manylinux1_x86_64":
+		return 5, true
+	case "manylinux2010_x86_64":
+		return 12, true
+	case "manylinux2014_x86_64":
+		return 17, true
+	}
+	rest, ok := strings.CutPrefix(plat, "manylinux_2_")
+	if !ok {
+		return 0, false
+	}
+	minor, arch, ok := strings.Cut(rest, "_")
+	if !ok || arch != "x86_64" {
+		return 0, false
+	}
+	n, err := strconv.Atoi(minor)
+	return n, err == nil
 }

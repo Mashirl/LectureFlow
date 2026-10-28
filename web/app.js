@@ -234,6 +234,7 @@ const inspector = mountInspector(inspEl, {
   onToggleDevice: toggleDevice,
   onRetry: refreshResources,
   system: () => state.system,
+  subscribe: ctx.subscribe, // stream-parallel: background playback files in the system area
 });
 
 // The overlay inspector (narrow windows) closes on Esc or a click outside it.
@@ -813,6 +814,9 @@ async function boot() {
   syncZh(zhState);
   await setLocale(locale);
   translateStatic();
+  // the inspector was drawn when this module loaded, before the catalog
+  // (its title read "resources.title" until the resources came, 3.2.0 L1)
+  inspector.render();
   window.addEventListener('localechange', onLocaleChange);
   window.addEventListener('zhdisplaychange', onLocaleChange);
   installMenuCloser();

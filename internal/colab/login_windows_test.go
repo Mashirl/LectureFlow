@@ -45,8 +45,13 @@ func TestLoginCancelSparesTheBrowser(t *testing.T) {
 	}
 	bpid := waitPID(t, e.out, "browser")
 	t.Cleanup(func() {
+		// Gone before the temporary directory is removed: the browser's
+		// working directory is the sign-in directory (gcloud's, which it
+		// inherited), and a process that is still exiting keeps it in use
+		// (TempDir RemoveAll failed on a loaded machine, 2026-10-28).
 		if p, err := os.FindProcess(bpid); err == nil {
 			_ = p.Kill()
+			_, _ = p.Wait()
 		}
 	})
 	pid := waitPID(t, e.out, "python")

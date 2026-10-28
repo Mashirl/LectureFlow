@@ -308,19 +308,42 @@ func (s *sqlStore) CreateLecture(ctx context.Context, l model.Lecture) error {
 	})
 }
 
-const lectureCols = `id, course_id, title, media_path, created_at, launched_at, seq,
-	recorded_at, recorded_at_source, title_zh, title_source, blurb_en, blurb_zh, original_filename, kind, kind_source`
+const lectureCols = `l.id, l.course_id, l.title, l.media_path, l.created_at, l.launched_at, l.seq,
+	l.recorded_at, l.recorded_at_source, l.title_zh, l.title_source, l.blurb_en, l.blurb_zh, l.original_filename, l.kind, l.kind_source`
+
+// lectureSelect reads lecture rows (alias l) with their week override
+// (lecture_week_override, migration 011; alias o, NULL when none).
+const lectureSelect = `SELECT ` + lectureCols + `, o.week, o.kind, o.created_at
+	FROM lecture l LEFT JOIN lecture_week_override o ON o.lecture_id = l.id`
+
+// lectureSelectPre011 is lectureSelect on a database below migration 011,
+// which has no lecture_week_override: the upgrade tests read lectures with
+// the store before migrating further (a store opened by Open is always
+// migrated). queryLectures falls back to it.
+const lectureSelectPre011 = `SELECT ` + lectureCols + `, NULL, NULL, NULL FROM lecture l`
+
+// noOverrideTable reports the error of lectureSelect on a database below
+// migration 011.
+func noOverrideTable(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such table: lecture_week_override")
+}
 
 func scanLecture(sc interface{ Scan(...any) error }) (model.Lecture, error) {
 	var l model.Lecture
 	var launched, recorded, titleZh, blurbEn, blurbZh, kind sql.NullString
 	var seq sql.NullInt64
+	var ovWeek sql.NullInt64
+	var ovKind, ovAt sql.NullString
 	err := sc.Scan(&l.ID, &l.CourseID, &l.Title, &l.MediaPath, &l.CreatedAt, &launched, &seq,
-		&recorded, &l.RecordedAtSource, &titleZh, &l.TitleSource, &blurbEn, &blurbZh, &l.OriginalFilename, &kind, &l.KindSource)
+		&recorded, &l.RecordedAtSource, &titleZh, &l.TitleSource, &blurbEn, &blurbZh, &l.OriginalFilename, &kind, &l.KindSource,
+		&ovWeek, &ovKind, &ovAt)
 	l.Kind = kind.String
 	l.LaunchedAt = strPtr(launched)
 	l.Seq = int(seq.Int64)
 	l.RecordedAt, l.TitleZh, l.BlurbEn, l.BlurbZh = strPtr(recorded), strPtr(titleZh), strPtr(blurbEn), strPtr(blurbZh)
+	if ovWeek.Valid && ovKind.Valid {
+		l.WeekOverride = &model.WeekOverride{Week: int(ovWeek.Int64), Kind: ovKind.String, CreatedAt: ovAt.String}
+	}
 	return l, err
 }
 
@@ -339,7 +362,11 @@ func lectureV2(l *model.Lecture) {
 }
 
 func (s *sqlStore) ListLectures(ctx context.Context, courseID string) ([]model.Lecture, error) {
-	rows, err := s.q.QueryContext(ctx, `SELECT `+lectureCols+` FROM lecture WHERE course_id = ? ORDER BY created_at, id`, courseID)
+	const where = ` WHERE l.course_id = ? ORDER BY l.created_at, l.id`
+	rows, err := s.q.QueryContext(ctx, lectureSelect+where, courseID)
+	if noOverrideTable(err) {
+		rows, err = s.q.QueryContext(ctx, lectureSelectPre011+where, courseID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +383,10 @@ func (s *sqlStore) ListLectures(ctx context.Context, courseID string) ([]model.L
 }
 
 func (s *sqlStore) GetLecture(ctx context.Context, id string) (model.Lecture, error) {
-	l, err := scanLecture(s.q.QueryRowContext(ctx, `SELECT `+lectureCols+` FROM lecture WHERE id = ?`, id))
+	l, err := scanLecture(s.q.QueryRowContext(ctx, lectureSelect+` WHERE l.id = ?`, id))
+	if noOverrideTable(err) {
+		l, err = scanLecture(s.q.QueryRowContext(ctx, lectureSelectPre011+` WHERE l.id = ?`, id))
+	}
 	return l, notFound(err)
 }
 
@@ -1099,10 +1129,20 @@ func (s *sqlStore) GetKV(ctx context.Context, key string) (string, bool, error) 
 	if err != nil {
 		return "", false, err
 	}
+	if isSealedKV(key) { // cred-enc: sealed at rest (sealed.go)
+		v, ok := openKV(key, v)
+		return v, ok, nil
+	}
 	return v, true, nil
 }
 
 func (s *sqlStore) SetKV(ctx context.Context, key, value string) error {
+	if isSealedKV(key) { // cred-enc: sealed at rest (sealed.go)
+		var err error
+		if value, err = sealStored(value); err != nil {
+			return err
+		}
+	}
 	_, err := s.q.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
 	return err
 }

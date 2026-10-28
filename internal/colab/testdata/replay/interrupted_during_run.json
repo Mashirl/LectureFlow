@@ -13,6 +13,93 @@
  "until": "kernel channels: run colab_remote.py",
  "steps": [
   {
+   "name": "upload audio chunk 1",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload audio last chunk",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": -1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "audio.flac",
+     "path": "content/lectureflow/jobs/lecture-1/audio.flac",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
+   "name": "upload job.json",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "job.json",
+     "path": "content/lectureflow/jobs/lecture-1/job.json",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
    "name": "release: shut the kernel down",
    "request": {
     "method": "DELETE",

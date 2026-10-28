@@ -4,8 +4,10 @@
 // Command lectureflow: load config, migrate, recover, start scheduler and HTTP (SPEC §1.1).
 //
 // Command-line contract (SPEC-v3 V1, v3-brief §1): -config, -listen,
-// -data-dir, -desktop, -resources, -app-version. Once HTTP is ready it
-// prints "LECTUREFLOW_READY http://127.0.0.1:PORT" on stdout; a failed
+// -data-dir, -desktop, -resources, -app-version; for the browser extension
+// (SPEC-ext, nmhost.go) -launcher, -launcher-blocked, -portable,
+// -nm-endpoint. Once HTTP is
+// ready it prints "LECTUREFLOW_READY http://127.0.0.1:PORT" on stdout; a failed
 // start ends with "ERROR: <reason>" as the last line of stderr and exit
 // code 1; exit code 3 asks the desktop shell to start the service again.
 package main
@@ -25,15 +27,19 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"lectureflow/internal/api"
 	"lectureflow/internal/config"
+	"lectureflow/internal/dirperm"
 	"lectureflow/internal/relocate"
 )
 
 // version is set at build time with -ldflags "-X main.version=X.Y.Z";
-// -app-version takes precedence.
+// -app-version takes precedence for what the app reports. Left at "dev"
+// (nmhost.DevBuildVersion) it makes a development build, whose browser
+// registration admits the unpacked development extension too (nmhost.go).
 var version = "dev"
 
 // applyStaged is the startup hook run before the database is opened: it
@@ -86,6 +92,11 @@ var (
 const webModeNotice = "网页模式：只监听 127.0.0.1，不需要访问令牌，仅供开发与高级用户使用。 / Web mode: listening on 127.0.0.1 only, no access token required; for development and advanced users only."
 
 func main() {
+	// A desktop shell that is killed closes the service's stdout / stderr;
+	// without this the next log line raises SIGPIPE and the service exits
+	// without its orderly stop (Mac acceptance, 2026-10-28). Writes then
+	// just fail with EPIPE.
+	signal.Ignore(syscall.SIGPIPE)
 	os.Exit(runMain(runEnv{
 		args:   os.Args[1:],
 		stdin:  os.Stdin,
@@ -107,6 +118,31 @@ type cliOptions struct {
 	// desktop shell unless LECTUREFLOW_DATA_DIR chose the data directory
 	// (DesktopOptions.LocationFile; step 5 "change the data directory").
 	LocationFile string
+	// Native Messaging (SPEC-ext, ext-brief §4, nmhost.go): the program the
+	// native host starts the desktop app with (launch.json), whether this
+	// is the portable build (the host is copied to a stable place), and
+	// the IPC endpoint ("" = LECTUREFLOW_NM_ENDPOINT or the per-user
+	// default, "off" = none).
+	Launcher   string
+	Portable   bool
+	NMEndpoint string
+	// LauncherBlocked is why the desktop shell passes no -launcher
+	// although it is the desktop app (macOS: "translocated" or "dmg",
+	// nmhost.Launcher*): the diagnostics ask to move the app.
+	LauncherBlocked string
+	// SelfUpdateVerify, when set, is an updates directory: check its
+	// pending update again and exit (selfupdate_verify.go); nothing else
+	// runs.
+	SelfUpdateVerify string
+	// SelfUpdatePrevious: check previous.json's package (the version a
+	// rollback returns to) instead; SelfUpdateCopy: copy the vouched
+	// package into a new private directory there (sec-update M2, M3).
+	SelfUpdatePrevious bool
+	SelfUpdateCopy     string
+	// DataKeyStdin: the line after the token is the data key of the stored
+	// credentials (the macOS desktop shell keeps it in the Keychain;
+	// secrets_setup.go).
+	DataKeyStdin bool
 }
 
 // parseArgs parses the command line. Usage and parse errors go to stderr.
@@ -118,9 +154,17 @@ func parseArgs(args []string, stderr io.Writer) (cliOptions, error) {
 	fs.StringVar(&o.Listen, "listen", "", "listen address 127.0.0.1:PORT (overrides the config; port 0 picks a free one)")
 	fs.StringVar(&o.DataDir, "data-dir", "", "data directory (overrides the config)")
 	fs.BoolVar(&o.Desktop, "desktop", false, "desktop mode: read the access token from the first line of stdin; stdin EOF stops the service")
+	fs.BoolVar(&o.DataKeyStdin, "datakey-stdin", false, "desktop mode: the second line of stdin is the data key of the stored credentials (64 hex characters; the macOS shell keeps it in the Keychain)")
 	fs.StringVar(&o.Resources, "resources", "", "packaged resources directory (worker/, bin/ffmpeg, bin/uv, components.json)")
 	fs.StringVar(&o.AppVersion, "app-version", "", "application version (default: the build version)")
 	fs.StringVar(&o.LocationFile, "location-file", "", "desktop mode: path of location.json in the default data directory")
+	fs.StringVar(&o.Launcher, "launcher", "", "desktop mode: the program that starts the desktop app (the browser extension's host runs it with --background)")
+	fs.StringVar(&o.LauncherBlocked, "launcher-blocked", "", "desktop mode on macOS: why there is no -launcher (translocated | dmg: the app runs from a place that disappears; the diagnostics ask to move it to Applications)")
+	fs.BoolVar(&o.Portable, "portable", false, "portable build: copy the browser extension's host to a stable place before registering it")
+	fs.StringVar(&o.NMEndpoint, "nm-endpoint", "", "browser extension endpoint: a named pipe or a socket path, \"off\" = none (default: LECTUREFLOW_NM_ENDPOINT, else per user)")
+	fs.StringVar(&o.SelfUpdateVerify, "selfupdate-verify", "", "verify the pending update of this updates directory with the built-in key, print one line and exit (0 valid, 1 invalid, 2 not configured, 3 other accounts can change the data directory)")
+	fs.BoolVar(&o.SelfUpdatePrevious, "selfupdate-previous", false, "with -selfupdate-verify: verify the package of previous.json (the version a rollback returns to) instead")
+	fs.StringVar(&o.SelfUpdateCopy, "selfupdate-copy", "", "with -selfupdate-verify: copy the package, while hashing it, into a new private directory in this directory and name it on the ok line (copy=<path>)")
 	if err := fs.Parse(args); err != nil {
 		return o, err
 	}
@@ -209,8 +253,15 @@ func (s *stopper) request(code int) {
 
 // runMain runs the service and returns the process exit code.
 func runMain(env runEnv) int {
+	desktop := false
 	fail := func(err error) int {
 		slog.Error("fatal", "err", err)
+		// a coded failure: its code for the desktop shell, just before the
+		// ERROR line (startfail.go)
+		var sf *startFailure
+		if desktop && errors.As(err, &sf) {
+			fmt.Fprintln(env.stderr, failureLine(sf))
+		}
 		fmt.Fprintf(env.stderr, "ERROR: %s\n", oneLine(err.Error()))
 		return exitFailure
 	}
@@ -221,15 +272,33 @@ func runMain(env runEnv) int {
 	if err != nil {
 		return fail(err)
 	}
+	desktop = opts.Desktop
+	if opts.SelfUpdateVerify != "" {
+		return runSelfUpdateVerify(selfUpdateVerifyArgs{Dir: opts.SelfUpdateVerify, Current: opts.AppVersion,
+			Previous: opts.SelfUpdatePrevious, CopyDir: opts.SelfUpdateCopy}, env.stdout)
+	}
 
 	stop := newStopper()
 	var token string
+	var shellKey []byte
+	shellKeyUnavailable := false
+	if opts.DataKeyStdin && !opts.Desktop {
+		return fail(errors.New("-datakey-stdin needs -desktop"))
+	}
 	if opts.Desktop {
 		tok, rest, err := readToken(env.stdin)
 		if err != nil {
 			return fail(err)
 		}
 		token = tok
+		if opts.DataKeyStdin {
+			shellKey, err = readDataKey(rest)
+			if errors.Is(err, errShellKeyUnavailable) {
+				shellKeyUnavailable = true // no key this run (sec3 L4)
+			} else if err != nil {
+				return fail(err)
+			}
+		}
 		// The shell keeps stdin open; EOF means it is gone (v3-brief §1).
 		watchEOF(rest, func() {
 			slog.Info("stdin closed: stopping")
@@ -241,6 +310,19 @@ func runMain(env runEnv) int {
 	if err != nil {
 		return fail(err)
 	}
+	// A data directory created here is private from the start (sec-update
+	// M2, internal/dirperm); an existing one is left as it is (the
+	// diagnostics warn when other accounts can change it).
+	if _, err := dirperm.MkdirPrivate(cfg.DataDir); err != nil {
+		return fail(err)
+	}
+	// One service per data directory (instancelock.go, test-upgrade F4):
+	// before anything in it is written.
+	lock, err := acquireInstanceLock(cfg.DataDir)
+	if err != nil {
+		return fail(err)
+	}
+	defer lock.Release()
 	if err := os.MkdirAll(filepath.Join(cfg.DataDir, "logs"), 0o755); err != nil {
 		return fail(err)
 	}
@@ -254,7 +336,10 @@ func runMain(env runEnv) int {
 		level = slog.LevelDebug
 	}
 	prevLogger := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(io.MultiWriter(env.stdout, logFile), &slog.HandlerOptions{Level: level})))
+	// The log file first: once the desktop shell is gone, writes to stdout
+	// fail with EPIPE (SIGPIPE is ignored), and MultiWriter stops at the
+	// first error (Mac acceptance, 2026-10-28).
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.MultiWriter(logFile, env.stdout), &slog.HandlerOptions{Level: level})))
 	defer slog.SetDefault(prevLogger)
 
 	sigc := env.signals
@@ -273,7 +358,7 @@ func runMain(env runEnv) int {
 
 	// Listen first: the actual port (-listen 127.0.0.1:0) goes into the
 	// desktop options (Host check) and the ready line.
-	ln, err := net.Listen("tcp", cfg.Listen)
+	ln, err := listenTCP(cfg.Listen) // listen_*.go: exclusive on Windows (sec2-app M1)
 	if err != nil {
 		return fail(fmt.Errorf("listen %s: %w", cfg.Listen, err))
 	}
@@ -281,6 +366,7 @@ func runMain(env runEnv) int {
 
 	appOpts := env.appOpts
 	appOpts.Version = opts.AppVersion
+	appOpts.Portable = opts.Portable
 	if opts.Desktop {
 		appOpts.Desktop = &api.DesktopOptions{
 			Token:        token,
@@ -296,12 +382,33 @@ func runMain(env runEnv) int {
 	// the scheduler (which has its own cancellation) has stopped.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	// Long steps before the ready line tell the desktop shell to keep
+	// waiting (startfail.go, test-upgrade F3).
+	prog := &progress{}
+	if opts.Desktop {
+		prog.w = env.stdout
+	}
+	// A database from a newer LectureFlow is left untouched (upgrade.go,
+	// test-upgrade F2), the staged data of an import included.
+	if err := checkNotNewer(ctx, cfg.DataDir, prog); err != nil {
+		ln.Close()
+		return fail(err)
+	}
 	// Before the database is opened: switch to the staged data of an
 	// "import existing data" (step 5, internal/relocate).
 	if err := runApplyStaged(ctx, cfg.DataDir); err != nil {
 		ln.Close()
 		return fail(err)
 	}
+	// The backup before an upgrade, then the migrations (upgrade.go,
+	// test-upgrade F1).
+	if err := prepareDatabase(ctx, cfg.DataDir, opts.AppVersion, prog); err != nil {
+		ln.Close()
+		return fail(err)
+	}
+	// The stored credentials' data key, then the one-time sealing of plain
+	// ones (cred-enc, secrets_setup.go).
+	setupSecretsWith(ctx, cfg.DataDir, shellKey, shellKeyUnavailable, prog)
 	app, err := buildApp(ctx, cfg, appOpts)
 	if err != nil {
 		ln.Close()
@@ -317,6 +424,10 @@ func runMain(env runEnv) int {
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 	url := fmt.Sprintf("http://127.0.0.1:%d", port)
+	// The browser extension's endpoint and registration (nmhost.go).
+	nm := startNM(app, nmOptions{Endpoint: opts.NMEndpoint, Launcher: absOrEmpty(opts.Launcher), LauncherBlocked: opts.LauncherBlocked, Portable: opts.Portable,
+		Desktop: opts.Desktop, Port: port, Version: opts.AppVersion, BuildVersion: version, Stdout: env.stdout, ResourcesDir: cfg.ResourcesDir})
+	app.Server.SetNMHost(nm)
 	mode := "web"
 	if opts.Desktop {
 		mode = "desktop"
@@ -343,6 +454,7 @@ func runMain(env runEnv) int {
 
 	slog.Info("shutting down", "exit_code", code)
 	withLimit(shutdownLimit, code, env.exit, func(deadline time.Time) {
+		nm.Close() // no new extension requests while the app stops
 		app.Shutdown(deadline, srv)
 		cancel()
 	})

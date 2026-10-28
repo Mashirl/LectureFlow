@@ -27,6 +27,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"lectureflow/internal/pyenv"
 )
 
 // The test binary doubles as a fake uv and a fake python: TestMain copies it
@@ -41,6 +43,7 @@ import (
 //	LF_FAKE_UV_HASH_FAIL=file   file holds a count n: the next n uv pip sync calls fail with uv's
 //	                            "Hash mismatch for `pkg-a==1.0.0`" (decremented per call)
 //	LF_FAKE_PY_FAIL=module      python -c "import ..." fails when it imports module
+//	LF_FAKE_PY_LOG=file         each python call appends {"args", "telemetry_off": pyenv.Has(its environment)}
 var fakeBin string
 
 func TestMain(m *testing.M) {
@@ -245,6 +248,13 @@ func parseLock(p string) ([]lockReq, error) {
 }
 
 func fakePython(args []string) int {
+	if p := os.Getenv("LF_FAKE_PY_LOG"); p != "" {
+		if f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+			b, _ := json.Marshal(map[string]any{"args": args, "telemetry_off": pyenv.Has(os.Environ())})
+			f.Write(append(b, '\n'))
+			f.Close()
+		}
+	}
 	if len(args) >= 3 && args[0] == "-I" && args[1] == "-c" {
 		if bad := os.Getenv("LF_FAKE_PY_FAIL"); bad != "" && strings.Contains(args[2], bad) {
 			fmt.Fprintf(os.Stderr, "ModuleNotFoundError: No module named '%s'\n", bad)

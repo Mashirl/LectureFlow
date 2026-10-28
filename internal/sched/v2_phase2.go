@@ -210,7 +210,9 @@ func (s *Scheduler) filenameRuleDue(ctx context.Context, courseID string, waited
 // no video; no_space or failed: written by prep or an earlier stream task).
 // Those are never retried automatically: the user retries from the
 // lecture's hint (the API turns that into a new run). A lecture prepared
-// before v2 has no kv state and no stream task: it gets one.
+// before v2 has no kv state and no stream task: it gets one; so does a
+// lecture whose stream task was interrupted by a restart (stream-parallel:
+// prep leaves transcodes to that task) and recorded no result.
 // Unknown lecture → db.ErrNotFound.
 func (s *Scheduler) EnsureStream(ctx context.Context, lectureID string) (generating bool, err error) {
 	l, err := s.st.GetLecture(ctx, lectureID)
@@ -246,7 +248,13 @@ func (s *Scheduler) EnsureStream(ctx context.Context, lectureID string) (generat
 				generating = true
 				return nil
 			case model.StatusFailed, model.StatusCancelled:
-				return nil
+				// stream-parallel: a run cut off by a restart (§4.7: failed
+				// "interrupted by restart", not requeued for an auxiliary
+				// task) is no failure of the playback file and recorded no
+				// result; the player asking for it starts it again.
+				if j.Status == model.StatusCancelled || !state.IsInterrupted(j.Error) {
+					return nil
+				}
 			}
 		case !errors.Is(err, db.ErrNotFound):
 			return err

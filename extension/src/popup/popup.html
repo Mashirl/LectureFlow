@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=360">
+  <title>LectureFlow</title>
+  <link rel="stylesheet" href="../ui/tokens.css">
+  <link rel="stylesheet" href="../ui/base.css">
+  <link rel="stylesheet" href="../ui/card.css">
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="popup.js"></script>
+</head>
+<body data-view="loading">
+  <header class="hd">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <rect class="logo-bg" width="32" height="32" rx="8"/>
+        <path class="logo-bars" d="M9 13v6M13 10v12M17 8v16M21 11v10M25 14v4"/>
+      </svg>
+      <span>LectureFlow</span>
+    </div>
+    <div class="conn" id="conn" data-nm-state="checking">
+      <span class="chip chip-run" id="conn-chip"><span data-i18n="connChecking"></span></span>
+    </div>
+  </header>
+
+  <main class="body" id="main" aria-live="polite"></main>
+
+  <section class="grant-panel" id="grant-panel" hidden>
+    <p class="small muted" data-i18n="grantCookieHosts"></p>
+    <div class="grant-hosts" id="grant-hosts"></div>
+    <div class="btn-row"><button class="btn btn-sm" id="grant-allow"><span data-i18n="grantAllow"></span></button></div>
+  </section>
+
+  <footer class="ft">
+    <button class="link-btn" id="export" disabled><span data-i18n="exportReport"></span></button>
+    <button class="link-btn" id="grant" hidden><span data-i18n="grantSite"></span></button>
+    <span class="ft-spacer"></span>
+    <button class="link-btn" id="options"><span data-i18n="openOptions"></span></button>
+  </footer>
+  <p class="note foot-msg" id="foot-msg" role="status" hidden></p>
+</body>
+</html>

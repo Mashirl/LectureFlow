@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"sync"
 	"time"
+	"weak"
 
 	"lectureflow/internal/db"
 	"lectureflow/internal/model"
@@ -383,13 +385,66 @@ func (s *Scheduler) GPUPaused() bool {
 	return s.paused
 }
 
-// GPUStatus reads nvidia-smi now (not in fake ASR mode) and returns the
-// GPU row of the diagnostics page. With Options.Devices it is the view of
-// cuda:0 (its slots and jobs; SlotsMax 0 without a cuda:0 row).
+// GPUStatusTTL is how long GPUStatus reuses its last nvidia-smi reading
+// (perf-fix: GET /api/system and GET /api/settings ran nvidia-smi on every
+// request, 60–150 ms each). The free memory shown is at most this old; the
+// scan's admission reads nvidia-smi itself, unaffected.
+const GPUStatusTTL = 3 * time.Second
+
+// gpuReading is the GPUStatus cache of one Scheduler. mu is held while
+// nvidia-smi runs, so concurrent callers share one run; at is when the
+// last reading ended (zero: none yet).
+type gpuReading struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+// gpuReadings maps each Scheduler to its gpuReading. It is kept here, not
+// in the Scheduler struct (scheduler.go has another owner; lead may move
+// it there): the key is weak and a cleanup drops the entry, so a scheduler
+// that is no longer used is still collected.
+var gpuReadings sync.Map // weak.Pointer[Scheduler] → *gpuReading
+
+func (s *Scheduler) gpuReadingCache() *gpuReading {
+	k := weak.Make(s)
+	if v, ok := gpuReadings.Load(k); ok {
+		return v.(*gpuReading)
+	}
+	v, loaded := gpuReadings.LoadOrStore(k, &gpuReading{})
+	if !loaded {
+		runtime.AddCleanup(s, func(k weak.Pointer[Scheduler]) { gpuReadings.Delete(k) }, k)
+	}
+	return v.(*gpuReading)
+}
+
+// readGPUCached refreshes lastGPU from nvidia-smi unless GPUStatus read it
+// less than GPUStatusTTL ago. A caller whose context ends during the run
+// records nothing (the next caller reads again).
+func (s *Scheduler) readGPUCached(ctx context.Context) {
+	c := s.gpuReadingCache()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.at.IsZero() {
+		if age := s.now().Sub(c.at); age >= 0 && age < GPUStatusTTL {
+			return
+		}
+	}
+	m, err := s.gpuQ(ctx)
+	if ctx.Err() != nil {
+		return
+	}
+	s.rememberGPU(m, err)
+	c.at = s.now()
+}
+
+// GPUStatus returns the GPU row of the diagnostics page: nvidia-smi's
+// reading of at most GPUStatusTTL ago (not in fake ASR mode; concurrent
+// callers share one run) with the live pause flag, slots and jobs. With
+// Options.Devices it is the view of cuda:0 (its slots and jobs; SlotsMax 0
+// without a cuda:0 row).
 func (s *Scheduler) GPUStatus(ctx context.Context) GPUStatus {
 	if !s.fakeASR() {
-		m, err := s.gpuQ(ctx)
-		s.rememberGPU(m, err)
+		s.readGPUCached(ctx)
 	}
 	slotsMax := 0
 	if s.devs == nil {
@@ -412,6 +467,20 @@ func (s *Scheduler) GPUStatus(ctx context.Context) GPUStatus {
 	}
 	g.EstimatedJobMB, _, _ = s.estimate(ctx, g.TotalMB, nil)
 	return g
+}
+
+// GPUTotalMB is the first GPU's total memory in MB (0 unknown) for views
+// that need only that (the settings page, the CUDA self-test's compute
+// type): the last successful reading's, which does not change while the
+// program runs; nvidia-smi is read (GPUStatus) only while none succeeded.
+func (s *Scheduler) GPUTotalMB(ctx context.Context) int {
+	s.mu.Lock()
+	total := s.lastGPU.TotalMB
+	s.mu.Unlock()
+	if total > 0 {
+		return total
+	}
+	return s.GPUStatus(ctx).TotalMB
 }
 
 // APIStatus returns inflight/max/rpm per provider.

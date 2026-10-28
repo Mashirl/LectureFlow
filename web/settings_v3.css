@@ -108,8 +108,6 @@
 .rc-head > .icon { flex: none; color: var(--accent-text); }
 .rc-name { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: var(--fs-sm); color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rc-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.rc-window .metric-v { font-variant-numeric: tabular-nums; }
-.rc-left { margin: 0; font-size: var(--fs-sm); font-weight: 500; color: var(--text-1); }
 .rc-kv { display: grid; grid-template-columns: minmax(64px, max-content) minmax(0, 1fr); gap: 8px; font-size: var(--fs-xs); line-height: 1.45; }
 .rc-k { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); white-space: nowrap; }
 .rc-v { display: flex; flex-direction: column; min-width: 0; color: var(--text-1); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
@@ -122,6 +120,86 @@
 .rc-line > .icon { flex: none; color: var(--text-3); }
 .rc-line-t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .insp-remote.is-line .insp-note { margin: 6px 0 0; }
+
+/* colab-obs (2026-10-27): the account without a session; with one the
+   remote machine, its sparklines and the segmented memory bar; the rail's
+   Colab cell. Segment colours: 内存盘 aqua, Whisper the app blue, 系统 and
+   已用 neutral grey ("not ours"), 数据 orange. The three hues pass the
+   dataviz all-pairs colour-blind check in light and dark (validated with
+   the approved draft); aqua is 2.8:1 on white, so the legend text and the
+   hover values carry the numbers too. 2 px gaps, no outlines, no
+   gradients; a segment keeps 3 px so it can be hovered. */
+:root {
+  --ram-disk: light-dark(#1baf7a, #199e70);
+  --ram-asr: light-dark(#1f6feb, #3b8cff);
+  --ram-sys: light-dark(#8a919d, #6b7380);
+  --ram-data: light-dark(#eb6834, #d95926);
+}
+.rc-part { display: contents; }
+.insp-remote .tiles { margin-top: 2px; }
+.insp-remote .metric { margin-top: 2px; }
+.rc-tile { padding-bottom: 8px; }
+.rc-tile.is-text .tile-v { font-size: 16px; line-height: 1.6; letter-spacing: 0; overflow-wrap: anywhere; }
+.rc-v.tone-warn { color: color-mix(in srgb, var(--warn) 85%, var(--text-1)); }
+.rc-quota { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45; }
+.rc-quota .icon { flex: none; margin-top: 1px; color: var(--text-3); }
+.rc-checked { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 8px 0 0; font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.rc-checked[hidden] { display: none; }
+.rc-link-btn { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.rc-link-btn:disabled { opacity: 0.6; cursor: default; text-decoration: none; }
+.rc-smi { margin-top: -4px; font-size: var(--fs-xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-sep { height: 1px; margin: 2px 0; background: var(--border-1); }
+.rc-line-v { margin: 0; }
+.rc-task { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.rc-task-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rc-task-p { flex: none; font-weight: 600; }
+.rc-task + .rc-sub { margin-bottom: 3px; }
+.rc-ram { position: relative; }
+.rc-ram .metric-v b { font-weight: 650; }
+.rc-ram .metric-v.is-low b { color: var(--warn); }
+.rc-ram > .insp-note { margin: 6px 0 0; }
+.rc-ram > .insp-note[hidden] { display: none; }
+.rc-rbar { display: flex; gap: 2px; height: 10px; margin-top: 2px; }
+.rc-seg { flex: 0 1 auto; min-width: 3px; height: 100%; border-radius: 1px; cursor: default; transition: opacity var(--dur) var(--ease); }
+.rc-seg:first-child { border-radius: 3px 1px 1px 3px; }
+.rc-seg.seg-free { flex: 1 1 0; min-width: 0; border-radius: 1px 3px 3px 1px; background: var(--bg-sunken); box-shadow: inset 0 0 0 1px var(--border-1); }
+.rc-seg.seg-free:first-child { border-radius: 3px; }
+.seg-ramdisk { background: var(--ram-disk); }
+.seg-whisper { background: var(--ram-asr); }
+.seg-system, .seg-used { background: var(--ram-sys); }
+.seg-data { background: var(--ram-data); }
+.rc-rbar.is-focus .rc-seg:not(.is-on) { opacity: 0.4; }
+.rc-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; margin: 7px 0 0; padding: 0; list-style: none; font-size: var(--fs-xs); }
+.rc-legend li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rc-sw { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+.rc-sw.seg-free { background: var(--bg-sunken); box-shadow: inset 0 0 0 1px var(--border-3); }
+.rc-lg-k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.rc-lg-v { margin-left: auto; color: var(--text-1); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-rtip {
+  position: absolute; z-index: 5; top: 40px; width: 236px; max-width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border-2); border-radius: var(--r-md); background: var(--bg-raised);
+  box-shadow: var(--shadow-md); font-size: var(--fs-xs); line-height: 1.5; color: var(--text-2); pointer-events: none;
+}
+.rc-rtip[hidden] { display: none; }
+.rc-rtip-h { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; color: var(--text-1); font-weight: 600; font-size: var(--fs-sm); }
+.rc-rtip-n { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-rtip p { margin: 0; }
+/* the collapsed rail's Colab cell */
+.rail-colab { padding-top: 10px; border-top: 1px solid var(--border-1); }
+.rail-colab > .icon { color: var(--accent-text); }
+.rail-colab.is-warn > .icon { color: var(--warn); }
+.rail-sub { font-size: 9px; line-height: 1; color: var(--text-3); }
+.rail-colab.is-warn .rail-sub { color: var(--warn); }
+.rail-mini { display: flex; gap: 1px; width: 30px; height: 4px; margin-top: 3px; }
+.rail-mini[hidden] { display: none; }
+.rail-mini span { flex: 0 1 auto; min-width: 2px; border-radius: 1px; }
+.rail-mini .seg-free { flex: 1 1 0; min-width: 0; background: var(--border-1); }
+/* the phone's overlay panel (272 px): the key column narrower, no icons */
+:root[data-insp="overlay"] .insp-remote .rc-kv { grid-template-columns: 56px minmax(0, 1fr); gap: 6px; }
+:root[data-insp="overlay"] .insp-remote .rc-k .icon { display: none; }
+:root[data-insp="overlay"] .insp-remote .rc-k { white-space: normal; }
+:root[data-insp="overlay"] .insp-remote .rc-legend { gap: 3px 10px; }
+:root[data-insp="overlay"] .insp-remote .rc-rtip { width: 210px; }
 
 /* pipeline: the remote mark of an asr segment and the hover card's steps */
 .seg-wrap.is-remote .seg { position: relative; }
@@ -179,6 +257,48 @@
 .colab-model-line { flex-wrap: wrap; gap: 8px; }
 .colab-model { width: 13em; max-width: 100%; }
 .colab-sel { min-width: 8em; }
+/* colab-obs: the account row and the accelerators as a radio list (each GPU's
+   measured runtime, time and cost per lecture, lectures the balance covers;
+   a locked one greyed with its numbers kept and the reason in its row) */
+.acct-box { display: flex; flex-direction: column; gap: 6px; width: 100%; padding: 10px 12px; border: 1px solid var(--border-1); border-radius: var(--r-md); background: var(--bg-content); }
+.acct-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.acct-cu { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.acct-num { font-family: var(--font-display); font-size: 22px; font-weight: 650; line-height: 1.15; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.acct-unit { font-size: var(--fs-sm); color: var(--text-2); }
+.acct-quota { display: flex; align-items: flex-start; gap: 6px; color: var(--text-2); }
+.acct-quota .icon { flex: none; margin-top: 2px; color: var(--text-3); }
+.acct-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.acct-foot .dim { font-variant-numeric: tabular-nums; }
+.acc-list { display: flex; flex-direction: column; width: 100%; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border-1); border-radius: var(--r-lg); background: var(--bg-content); overflow: hidden; }
+.acc { border-top: 1px solid var(--border-1); }
+.acc:first-child { border-top: 0; }
+.acc-in { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 2px 10px; align-items: start; padding: 10px 12px; cursor: pointer; }
+.acc:not(.is-locked):not(.is-sel) .acc-in:hover { background: var(--bg-hover); }
+.acc-radio { width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); }
+.acc.is-sel { background: var(--bg-selected); box-shadow: inset 3px 0 0 var(--accent); }
+.acc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.acc-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
+.acc-name { margin-right: 2px; font-size: var(--fs-md); font-weight: 650; }
+.acc-line .chip { height: 18px; padding: 0 6px; }
+.acc-meas { font-size: var(--fs-sm); color: var(--text-1); font-variant-numeric: tabular-nums; }
+.acc-sub { font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.acc-why { display: flex; align-items: flex-start; gap: 5px; font-size: var(--fs-xs); color: color-mix(in srgb, var(--warn) 80%, var(--text-1)); }
+.acc-why .icon { flex: none; margin-top: 2px; }
+.acc-fit { display: flex; flex-direction: column; align-items: flex-end; min-width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+.acc-fit b { font-size: var(--fs-md); font-weight: 650; color: var(--text-1); white-space: nowrap; }
+.acc-fit small { font-size: 10.5px; color: var(--text-3); white-space: nowrap; }
+.acc-fit .icon { color: var(--text-3); }
+.acc.is-locked .acc-in { cursor: default; }
+.acc.is-locked .acc-radio { opacity: 0.5; }
+.acc.is-locked .acc-name, .acc.is-locked .acc-meas, .acc.is-locked .acc-fit b { color: var(--text-3); }
+.acc.is-locked .chip { opacity: 0.7; }
+@media (max-width: 560px) {
+  .acc-in { grid-template-columns: 16px minmax(0, 1fr); }
+  .acc-fit { grid-column: 2; flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; text-align: left; }
+}
+/* the lecture page: transcribed in speed mode (a quiet fact) */
+.lec-notice.is-split { background: var(--bg-sunken); color: var(--text-2); font-size: var(--fs-sm); }
+.lec-notice.is-split .icon { color: var(--accent-text); }
 .colab-points { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; padding: 0; list-style: none; }
 .colab-points li { display: flex; align-items: flex-start; gap: 8px; color: var(--text-2); line-height: 1.5; }
 .colab-points .icon { margin-top: 3px; flex: none; color: var(--accent); }

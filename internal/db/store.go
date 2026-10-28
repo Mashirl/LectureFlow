@@ -303,4 +303,19 @@ type Store interface {
 	// SetASRDeviceBenchmark writes last_benchmark (raw JSON of
 	// model.DeviceBenchmark; nil = NULL); ErrNotFound when there is no such row.
 	SetASRDeviceBenchmark(ctx context.Context, id string, raw *string) error
+
+	// ---------------------------------------------------------------------
+	// Week overrides (migrations/011_week_override.sql; course-ux, user
+	// request 2026-10-27). GetLecture and ListLectures read a lecture's
+	// override into Lecture.WeekOverride.
+	// ---------------------------------------------------------------------
+
+	// SetWeekOverride writes the lecture's override (replacing one it has).
+	// CreatedAt "" → now. ErrWeekOverrideInvalid for a week outside
+	// 1–model.MaxBindWeek or an unknown kind; ErrNotFound when there is no
+	// such lecture.
+	SetWeekOverride(ctx context.Context, lectureID string, o model.WeekOverride) error
+	// DeleteWeekOverride removes the lecture's override; ErrNotFound when it
+	// has none.
+	DeleteWeekOverride(ctx context.Context, lectureID string) error
 }

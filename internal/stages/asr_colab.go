@@ -62,6 +62,7 @@ func (s *asrStage) remoteRun(ctx context.Context, job model.Job, run model.ASRSn
 		p, err := rb.Transcribe(ctx, colab.Job{
 			ID: job.ID, AudioPath: audio, DurationSec: float64(ms) / 1000,
 			Language: run.Language, InitialPrompt: prompt, OutDir: dir,
+			NoRedecode: !s.d.redecodeOn(ctx),
 		}, func(ev colab.Event) { rep.report(ev, false) })
 		done <- outcome{p, err}
 	}()

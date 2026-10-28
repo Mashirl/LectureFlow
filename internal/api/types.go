@@ -158,6 +158,19 @@ type Lecture struct {
 	// Materials are the slide files this lecture uses (bound to it, to its
 	// teaching week, course-wide; state.MaterialSetOf), never null.
 	Materials []MaterialUse `json:"materials"`
+	// Angles are the lecture's extra camera angles (the extension's "双机位",
+	// handlers_angles.go): [{"name": "angle2"}], served by GET
+	// /api/lectures/{id}/angles/{name}; left out when there is none.
+	Angles []Angle `json:"angles,omitempty"`
+	// WeekOverride: the user placed the lecture in a teaching week
+	// (course-ux, types_course_ux.go); absent when it has none.
+	WeekOverride *WeekOverride `json:"week_override,omitempty"`
+}
+
+// Angle is one extra camera angle of a lecture: a video-only MP4 (the
+// lecture's media keeps the audio).
+type Angle struct {
+	Name string `json:"name"` // "angle2"
 }
 
 type Course struct {

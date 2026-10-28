@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 import asr
-from conftest import PROJECT_DIR, WORKER_DIR
+from conftest import PROJECT_DIR, WORKER_DIR, all_speech_vad
 
 PROGRESS_RE = re.compile(r"^PROGRESS (0\.\d\d|1\.00)$")
 
@@ -70,8 +70,10 @@ class FakeModel:
 
 @pytest.fixture
 def fake(monkeypatch):
-    """Installs a FakeModel in place of the real model loader."""
+    """Installs a FakeModel in place of the real model loader; asr.py's own VAD step
+    (textrepair-int) finds the whole audio to be speech (state.vad_calls)."""
     state = SimpleNamespace(model=FakeModel(), load_args=None)
+    state.vad_calls = all_speech_vad(monkeypatch, asr)
 
     def fake_load(model_name, device, compute_type, cpu_threads, emit):
         state.load_args = (model_name, device, compute_type, cpu_threads)
@@ -151,10 +153,14 @@ def test_transcribe_parameters(fake, job, capsys):
     rc, _, err = run_main(capsys, "--in", in_path, "--out", out_path)
     assert rc == 0, err
     assert fake.load_args == ("large-v3", "cuda", "float16", 4)
-    audio, kwargs = fake.model.calls[0]
+    (audio, kwargs), = fake.model.calls
+    # SPEC §6.2's VAD runs in the worker, once per run (textrepair-int: speech_audio, the
+    # VAD step of transcribe(vad_filter=True)); the model decodes the speech-only audio
+    assert fake.vad_calls == [160000]
     assert kwargs == {"language": "en", "initial_prompt": "cache, write-back, TLB",
-                      "vad_filter": True, "word_timestamps": True, "beam_size": 5,
+                      "vad_filter": False, "word_timestamps": True, "beam_size": 5,
                       "condition_on_previous_text": False}
+    assert dict(kwargs, vad_filter=True, language=None, initial_prompt=None) ==         dict(asr.TRANSCRIBE_KWARGS, language=None, initial_prompt=None)
     assert "hotwords" not in kwargs
     # audio decoded in-process to 16 kHz mono float32
     assert audio.dtype.name == "float32" and len(audio) == 160000
@@ -200,13 +206,15 @@ def test_no_speech_gives_empty_sentence_list(fake, job, capsys):
     assert [l for l in lines if l.startswith("PROGRESS")] == ["PROGRESS 1.00"]
 
 
-def test_progress_is_monotonic_and_clamped(fake, job, capsys):
+def test_progress_is_monotonic_and_clamped(fake, job, capsys, wav_factory):
     fake.model = FakeModel(duration=4.0, segments=[
         seg(0.0, 2.0, [W("One", 0.0, 1.0), W("two.", 1.0, 2.0)]),
         seg(2.0, 1.5, [W("Odd", 1.4, 1.5), W("order.", 1.5, 1.5)]),
         seg(2.0, 9.0, [W("Past", 2.0, 3.0), W("end.", 3.0, 9.0)]),
     ])
-    in_path, out_path = job()
+    # progress is measured against the lecture's audio (4 s; the worker runs the VAD
+    # itself, so the model's info.duration would be the speech-only audio's)
+    in_path, out_path = job(audio=wav_factory("short.wav", seconds=4.0))
     rc, lines, _ = run_main(capsys, "--in", in_path, "--out", out_path)
     assert rc == 0
     assert [l for l in lines if l.startswith("PROGRESS")] == [

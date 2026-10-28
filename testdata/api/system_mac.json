@@ -1,0 +1,252 @@
+{
+ "checks": [
+  {
+   "name": "data_dir",
+   "status": "ok",
+   "detail": "/Volumes/Data/LectureFlow 可写",
+   "hint": "",
+   "detail_info": {
+    "code": "check.dir_writable",
+    "params": {
+     "path": "/Volumes/Data/LectureFlow"
+    }
+   }
+  },
+  {
+   "name": "ffmpeg",
+   "status": "ok",
+   "detail": "ffmpeg version 7.1.1",
+   "hint": ""
+  },
+  {
+   "name": "aria2c",
+   "status": "ok",
+   "detail": "aria2 version 1.37.0，SHA-256 6c1e0f3a9b54d2e8a7c3f1b0d9e8a6c5b4f3e2d1c0b9a8f7e6d5c4b3a2918f7e",
+   "hint": "",
+   "detail_info": {
+    "code": "check.aria2c_ok",
+    "params": {
+     "version": "aria2 version 1.37.0",
+     "sha256": "6c1e0f3a9b54d2e8a7c3f1b0d9e8a6c5b4f3e2d1c0b9a8f7e6d5c4b3a2918f7e"
+    }
+   }
+  },
+  {
+   "name": "python",
+   "status": "ok",
+   "detail": "Python 3.12.8",
+   "hint": ""
+  },
+  {
+   "name": "pypdf",
+   "status": "ok",
+   "detail": "可以导入 pypdf",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "pypdf"
+    }
+   }
+  },
+  {
+   "name": "mlx_python",
+   "status": "ok",
+   "detail": "Python 3.12.8",
+   "hint": ""
+  },
+  {
+   "name": "mlx",
+   "status": "ok",
+   "detail": "可以导入 mlx, mlx_whisper",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "mlx, mlx_whisper"
+    }
+   }
+  },
+  {
+   "name": "mlx_model",
+   "status": "ok",
+   "detail": "模型文件齐全：Whisper large-v3-turbo（fp16）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.mlx_model_ok",
+    "params": {
+     "model": "large-v3-turbo",
+     "precision": "fp16"
+    }
+   }
+  },
+  {
+   "name": "mlx_selftest",
+   "status": "ok",
+   "detail": "SELFTEST ok device=mlx:gpu load_s=1.2 transcribe_s=0.31 segments=0",
+   "hint": ""
+  },
+  {
+   "name": "browser_ext",
+   "status": "ok",
+   "detail": "已在 Chrome, Firefox 中登记；这次启动后还没有扩展连接过",
+   "hint": "",
+   "detail_info": {
+    "code": "check.browser_ext_registered",
+    "params": {
+     "browsers": "Chrome, Firefox"
+    }
+   }
+  },
+  {
+   "name": "api_key:DeepSeek",
+   "status": "ok",
+   "detail": "已配置（sk-…7f3a）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…7f3a"
+    }
+   }
+  },
+  {
+   "name": "api:DeepSeek",
+   "status": "ok",
+   "detail": "连通（312 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 312
+    }
+   }
+  },
+  {
+   "name": "api_key:Anthropic",
+   "status": "ok",
+   "detail": "已配置（sk-…c2d9）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…c2d9"
+    }
+   }
+  },
+  {
+   "name": "api:Anthropic",
+   "status": "ok",
+   "detail": "连通（684 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 684
+    }
+   }
+  },
+  {
+   "name": "disk",
+   "status": "warn",
+   "detail": "剩余 4.2 GB",
+   "hint": "剩余空间少于 5 GB，建议删除不需要的讲座",
+   "detail_info": {
+    "code": "check.disk_free",
+    "params": {
+     "free_mb": 4300
+    }
+   },
+   "hint_info": {
+    "code": "check.hint_disk_warn"
+   }
+  }
+ ],
+ "gpu": {
+  "total_mb": 0,
+  "free_mb": 0,
+  "paused": false,
+  "slots_used": 0,
+  "slots_max": 0,
+  "estimated_job_mb": 0
+ },
+ "api": {
+  "Anthropic": {
+   "inflight": 4,
+   "max": 4,
+   "rpm_limit": 50
+  },
+  "DeepSeek": {
+   "inflight": 3,
+   "max": 8,
+   "rpm_limit": 120
+  },
+  "OpenRouter": {
+   "inflight": 0,
+   "max": 4,
+   "rpm_limit": 60
+  }
+ },
+ "usage_today": {
+  "prompt_tokens": 2152400,
+  "cache_hit_tokens": 1786600,
+  "completion_tokens": 115200,
+  "estimated_cost": 2.71
+ },
+ "budget_hit": false,
+ "disk": {
+  "free_mb": 4300,
+  "data_mb": 9840,
+  "courses_mb": {
+   "01JC0000000000000000002120": 2210,
+   "01JC0000000000000000003121": 1460,
+   "01JC0000000000000000003311": 980,
+   "01JC0000000000000000003631": 4870,
+   "01JC000000000000000000RM01": 320
+  }
+ },
+ "config": {
+  "listen": "127.0.0.1:8420",
+  "data_dir": "/Volumes/Data/LectureFlow",
+  "python": [
+   {
+    "backend": "mlx",
+    "path": "/Volumes/Data/LectureFlow/components/asr-mlx/0.4.2-1/venv/bin/python",
+    "source": "component",
+    "exists": true
+   },
+   {
+    "backend": "base",
+    "path": "/Volumes/Data/LectureFlow/components/python/3.12.8-1/venv/bin/python",
+    "source": "component",
+    "exists": true
+   }
+  ],
+  "ffmpeg": "/Applications/LectureFlow.app/Contents/Resources/bin/ffmpeg",
+  "worker_dir": "/Applications/LectureFlow.app/Contents/Resources/worker",
+  "log_level": "info",
+  "asr": {
+   "language": "en",
+   "device_mode": "auto",
+   "multi_device": true,
+   "battery_aware": true,
+   "mem_reserve_mb": 2048
+  },
+  "general": {
+   "keep_original_media": true,
+   "notifications": true,
+   "daily_budget": 20
+  },
+  "asr_devices": [
+   {
+    "id": "mlx:gpu",
+    "label": "Apple M4",
+    "backend": "mlx",
+    "model": "large-v3-turbo",
+    "precision": "fp16",
+    "max_parallel": 1,
+    "enabled": true
+   }
+  ]
+ }
+}

@@ -87,7 +87,7 @@ LectureFlow 係一個喺你自己部電腦度行嘅講課工具。將堂課嘅�
 
 - 自動揀 NVIDIA 顯示卡、Intel 內置顯示卡或者 NPU、Apple Silicon 嚟轉寫。
 - 手提電腦一次淨係用一部轉寫裝置：駁電用獨顯，唔駁電就轉去慳電啲嘅 NPU；搬唔到嘅工作會暫停，駁返電再繼續。
-- 可以揀借用 Google Colab 嘅 GPU：自動開機、轉寫、攞返結果、熄機，一蚊都唔會畀佢燒多咗。
+- 可以揀借用 Google Colab 嘅 GPU：自動開機、將排緊隊嘅課一堂接一堂轉寫晒、攞返結果、熄機，一蚊都唔會畀佢燒多咗。
 
 **慢慢嚟，唔催你**
 
@@ -98,13 +98,16 @@ LectureFlow 係一個喺你自己部電腦度行嘅講課工具。將堂課嘅�
 **可以同其他工具一齊用**
 
 - 匯出中英對照講稿、雙語字幕（VTT），同埋帶時間戳引用嘅 JSON，可以交畀其他 AI 整理筆記。
+- 瀏覽器擴充功能「傳送去 LectureFlow」，支援 Chrome 同 Firefox（Edge 喺 Chrome 線上應用程式商店安裝；睇 [docs/install.md](docs/install.md#browser-extension)）：喺 Panopto 呢類錄播平台睇緊堂嘅時候，撳一下、確認一次，就將嗰堂錄播送入 LectureFlow。喺 Panopto 仲可以直接喺頁面度傳送，一堂，或者課程列表成一頁。佢淨係讀媒體軌道，從來唔讀你嘅課程資料。
 
 ## 私隱
 
 - **錄音同轉寫全部喺你自己部電腦度完成**，乜都唔會上載。
 - 只有喺你設定咗模型服務之後，轉寫出嚟嘅文字先會傳去**你自己揀**嘅服務商，用嚟修正、做摘要同翻譯；你亦可以揀「淨係轉寫」，完全唔用任何網上服務。
-- 用 Google Colab 後端嘅時候，錄音會上載去 Google 嘅伺服器，揀嘅時候會清楚提你。
+- 用 Google Colab 後端嘅時候，錄音會上載去 Google 嘅伺服器，揀嘅時候會清楚提你。LectureFlow 亦會用你自己嘅授權，向 Google 查你 Colab 帳戶仲有幾多運算單元、可以借邊啲 GPU；淨係喺用緊執行階段嘅時候，先會讀佢嘅記憶體同 GPU 讀數，顯示喺資源欄。
+- 儲低咗嘅 API key 同 Colab 授權，會用系統帳戶嘅憑證保護（Windows 嘅 DPAPI、macOS 嘅鑰匙圈）加密存放。將資料目錄搬去另一部電腦或者另一個系統帳戶之後，要重新輸入。
 - LectureFlow 唔會收集任何使用數據，冇遙測，唔使開帳戶。
+- 瀏覽器擴充功能淨係同你部電腦入面嘅 LectureFlow 溝通，只會喺你送堂入去嘅時候先讀錄播網站嘅 Cookie，詳情睇[擴充功能私隱聲明](docs/extension/privacy.md)。
 
 ## 轉寫後端
 
@@ -141,7 +144,7 @@ LectureFlow 係一個喺你自己部電腦度行嘅講課工具。將堂課嘅�
 
 ## 點樣開始
 
-1. 喺 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下載啱你系統嘅安裝檔：Windows 用 `LectureFlow-Setup-3.1.0-x64.exe`（或者免安裝版），Apple Silicon Mac 用 `LectureFlow-3.1.0-arm64.dmg`。
+1. 喺 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下載啱你系統嘅安裝檔：Windows 用 `LectureFlow-Setup-3.2.0-x64.exe`（或者免安裝版），Apple Silicon Mac 用 `LectureFlow-3.2.0-arm64.dmg`。新版有咩唔同，睇[發佈說明](docs/release-notes/3.2.0.md)。
 2. 安裝檔暫時未有程式碼簽署，系統會彈出安全提示，點樣放行可以睇 [docs/install.md](docs/install.md)。
 3. 打開 LectureFlow，跟住導引行幾步：揀語言、檢查電腦、揀收費方案、下載組件。每一步都可以跳過，遲啲再返嚟。
 4. 加一科：填返科目名稱同開課日期，可以順手貼埋課程大綱、上載簡報（唔係必須，但會明顯令專業術語準啲）。
@@ -159,7 +162,9 @@ English · 简体中文 · 繁體中文（台灣） · 粵語（香港） · Р�
 
 - **暫時淨係喺讀電腦科學嘅學生之間測試過**，講課語言係英文，翻譯做簡體中文。醫科、法律、人文等學科嘅術語同講課風格唔同，效果可能有分別，歡迎話我哋知。
 - macOS 淨係喺 Mac mini（Apple M6，macOS 27）上面測試過，未試過用緊電池嘅 MacBook。
-- Whisper 嘅 large-v3 系列（包括 Mac 預設用嘅 large-v3-turbo）成日漏咗標點同大細楷，large-v2 就冇呢個問題。之後嘅版本會解決。
+- Whisper 嘅 large-v3 系列（包括 Mac 預設用嘅 large-v3-turbo）成日漏咗標點同大細楷，large-v2 就冇呢個問題。由 3.2.0 開始，LectureFlow 會修補英文講課入面呢類段落：用 NVIDIA 顯示卡、CPU 或者 Colab 轉寫嘅時候，會將呢啲段落再轉寫一次；所有後端都會跟住同一堂其他部分嘅規律補返標點同大細楷；以前轉寫嘅堂可以用「修正斷句」修補。修得唔錯，但唔係完美。
+- 瀏覽器擴充功能最熟 Panopto，其他網站就淨係做通用嘅軌道偵測；唔處理受 DRM 保護嘅媒體，唔支援 Linux、ChromeOS 同手機。
+- 瀏覽器擴充功能同 LectureFlow 都唔處理 YouTube 同網上課程平台（MOOC、付費課程，例如 Coursera、edX、Udemy）：佢哋只係用嚟處理學校俾你嘅講座錄影。
 - 未支援 AMD ROCm；多個推理後端之間嘅調度仲未夠聰明。
 - 自動轉寫、修正同翻譯都有機會出錯，重要嘅內容請聽返原聲確認。
 - 佢係為**有參考資料嘅知識型內容**而設計，唔係通用嘅影片字幕工具：睇戲、動畫、直播請搵更合適嘅工具。
@@ -209,7 +214,7 @@ English · 简体中文 · 繁體中文（台灣） · 粵語（香港） · Р�
 
 ## 授權
 
-LectureFlow 以 GNU Affero 通用公眾授權條款第 3 版或更新版本（AGPL-3.0-or-later）發佈，見 [LICENSE](LICENSE)。如果你修改咗 LectureFlow，再經網絡提供畀其他人用，就要向呢啲用戶提供修改後嘅原始碼。另外有一項根據授權第 7 條嘅附加許可，容許將 LectureFlow 同 [LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md) 列出嘅程式庫組合使用。第三方組件嘅授權見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+LectureFlow 以 GNU Affero 通用公眾授權條款第 3 版或更新版本（AGPL-3.0-or-later）發佈，見 [LICENSE](LICENSE)。如果你修改咗 LectureFlow，再經網絡提供畀其他人用，就要向呢啲用戶提供修改後嘅原始碼。另外有一項根據授權第 7 條嘅附加許可（[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md)），容許將 LectureFlow 同入面列出嘅專有或者同 AGPL 唔兼容嘅程式庫（例如 NVIDIA CUDA，由組件管理器喺你部電腦度下載）組合使用；AGPL 其他條件不變。第三方組件嘅授權見 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 鳴謝
 

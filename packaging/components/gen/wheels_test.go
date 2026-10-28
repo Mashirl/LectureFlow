@@ -11,6 +11,7 @@ import (
 func TestWheelScore(t *testing.T) {
 	win := wheelTarget{pyMinor: 12, platform: "windows-x64"}
 	mac := wheelTarget{pyMinor: 12, platform: "darwin-arm64", macMajor: 13, macMinor: 0}
+	lin := wheelTarget{pyMinor: 12, platform: "linux-x64"}
 	cases := []struct {
 		file string
 		t    wheelTarget
@@ -29,6 +30,15 @@ func TestWheelScore(t *testing.T) {
 		{"x-1.0-cp312-cp312-macosx_10_9_universal2.whl", mac, true},
 		{"x-1.0-cp312-cp312-macosx_10_9_x86_64.whl", mac, false},
 		{"x-1.0.tar.gz", win, false},
+		// linux-x64 (ssh-mvp): manylinux up to glibc 2.28, x86_64 only
+		{"ctranslate2-4.8.3-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", lin, true},
+		{"av-15.1.0-cp312-cp312-manylinux_2_28_x86_64.whl", lin, true},
+		{"x-1.0-cp312-cp312-manylinux_2_34_x86_64.whl", lin, false},
+		{"x-1.0-cp312-cp312-manylinux_2_28_aarch64.whl", lin, false},
+		{"x-1.0-cp312-cp312-musllinux_1_2_x86_64.whl", lin, false},
+		{"x-1.0-cp312-cp312-linux_x86_64.whl", lin, false},
+		{"cffi-2.1.1-cp312-cp312-manylinux1_x86_64.whl", lin, true},
+		{"numpy-2.5.4-cp312-cp312-win_amd64.whl", lin, false},
 	}
 	for _, c := range cases {
 		if got := wheelScore(c.file, c.t) > 0; got != c.ok {

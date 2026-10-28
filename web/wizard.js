@@ -39,7 +39,7 @@ import { kindTag } from './kinds.js';
 import { bindSelect, weekChoices } from './material_bind.js';
 
 const SYLLABUS_ACCEPT = '.txt,.md,.pdf,text/plain,text/markdown,application/pdf';
-const MEDIA_ACCEPT = 'audio/*,video/*';
+const MEDIA_ACCEPT = U.MEDIA_ACCEPT; // extensions only (util.js, security review 2 M3)
 const NAME_MAX = 200; // same limits as the server (POST/PATCH /api/courses)
 const CODE_MAX = 32;
 const REFRESH_MS = 300; // SSE events → re-read the course (debounced)
@@ -1501,8 +1501,13 @@ export function openWizard(ctx) {
       clear(note);
       if (refreshError) note.append(icon('circle-alert', { size: 14 }), h('span', null, t('wizard.done.refresh_failed', { error: refreshError })), btn(t('common.retry'), { size: 'sm', kind: 'ghost', icon: 'rotate-cw', fkey: 'wiz:refresh', onclick: refresh }));
     };
-    // Retry of a failed or cancelled term extraction; the server's Course answer is shown.
+    // Retry of a failed or cancelled term extraction; the server's Course
+    // answer is shown. Sent once while it is on its way (a double click,
+    // 3.2.0 P2).
+    let seeding = false;
     async function retrySeed() {
+      if (seeding) return;
+      seeding = true;
       try {
         const c = await api.courseStageAction(W.course.id, 'glossary_seed', 'retry');
         if (!alive || !c) return;
@@ -1511,6 +1516,8 @@ export function openWizard(ctx) {
         renderRail();
       } catch {
         // shown by the API layer
+      } finally {
+        seeding = false;
       }
     }
     const renderLectures = () => {

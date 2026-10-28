@@ -24,11 +24,16 @@ type ReplayFile struct {
 	// Recorded is true only for real recordings made with cmd/record.
 	Recorded bool `json:"recorded"`
 	// Extends: this sample starts with another sample's steps (and vars),
-	// up to but not including the step named Until.
-	Extends string            `json:"extends,omitempty"`
-	Until   string            `json:"until,omitempty"`
-	Vars    map[string]string `json:"vars,omitempty"`
-	Steps   []ReplayStep      `json:"steps"`
+	// up to but not including the step named Until (all of them when Until
+	// is empty; the sample's vars override the parent's).
+	Extends string `json:"extends,omitempty"`
+	Until   string `json:"until,omitempty"`
+	// Resume: after this sample's own steps, the parent's steps continue
+	// from the step named Resume (a sample that inserts steps in the middle
+	// of its parent, e.g. the memory probe before the uploads).
+	Resume string            `json:"resume,omitempty"`
+	Vars   map[string]string `json:"vars,omitempty"`
+	Steps  []ReplayStep      `json:"steps"`
 }
 
 // ReplayUpstream names the upstream code a sample follows.
@@ -40,7 +45,11 @@ type ReplayUpstream struct {
 
 // ReplayStep is one HTTP exchange or one WebSocket connection.
 type ReplayStep struct {
-	Name      string          `json:"name"`
+	Name string `json:"name"`
+	// Group: consecutive steps of the same group may come in any order
+	// (requests the backend sends at once, e.g. the deletions of a job's
+	// files; colab-batch).
+	Group     string          `json:"group,omitempty"`
 	Request   *ReplayRequest  `json:"request,omitempty"`
 	Response  *ReplayResponse `json:"response,omitempty"`
 	WebSocket *ReplayWS       `json:"websocket,omitempty"`
@@ -81,8 +90,10 @@ type ReplayWS struct {
 // ReplayWSAction is one step of a WebSocket script: expect a client
 // message, send a server message, send stdout stream text (stdout_lines:
 // event objects, one line each, in one stream message; stdout_raw: text as
-// is), or close.
+// is), wait until the HTTP step named After was served (the cell runs while
+// the audio uploads: its lecture events follow job.json), or close.
 type ReplayWSAction struct {
+	After       string           `json:"after,omitempty"`
 	Expect      *ReplayKernelMsg `json:"expect,omitempty"`
 	Send        *ReplayKernelMsg `json:"send,omitempty"`
 	StdoutLines []map[string]any `json:"stdout_lines,omitempty"`

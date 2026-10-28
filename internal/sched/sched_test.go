@@ -310,11 +310,17 @@ func TestGPUMaxParallel(t *testing.T) {
 	e.prepDone(ls...)
 	e.start()
 	e.waitFor("2 asr running", 5*time.Second, func() bool { c, _, _ := g.stats(); return c == 2 })
-	time.Sleep(60 * time.Millisecond) // many scans
+	// A scan after both started refuses the third for the slot (not a fixed
+	// sleep: on a loaded machine the scan that started them may not have
+	// ended 60 ms later, and its waiting_for is not out yet).
+	var third model.Job
+	e.waitFor("the third asr waiting for a slot", 5*time.Second, func() bool {
+		third = e.lj(ls[2].ID, model.StageASR)
+		return e.s.WaitingFor(third) != ""
+	})
 	if c, m, _ := g.stats(); c != 2 || m != 2 {
 		t.Fatalf("running=%d max=%d, want 2", c, m)
 	}
-	third := e.lj(ls[2].ID, model.StageASR)
 	if third.Status != model.StatusQueued || e.s.WaitingFor(third) != model.WaitGPUSlot {
 		t.Fatalf("third asr: %s waiting_for=%q", third.Status, e.s.WaitingFor(third))
 	}
@@ -763,11 +769,17 @@ func TestCancelRunningAndQueued(t *testing.T) {
 // ---------- retries ----------
 
 func TestAutoRetryWithBackoff(t *testing.T) {
+	// The scheduler's clock (Options.Now: the backoff) stands still until
+	// the test moves it, so each backoff lasts until the test has read the
+	// waiting state; polling for a 60 ms state missed it on a loaded machine
+	// (flake-hunt #8). The runs' start times are read on that clock: a run
+	// that started before the backoff ended has the earlier time.
+	clk := &gpuTestClock{t: time.Date(2026, 10, 1, 9, 0, 0, 0, time.UTC)}
 	var mu sync.Mutex
 	var starts []time.Time
 	prep := &fakeStage{name: model.StagePrep, res: ResourceCPU, run: func(ctx context.Context, id string, p func(float64)) error {
 		mu.Lock()
-		starts = append(starts, time.Now())
+		starts = append(starts, clk.Now())
 		n := len(starts)
 		mu.Unlock()
 		if n <= 2 {
@@ -775,17 +787,21 @@ func TestAutoRetryWithBackoff(t *testing.T) {
 		}
 		return nil
 	}}
-	e := newEnv(t, nil, prep)
+	e := newEnvOpts(t, nil, func(o *Options) { o.Now = clk.Now }, prep)
 	l := e.lecture()
 	e.start()
-	e.waitFor("retry_backoff", 5*time.Second, func() bool {
-		return strings.HasPrefix(e.s.WaitingFor(e.lj(l.ID, model.StagePrep)), model.WaitRetryBackoffPrefix)
-	})
-	j := e.lj(l.ID, model.StagePrep)
-	if j.Status != model.StatusQueued || j.Attempt < 1 || j.Error == nil || !strings.Contains(*j.Error, "transient failure") {
-		t.Fatalf("during backoff: %+v", j)
+	for i, wait := range []time.Duration{60 * time.Millisecond, 120 * time.Millisecond} { // newScheduler's RetryBackoff
+		e.waitFor(fmt.Sprintf("retry_backoff %d", i+1), 5*time.Second, func() bool {
+			j := e.lj(l.ID, model.StagePrep)
+			return j.Attempt == i+1 && strings.HasPrefix(e.s.WaitingFor(j), model.WaitRetryBackoffPrefix)
+		})
+		j := e.lj(l.ID, model.StagePrep)
+		if j.Status != model.StatusQueued || j.Attempt != i+1 || j.Error == nil || !strings.Contains(*j.Error, fmt.Sprintf("transient failure %d", i+1)) {
+			t.Fatalf("during backoff %d: %+v", i+1, j)
+		}
+		clk.Advance(wait)
 	}
-	j = e.waitStatus(l.ID, model.StagePrep, model.StatusDone)
+	j := e.waitStatus(l.ID, model.StagePrep, model.StatusDone)
 	if j.Attempt != 2 || j.Error != nil || j.Progress != 1 {
 		t.Fatalf("final: %+v", j)
 	}
@@ -1053,7 +1069,11 @@ func TestInvalidationThroughScheduler(t *testing.T) {
 		instant(model.StageSummary, ResourceAPI), repair, instant(model.StageTranslate, ResourceAPI), instant(model.StageExport, ResourceCPU))
 	l := e.lecture()
 	e.start()
-	e.waitStatus(l.ID, model.StageExport, model.StatusDone)
+	// The whole pipeline (six stages) first: more than waitStatus's 5 s on a
+	// heavily loaded machine (flake-hunt #8).
+	e.waitFor("the pipeline", 30*time.Second, func() bool {
+		return e.lj(l.ID, model.StageExport).Status == model.StatusDone
+	})
 	hash.Store("h2")
 	changed, err := e.s.InvalidateCourse(e.ctx, e.course.ID)
 	if err != nil || len(changed) != 1 || changed[0].Stage != model.StageRepair {

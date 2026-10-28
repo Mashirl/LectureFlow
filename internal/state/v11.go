@@ -323,6 +323,29 @@ type RerunOpts struct {
 	// (and every stage when nil) keep the config_snapshot of the job they
 	// replace (A4.2: downstream keeps its own snapshot).
 	NewSnapshots map[string]string
+	// TextRepair (textrepair-int) is the asr rerun "修复断句" (text_only):
+	// the lecture's sentences are kept for the new asr job to repair (it
+	// replaces them in one transaction when it finishes, keeping the
+	// human_text of the sentences it does not change); every downstream
+	// stage is cleaned up and rerun as by a rerun of the stage after asr
+	// (summary: summary and patches deleted, repaired_text reset,
+	// translations cleared, text recomputed). The new asr job carries
+	// model.ASRModeTextRepair and what describes the transcription it builds
+	// on (textRepairStats); it keeps the asr snapshot (NewSnapshots must not
+	// list asr). Only for the asr stage of a lecture.
+	TextRepair bool
+}
+
+// textRepairStats is the stats of the new asr job of a "修复断句" rerun: its
+// mode, and from the job it replaces what describes the transcription it
+// repairs (the prompt and terms used, the glossary version, the input hash
+// formula, the timing), so the stage card and the A2.2 / §4.4 checks see the
+// same transcription.
+func textRepairStats(old model.JobStats) model.JobStats {
+	return model.JobStats{
+		ASRMode: model.ASRModeTextRepair, PromptTermsUsed: old.PromptTermsUsed, ASRPrompt: old.ASRPrompt,
+		GlossaryVersion: old.GlossaryVersion, HashVersion: old.HashVersion, ASRTiming: old.ASRTiming,
+	}
 }
 
 // RerunWith is Rerun (SPEC §4.6, unchanged semantics) plus the v1.1 rule

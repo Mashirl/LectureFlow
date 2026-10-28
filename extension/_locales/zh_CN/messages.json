@@ -1,0 +1,1058 @@
+{
+  "extName": {
+    "message": "发送至 LectureFlow",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "找出你正在看的录播里的音频和视频轨道，一键交给本机的 LectureFlow 桌面应用，保存到本地离线转写和翻译。需要先安装 LectureFlow。",
+    "description": "Store description"
+  },
+  "actionTitle": {
+    "message": "LectureFlow：本页的轨道",
+    "description": "Toolbar button tooltip"
+  },
+  "connChecking": {
+    "message": "正在连接…",
+    "description": "Native messaging state"
+  },
+  "connRecheck": {
+    "message": "重新检测",
+    "description": "Button: retry connecting to LectureFlow"
+  },
+  "connConnected": {
+    "message": "已连接 LectureFlow"
+  },
+  "connConnectedVersion": {
+    "message": "LectureFlow $P1$",
+    "description": "Connected, with app version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "connUnavailable": {
+    "message": "未连接"
+  },
+  "connNotRunning": {
+    "message": "无法启动 LectureFlow。请打开它后重新检测。"
+  },
+  "connNotInstalled": {
+    "message": "请安装或打开 LectureFlow，然后重新检测。"
+  },
+  "detecting": {
+    "message": "正在探测…"
+  },
+  "showTracks": {
+    "message": "展开",
+    "description": "Expand the track list"
+  },
+  "hideTracks": {
+    "message": "收起轨道",
+    "description": "Closes the full track list"
+  },
+  "emptyHint": {
+    "message": "打开一节录播并开始播放后再点。",
+    "description": "Empty state"
+  },
+  "exportReport": {
+    "message": "导出探测报告"
+  },
+  "grantSite": {
+    "message": "在此网站自动探测",
+    "description": "Button: grant host permission"
+  },
+  "openOptions": {
+    "message": "设置"
+  },
+  "notAPage": {
+    "message": "这个页面不能探测。"
+  },
+  "noAccess": {
+    "message": "扩展读不到这个页面。"
+  },
+  "noTracks": {
+    "message": "没探测到轨道"
+  },
+  "tracksDetected": {
+    "message": "探测到 $P1$ 条轨道",
+    "description": "Header with the track count",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "sourceProfile": {
+    "message": "对策文件：$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "sourceGeneric": {
+    "message": "通用探测"
+  },
+  "unreviewed": {
+    "message": "未审核",
+    "description": "Locally imported profile"
+  },
+  "reviewed": {
+    "message": "已审核"
+  },
+  "downloadDisabled": {
+    "message": "可能受政策限制",
+    "description": "Chip: the platform’s switch says the recording is restricted"
+  },
+  "protectedCount": {
+    "message": "$P1$ 条受版权保护（DRM）",
+    "description": "DRM tracks",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "protected": {
+    "message": "受版权保护（DRM）",
+    "description": "DRM track"
+  },
+  "recommended": {
+    "message": "推荐"
+  },
+  "unreadable": {
+    "message": "清单读不到"
+  },
+  "kind_video": {
+    "message": "视频"
+  },
+  "kind_audio": {
+    "message": "音频"
+  },
+  "kind_unknown": {
+    "message": "未知类型"
+  },
+  "format_file": {
+    "message": "单文件"
+  },
+  "format_hls": {
+    "message": "HLS"
+  },
+  "format_dash": {
+    "message": "DASH"
+  },
+  "source_element": {
+    "message": "页面元素",
+    "description": "Detection route"
+  },
+  "source_performance": {
+    "message": "已加载资源",
+    "description": "Detection route"
+  },
+  "source_webrequest": {
+    "message": "网络请求",
+    "description": "Detection route"
+  },
+  "sizeUnknown": {
+    "message": "大小未知"
+  },
+  "sizeAbout": {
+    "message": "约 $P1$",
+    "description": "Estimated size",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reportBuilding": {
+    "message": "正在生成报告…"
+  },
+  "reportRefused": {
+    "message": "报告没有导出：其中可能有个人信息。"
+  },
+  "reportFailed": {
+    "message": "无法为这个页面生成报告。"
+  },
+  "reportSaved": {
+    "message": "报告已保存。分享前请先看一遍。"
+  },
+  "finding_email": {
+    "message": "有内容像邮箱地址。"
+  },
+  "finding_identity_field": {
+    "message": "有字段像姓名、用户名或学号。"
+  },
+  "finding_student_id": {
+    "message": "有数字像学号。"
+  },
+  "finding_name": {
+    "message": "地址里有一段像人名。"
+  },
+  "grantDone": {
+    "message": "已允许。刷新页面后，扩展能从头看到播放器的请求。"
+  },
+  "grantFailed": {
+    "message": "无法申请权限。"
+  },
+  "optionsTitle": {
+    "message": "LectureFlow 扩展设置"
+  },
+  "languageHeading": {
+    "message": "界面语言",
+    "description": "Settings section: the extension’s language"
+  },
+  "languageHint": {
+    "message": "默认跟随浏览器；也可以在这里选一种语言，例如浏览器不提供的粤语。",
+    "description": "Settings: under the language heading"
+  },
+  "languageAuto": {
+    "message": "跟随浏览器",
+    "description": "Language choice: the browser’s language"
+  },
+  "profilesHeading": {
+    "message": "对策文件"
+  },
+  "profilesHint": {
+    "message": "对策文件为平台的轨道命名。本地导入的标“未审核”，并优先使用。"
+  },
+  "importProfile": {
+    "message": "导入本地对策文件"
+  },
+  "importNotJson": {
+    "message": "这个文件不是 JSON。"
+  },
+  "importInvalid": {
+    "message": "对策文件不符合格式："
+  },
+  "importBlocked": {
+    "message": "不能导入这个对策文件：它匹配了 $P1$。",
+    "description": "Settings: a local profile matching a do-not-handle site is refused; $1 = the host it matches. Followed by unsupportedYoutube or unsupportedCourses.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importDone": {
+    "message": "已导入 $P1$。",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "remove": {
+    "message": "移除"
+  },
+  "sitesHeading": {
+    "message": "站点"
+  },
+  "sitesHint": {
+    "message": "在这些站点上，扩展会自动计数并看到播放器的请求；其他站点只在你点图标时探测。"
+  },
+  "addSite": {
+    "message": "允许站点"
+  },
+  "siteInvalid": {
+    "message": "请输入以 https:// 开头的地址"
+  },
+  "privacyHeading": {
+    "message": "隐私"
+  },
+  "privacyText": {
+    "message": "扩展只和本机的 LectureFlow 通信。只有在你发送讲座时才读取 Cookie，且只读轨道所在域名的。不上传任何内容。",
+    "description": "Options: privacy"
+  },
+  "versionLine": {
+    "message": "版本 $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "redetect": {
+    "message": "重新探测",
+    "description": "Button: run detection again"
+  },
+  "unsupportedTitle": {
+    "message": "这个网站不在 LectureFlow 的支持范围内",
+    "description": "Do-not-handle site (YouTube)"
+  },
+  "unsupportedText": {
+    "message": "LectureFlow 只处理学校的讲座录播。",
+    "description": "Do-not-handle site"
+  },
+  "unsupportedYoutube": {
+    "message": "LectureFlow 不处理 YouTube，只处理学校的讲座录播。",
+    "description": "Do-not-handle site: YouTube (src/lib/blocklist.js). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "unsupportedCourses": {
+    "message": "LectureFlow 不处理在线课程平台（MOOC、付费课程），只处理学校的讲座录播。",
+    "description": "Do-not-handle site: MOOCs and online / paid course platforms (Udemy, Coursera…). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "blockedEmbedNote": {
+    "message": "这一页里嵌入的 YouTube 或在线课程平台内容已跳过，LectureFlow 不处理这些内容。",
+    "description": "No tracks found, and the page embeds YouTube or a course platform, which detection skipped"
+  },
+  "disconnectedTitle": {
+    "message": "LectureFlow 未连接",
+    "description": "State: native host unreachable"
+  },
+  "discNotInstalled": {
+    "message": "没有找到 LectureFlow。请安装并打开一次 LectureFlow，然后点“重新检测”。",
+    "description": "Disconnected: host not registered"
+  },
+  "discNotRunning": {
+    "message": "LectureFlow 没能启动。请手动打开它，然后点“重新检测”。",
+    "description": "Disconnected: start failed"
+  },
+  "discProtocol": {
+    "message": "LectureFlow 与扩展的版本不匹配。请把两者都更新到最新版本。",
+    "description": "Disconnected: protocol mismatch"
+  },
+  "discUnsupportedOs": {
+    "message": "LectureFlow 只支持 Windows 和 Apple 芯片的 Mac。",
+    "description": "Linux / ChromeOS note"
+  },
+  "getLectureFlow": {
+    "message": "获取 LectureFlow",
+    "description": "Button: open the download page"
+  },
+  "titleGenerated": {
+    "message": "标题由 LectureFlow 生成",
+    "description": "Generic detection reads no title"
+  },
+  "durationMinutes": {
+    "message": "$P1$ 分钟",
+    "description": "Lecture length",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileChip": {
+    "message": "$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "downloadDisabledOverridden": {
+    "message": "可能受政策限制 · 已确认",
+    "description": "Chip after the reminder was confirmed"
+  },
+  "observeNeedsGrant": {
+    "message": "允许在此网站自动探测并刷新页面后，可以读到平台的限制设置和完整录像。",
+    "description": "Profile reads a page response; site not authorized"
+  },
+  "observeNeedsReload": {
+    "message": "刷新录播页面后，可以读到平台的限制设置和完整录像。",
+    "description": "Profile reads a page response not seen yet"
+  },
+  "courseLabel": {
+    "message": "课程",
+    "description": "Course select label"
+  },
+  "courseNone": {
+    "message": "LectureFlow 里还没有课程。请先在 LectureFlow 里新建一门课程。",
+    "description": "No courses"
+  },
+  "sendButton": {
+    "message": "发送至 LectureFlow",
+    "description": "The send button (user’s wording)"
+  },
+  "sending": {
+    "message": "正在发送…",
+    "description": "Primary button while sending"
+  },
+  "dataNote": {
+    "message": "发送时，所选轨道的地址、本页地址和这些地址所需的 Cookie 会交给本机的 LectureFlow，不会上传。",
+    "description": "Data note under the popup’s button"
+  },
+  "selectHint": {
+    "message": "请至少勾选一条轨道。",
+    "description": "Nothing selected"
+  },
+  "oneEach": {
+    "message": "最多一条音频、一路画面；双机位可以两路",
+    "description": "Selection rule"
+  },
+  "selectTrack": {
+    "message": "选择 $P1$",
+    "description": "Checkbox label",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "blockedImported": {
+    "message": "这节课已经导入 LectureFlow。",
+    "description": "Cannot send: imported"
+  },
+  "blockedProtected": {
+    "message": "这条媒体流受数字版权保护（DRM），LectureFlow 不处理受保护的内容。",
+    "description": "Cannot send: DRM"
+  },
+  "openInApp": {
+    "message": "在 LectureFlow 中打开",
+    "description": "Button"
+  },
+  "opened": {
+    "message": "已在 LectureFlow 中打开。",
+    "description": "After open"
+  },
+  "againFailed": {
+    "message": "上次刮削没有完成，可以重新发送。",
+    "description": "Check: failed task"
+  },
+  "againCancelled": {
+    "message": "上次的刮削已取消，可以重新发送。",
+    "description": "Check: cancelled task"
+  },
+  "queuedTitle": {
+    "message": "已加入队列",
+    "description": "Queued state title"
+  },
+  "state_queued": {
+    "message": "排队中",
+    "description": "Fetch task state"
+  },
+  "state_downloading": {
+    "message": "刮削中",
+    "description": "Fetch task state (main app: downloads.state.downloading)"
+  },
+  "state_merging": {
+    "message": "合并中",
+    "description": "Fetch task state"
+  },
+  "state_importing": {
+    "message": "生成讲座中",
+    "description": "Fetch task state"
+  },
+  "state_done": {
+    "message": "已完成",
+    "description": "Fetch task state"
+  },
+  "state_failed": {
+    "message": "刮削失败",
+    "description": "Fetch task state"
+  },
+  "state_needs_refresh": {
+    "message": "需要刷新",
+    "description": "Fetch task state"
+  },
+  "state_cancelled": {
+    "message": "已取消",
+    "description": "Fetch task state"
+  },
+  "state_imported": {
+    "message": "已导入",
+    "description": "Check state"
+  },
+  "position": {
+    "message": "第 $P1$ 位",
+    "description": "Queue position",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "progress": {
+    "message": "$P1$% · $P2$ / $P3$",
+    "description": "Download progress",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "progressUnknown": {
+    "message": "已刮削 $P1$",
+    "description": "Progress without a total",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "closeHint": {
+    "message": "可以关掉这个窗口，刮削会在 LectureFlow 里继续。",
+    "description": "Queued note"
+  },
+  "doneHint": {
+    "message": "刮削完成，讲座已生成，接着进入转写。",
+    "description": "Done note"
+  },
+  "failedHint": {
+    "message": "刮削没有完成。可以在 LectureFlow 里查看原因并重试。",
+    "description": "Failed note"
+  },
+  "cancelledHint": {
+    "message": "这次刮削已取消。",
+    "description": "Cancelled note"
+  },
+  "refreshText": {
+    "message": "这节课的刮削中断了：凭据已经失效。点“续传”，用这个页面的新凭据接着刮削。",
+    "description": "needs_refresh view"
+  },
+  "refreshButton": {
+    "message": "续传",
+    "description": "Primary button of the needs_refresh view"
+  },
+  "refreshing": {
+    "message": "正在续传…",
+    "description": "Primary button while resuming"
+  },
+  "cancel": {
+    "message": "取消",
+    "description": "Button"
+  },
+  "errCourseGone": {
+    "message": "这门课程在 LectureFlow 里已经不存在，请重新选择。",
+    "description": "Error"
+  },
+  "errStale": {
+    "message": "页面已经变了。请关掉这个窗口，再点一次扩展图标。",
+    "description": "Error"
+  },
+  "errProtected": {
+    "message": "受版权保护（DRM）的轨道不能发送。",
+    "description": "Error"
+  },
+  "errNotRunning": {
+    "message": "LectureFlow 没有响应。请打开它后重试。",
+    "description": "Error"
+  },
+  "errTimeout": {
+    "message": "LectureFlow 没有及时回应，请重试。",
+    "description": "Error"
+  },
+  "errRefreshGone": {
+    "message": "LectureFlow 里找不到这个刮削任务，可以重新发送。",
+    "description": "Error"
+  },
+  "errInvalid": {
+    "message": "LectureFlow 拒绝了这次请求（$P1$）。",
+    "description": "Error with the field name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errSiteBlocked": {
+    "message": "LectureFlow 拒绝了这个网站的任务：它不处理 YouTube 和在线课程平台，只处理学校的讲座录播。",
+    "description": "Error: LectureFlow refused the send (downloads.site_blocked): the page or a track is on YouTube or a course platform. Same text as LectureFlow’s errors.downloads.site_blocked."
+  },
+  "errGeneric": {
+    "message": "没能完成（$P1$）。请重试。",
+    "description": "Error with its code",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileGrant": {
+    "message": "允许这些站点",
+    "description": "Options: grant a profile’s hosts"
+  },
+  "profileGranted": {
+    "message": "站点已允许",
+    "description": "Options: profile hosts granted"
+  },
+  "reportsHeading": {
+    "message": "探测报告",
+    "description": "Options section"
+  },
+  "reportsHint": {
+    "message": "导出已脱敏的探测报告，用来编写或改进对策文件。在录播页上点一次扩展图标后，那个页面会列在这里。",
+    "description": "Options: reports"
+  },
+  "reportsEmpty": {
+    "message": "还没有可以导出的页面。",
+    "description": "Options: reports"
+  },
+  "reportRow": {
+    "message": "$P1$ · $P2$ 条轨道",
+    "description": "Options: one page",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "exportOne": {
+    "message": "导出",
+    "description": "Options: export a report"
+  },
+  "profileHosts": {
+    "message": "站点：$P1$",
+    "description": "Options: profile hosts",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmSend": {
+    "message": "确认发送",
+    "description": "The in-page card’s primary button"
+  },
+  "inpageNote": {
+    "message": "Cookie 只在你点“确认发送”时读取，只交给本机的 LectureFlow",
+    "description": "Under the in-page card’s button"
+  },
+  "profileSource": {
+    "message": "$P1$ 对策文件 $P2$",
+    "description": "Lecture card: which profile named it",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "courseLast": {
+    "message": "（上次）",
+    "description": "Suffix of the course used last"
+  },
+  "close": {
+    "message": "关闭",
+    "description": "Button"
+  },
+  "done": {
+    "message": "完成",
+    "description": "Button"
+  },
+  "rowDownloading": {
+    "message": "刮削中 $P1$%",
+    "description": "List row: a lecture being fetched",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedChip": {
+    "message": "可能受政策限制",
+    "description": "Bulk row: skipped because restricted"
+  },
+  "restrictedNotice": {
+    "message": "检测到该媒体流或受讲师或大学政策限制。LectureFlow 仅将您有权访问的媒体流拉取至本地用于个人无障碍学习（转录/翻译）。请确保您遵守学校规定。发送前会再提醒一次。",
+    "description": "The user’s text, verbatim (it says 您)"
+  },
+  "restrictedTitle": {
+    "message": "该媒体流可能受政策限制",
+    "description": "Reminder dialog title"
+  },
+  "restrictedConfirm": {
+    "message": "LectureFlow 仅将您有权访问的媒体流拉取至本地，用于个人无障碍学习（转录/翻译）。请确保您遵守学校规定。",
+    "description": "Reminder dialog text"
+  },
+  "bulkRestrictedConfirm": {
+    "message": "其中 $P1$ 节可能受讲师或大学政策限制。LectureFlow 仅将您有权访问的媒体流拉取至本地，用于个人无障碍学习（转录/翻译）。请确保您遵守学校规定。",
+    "description": "Bulk reminder dialog text",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedNoticeQuiet": {
+    "message": "检测到该媒体流或受讲师或大学政策限制。LectureFlow 仅将您有权访问的媒体流拉取至本地用于个人无障碍学习（转录/翻译）。请确保您遵守学校规定。",
+    "description": "The restricted notice (the user’s own text) without its last sentence, shown when the reminder is off for this platform"
+  },
+  "restrictedRemember": {
+    "message": "对这个平台（$P1$）不再提醒",
+    "description": "Check box in the restricted reminder; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedRememberedNote": {
+    "message": "你已对 $P1$ 关闭这个提醒，可以在扩展设置里恢复。",
+    "description": "Line under the restricted notice when the reminder is off for this platform; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedHeading": {
+    "message": "受限录播的提醒",
+    "description": "Settings: section heading"
+  },
+  "restrictedHint": {
+    "message": "发送可能受政策限制的录播前，扩展会先提醒你。在提醒里选择了不再提醒的平台列在这里；恢复后，每次发送前都会再提醒。",
+    "description": "Settings: section text"
+  },
+  "restrictedEmpty": {
+    "message": "没有关闭提醒的平台：每次都会提醒。",
+    "description": "Settings: no platform listed"
+  },
+  "restrictedSince": {
+    "message": "$P1$ 起不再提醒",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedForget": {
+    "message": "恢复提醒",
+    "description": "Settings: button that undoes “don’t remind me again”"
+  },
+  "sendAnyway": {
+    "message": "仍然发送",
+    "description": "Reminder dialog: confirm"
+  },
+  "contentLabel": {
+    "message": "内容",
+    "description": "Label of the three choices"
+  },
+  "presetMain": {
+    "message": "主要音视频",
+    "description": "Choice: the full recording, or main audio + first picture"
+  },
+  "presetDual": {
+    "message": "双机位",
+    "description": "Choice: main audio + two pictures"
+  },
+  "presetAudio": {
+    "message": "仅音频",
+    "description": "Choice: main audio"
+  },
+  "presetMainNone": {
+    "message": "这页没有可以发送的轨道",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetDualNone": {
+    "message": "只探测到一路画面",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetAudioNone": {
+    "message": "没有单独的音频轨道",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "chooseContent": {
+    "message": "选一项要发送的内容",
+    "description": "Nothing chosen yet"
+  },
+  "chooseTracks": {
+    "message": "选择轨道…（$P1$ 条）",
+    "description": "Opens the full track list",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerEmbedded": {
+    "message": "这页嵌着 $P1$。允许访问 $P1$ 网站并刷新页面后，就能在这里发送。",
+    "description": "Popup: a platform frame not readable yet",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerOpaque": {
+    "message": "这页有扩展读不到的嵌入内容。如果其中是 $P1$（例如 Canvas 里的 ReCap），允许访问 $P1$ 网站并刷新页面。",
+    "description": "Popup: unreadable frames",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerGrant": {
+    "message": "允许 $P1$ 网站",
+    "description": "Popup: grant a profile’s sites",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errInfoFailed": {
+    "message": "没能从录播平台读到这节课的信息（$P1$）。",
+    "description": "Error",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectRow": {
+    "message": "选中 $P1$",
+    "description": "Row check box",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selBar": {
+    "message": "已选 $P1$ 节",
+    "description": "Selection bar",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selClear": {
+    "message": "清除",
+    "description": "Selection bar"
+  },
+  "selSend": {
+    "message": "发送选中的 $P1$ 节",
+    "description": "Selection bar button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkButton": {
+    "message": "更新这门课程到 LectureFlow",
+    "description": "Folder list button (user’s wording)"
+  },
+  "bulkTitle": {
+    "message": "更新这门课程到 LectureFlow",
+    "description": "Bulk card title"
+  },
+  "bulkSummary": {
+    "message": "共 $P1$ 节：$P2$ 节已导入（按会话与标题去重），$P3$ 节正在刮削，",
+    "description": "Bulk card summary, first part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "bulkSummaryTo": {
+    "message": "$P1$ 节将发送",
+    "description": "Bulk card summary, last part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkNew": {
+    "message": "新",
+    "description": "Bulk row"
+  },
+  "bulkQueued": {
+    "message": "已加入队列",
+    "description": "Bulk row"
+  },
+  "bulkFailed": {
+    "message": "没有发送",
+    "description": "Bulk row"
+  },
+  "bulkSkipped": {
+    "message": "已跳过",
+    "description": "Bulk row"
+  },
+  "bulkSend": {
+    "message": "发送 $P1$ 节",
+    "description": "Bulk card button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkReading": {
+    "message": "正在读取 $P1$ / $P2$…",
+    "description": "Bulk card button while reading",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkSending": {
+    "message": "正在发送 $P1$ / $P2$…",
+    "description": "Bulk card button while sending",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkQueueNote": {
+    "message": "按顺序排队，同时刮削几节在 LectureFlow 设置里改（默认 3 节）",
+    "description": "Bulk card note"
+  },
+  "bulkPageOnly": {
+    "message": "只包括这一页列出的课；有更多页时，翻页后再点一次。",
+    "description": "Bulk card note"
+  },
+  "bulkSkipDisabled": {
+    "message": "跳过这 $P1$ 节",
+    "description": "Bulk reminder: skip",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkDone": {
+    "message": "已发送 $P1$ 节；$P2$ 节没有发送。",
+    "description": "Bulk card result",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkNoTrack": {
+    "message": "没有符合所选内容的轨道",
+    "description": "Bulk row error"
+  },
+  "grantCookieHosts": {
+    "message": "这些轨道在其他网站上。如果刮削需要这些网站的 Cookie，可以一并允许（可以不选）：",
+    "description": "Popup: above check boxes, one per other host whose cookies a send would read"
+  },
+  "grantAllow": {
+    "message": "允许",
+    "description": "Popup: button that asks the browser for the page’s site and the ticked hosts"
+  },
+  "trustedHeading": {
+    "message": "信任的嵌入网站",
+    "description": "Settings: section heading (sites the platform’s pages may be embedded in, with in-page confirmation)"
+  },
+  "trustedHint": {
+    "message": "录播平台的页面嵌在这些网站里时（例如学校的 Canvas），可以直接在页面上确认发送。嵌在其他网站里时，按钮会打开 LectureFlow 的确认窗口，以防别的网站诱导你点击。",
+    "description": "Settings: section text"
+  },
+  "trustedEmpty": {
+    "message": "还没有信任的网站：嵌在其他网站里的按钮都会打开确认窗口。",
+    "description": "Settings: no site listed"
+  },
+  "trustedSince": {
+    "message": "$P1$ 起信任",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importReplaceConfirm": {
+    "message": "这个文件与内置的对策文件“$P1$ $P2$”同名。导入后会代替内置版本，卡片上标“未审核”。要代替吗？",
+    "description": "Settings: an imported file has the id of a built-in profile; $1 its name, $2 its version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "importReplace": {
+    "message": "代替内置版本",
+    "description": "Settings: button, import the file in place of the built-in profile"
+  },
+  "profileReplaces": {
+    "message": "代替内置的 $P1$ 版",
+    "description": "Settings: under a local profile that replaces a built-in one; $1 is the built-in version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileInactive": {
+    "message": "未启用：与内置的对策文件同名，需要重新导入并确认",
+    "description": "Settings: chip on a local profile with a built-in profile’s id that was never confirmed"
+  },
+  "embedWhy": {
+    "message": "这个录播页面嵌在 $P1$ 的网页里。为了防止其他网站诱导你点击，请在这个窗口里确认。",
+    "description": "Confirmation window: why it opened; $1 is the site the recording page is embedded in (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedWhyUnknown": {
+    "message": "这个录播页面嵌在另一个网站的网页里，浏览器没有告诉扩展是哪个网站。为了防止其他网站诱导你点击，请在这个窗口里确认。",
+    "description": "Confirmation window: why it opened, when the browser does not tell the site"
+  },
+  "embedFrom": {
+    "message": "录播页面：$P1$",
+    "description": "Confirmation window: the recording page’s host; $1 is a host name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedTrust": {
+    "message": "以后在 $P1$ 里直接在页面上确认",
+    "description": "Confirmation window: check box; $1 is the site (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmGone": {
+    "message": "这个确认窗口已经失效：录播页面已关闭或刷新。请回到页面再点一次按钮。",
+    "description": "Confirmation window: the page it belonged to is gone"
+  },
+  "errConfirmWindow": {
+    "message": "请在 LectureFlow 的确认窗口里发送。",
+    "description": "Error: this frame must confirm in the extension’s window"
+  }
+}

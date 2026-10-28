@@ -242,7 +242,9 @@ func newMoveEnv(t *testing.T) *moveEnv {
 	root := t.TempDir()
 	src := filepath.Join(root, "LectureFlow")
 	fx := newFixture(t, src)
-	writeFiles(t, src, map[string]string{"electron/Local State": "{}"})
+	writeFiles(t, src, map[string]string{"electron/Local State": "{}",
+		// the browser extension's native messaging files (internal/nmhost)
+		"nmhost/launch.json": "{}", "nmhost/org.lectureflow.nmhost.chromium.json": "{}", "run/nm.sock": ""})
 	return &moveEnv{src: src, dst: filepath.Join(root, "Big Disk", "LectureFlow Data"), loc: filepath.Join(src, LocationName), fx: fx}
 }
 
@@ -307,7 +309,7 @@ func TestMoveDataDir(t *testing.T) {
 			t.Errorf("%s: %q, %v", rel, got, err)
 		}
 	}
-	for _, rel := range []string{"electron", LocationName, DBName + "-wal", DBName + "-shm"} {
+	for _, rel := range []string{"electron", "nmhost", "run", LocationName, DBName + "-wal", DBName + "-shm"} {
 		if exists(filepath.Join(e.dst, rel)) {
 			t.Errorf("%s copied", rel)
 		}
@@ -522,7 +524,8 @@ func TestMoveComponentsAndCommitFailures(t *testing.T) {
 func TestMoveIntoDefaultDir(t *testing.T) {
 	root := t.TempDir()
 	def := filepath.Join(root, "LectureFlow")
-	writeFiles(t, def, map[string]string{"electron/Local State": "{}", LocationName: `{"data_dir":"x"}`})
+	writeFiles(t, def, map[string]string{"electron/Local State": "{}", LocationName: `{"data_dir":"x"}`,
+		"nmhost/launch.json": "{}", "run/nm.sock": ""})
 	src := filepath.Join(root, "moved")
 	newFixture(t, src)
 	loc := filepath.Join(def, LocationName)
@@ -534,6 +537,22 @@ func TestMoveIntoDefaultDir(t *testing.T) {
 	}
 	if !exists(filepath.Join(def, "electron", "Local State")) {
 		t.Fatal("shell profile lost")
+	}
+	if !exists(filepath.Join(def, "nmhost", "launch.json")) || !exists(filepath.Join(def, "run", "nm.sock")) {
+		t.Fatal("native messaging files lost")
+	}
+}
+
+func TestIsInstallationEntry(t *testing.T) {
+	for _, n := range []string{"location.json", "electron", "Electron", "nmhost", "NMHost", "run"} {
+		if !IsInstallationEntry(n) {
+			t.Errorf("%s: want installation entry", n)
+		}
+	}
+	for _, n := range []string{"courses", "lectureflow.db", "components", "downloads", "nmhost2", "runs"} {
+		if IsInstallationEntry(n) {
+			t.Errorf("%s: want data", n)
+		}
 	}
 }
 

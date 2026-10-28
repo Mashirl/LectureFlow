@@ -21,6 +21,13 @@
 // show the English only (the saved display setting is kept for the other
 // lectures; C and the CC panel then switch between English and off).
 //
+// Second camera angle (ext web3, player_angles.js): a lecture with
+// "angles" shows the other angle as picture in picture in video mode; a
+// click (or V) swaps the two, the sound and the clock stay with the main
+// video. Chapters (ext web3): headings in the transcript stream, segments
+// on the timeline, and the current chapter's name in the top bar opens the
+// chapter list.
+//
 // The resume position (P6.4) is saved every 5 s while playing, on pause and
 // when leaving the page. Nothing here changes server state except the
 // sentence actions of the context menu, chapter generation and the resume
@@ -43,6 +50,8 @@ import { citeRef, coursePart } from './view_transcript.js';
 import { zh } from './zh_display.js';
 import { lectureTagText } from './kinds.js';
 import { englishOnly } from './lecture_english.js';
+import { createAngles, lectureAngles } from './player_angles.js';
+import { angleURL } from './api_ext.js';
 
 const enc = encodeURIComponent;
 
@@ -143,7 +152,8 @@ export function mountPlayer(main, route, ctx) {
   const courseEl = h('span', { class: 'pl-course' });
   const refEl = h('span', { class: 'pl-ref' });
   const nameEl = h('span', { class: 'pl-name' });
-  const chapterNow = h('span', { class: 'pl-chapter-now' });
+  // ext web3: the current chapter's name opens the chapter list
+  const chapterNow = h('button', { type: 'button', class: 'pl-chapter-now', hidden: true, 'aria-haspopup': 'menu', title: t('player.chap.now_tip'), onclick: () => chapters.openList(chapterNow) });
   const backLink = h('a', { class: 'pl-back', href: `#/lecture/${enc(id)}`, 'aria-label': t('player.back'), title: t('player.back') }, pIcon('arrow-left', { size: 18 }));
 
   const chapters = createChapters({
@@ -154,7 +164,7 @@ export function mountPlayer(main, route, ctx) {
     time: () => S.t,
     onChange: onChaptersChanged,
   });
-  const helpBtn = h('button', { type: 'button', class: 'pl-ctl pl-ctl-sm', 'aria-label': t('player.help.title'), title: tip(t('player.help.title'), '?'), onclick: () => openHelp() }, pIcon('keyboard', { size: 17 }));
+  const helpBtn = h('button', { type: 'button', class: 'pl-ctl pl-ctl-sm', 'aria-label': t('player.help.title'), title: tip(t('player.help.title'), '?'), onclick: () => openHelp({ angles: angles.available() }) }, pIcon('keyboard', { size: 17 }));
   const top = h('header', { class: 'pl-top' }, backLink, h('div', { class: 'pl-title' }, courseEl, refEl, nameEl, chapterNow), h('div', { class: 'pl-top-tools' }, chapters.btn, helpBtn));
 
   const frame = h('div', { class: 'pl-frame' });
@@ -164,6 +174,15 @@ export function mountPlayer(main, route, ctx) {
   const osdEl = h('div', { class: 'pl-osd', 'aria-live': 'polite' });
   const stageMsg = h('div', { class: 'pl-stage-msg', role: 'alert', hidden: true });
   const stage = h('div', { class: 'pl-stage' }, frame, sub.el, spinner, notice, osdEl, stageMsg);
+  // ext web3: the second camera angle (picture in picture)
+  const angles = createAngles({
+    url: (name) => angleURL(id, name),
+    osd: (text) => osd(text),
+    toast: (text, kind) => toast(text, kind),
+    onLayout: () => onAnglesChanged(),
+    tip,
+  });
+  frame.after(angles.box);
 
   const playBtn = ctlBtn('play', t('player.ctl.play'), `${t('player.key.space')} / K`, () => togglePlay(), { class: 'pl-ctl-play', size: 20 });
   const prevBtn = ctlBtn('skip-back', t('player.ctl.prev'), 'A', () => prevSentence(), { size: 17 });
@@ -221,7 +240,7 @@ export function mountPlayer(main, route, ctx) {
     { class: 'pl-bar' },
     h('div', { class: 'pl-bar-group' }, playBtn, prevBtn, nextBtn, loopBtn, clockEl),
     h('div', { class: 'pl-bar-spacer' }),
-    h('div', { class: 'pl-bar-group' }, rateBtn, h('div', { class: 'pl-vol' }, volBtn, volRange), ccBtn, citeBtn, sideBtn, theaterBtn, fsBtn),
+    h('div', { class: 'pl-bar-group' }, rateBtn, h('div', { class: 'pl-vol' }, volBtn, volRange), ccBtn, citeBtn, sideBtn, angles.button, theaterBtn, fsBtn),
   );
   const controls = h('div', { class: 'pl-controls' }, timeline.el, bar, ccPanel.el);
 
@@ -342,7 +361,9 @@ export function mountPlayer(main, route, ctx) {
 
   function startFrameLoop() {
     stopFrameLoop();
-    useRaf = !(media.kind === 'video' && typeof media.el.requestVideoFrameCallback === 'function');
+    // a main video that is not on screen (the second angle in the picture,
+    // no picture in picture) presents no frames: animation frames instead
+    useRaf = !(media.kind === 'video' && typeof media.el.requestVideoFrameCallback === 'function' && !angles.mainHidden());
     if (!useRaf) {
       const el = media.el;
       const step = (now, meta) => {
@@ -384,6 +405,7 @@ export function mountPlayer(main, route, ctx) {
     if (kind === 'video') {
       media = videoSource(api.mediaURL(id));
       frame.append(media.el);
+      angles.attach(media, frame);
     } else {
       // audio.wav with Range requests; the /audio clips when it is missing
       media = S.audioClips ? audioSource(id, totalMs) : fileSource(api.mediaURL(id, true), 'audio');
@@ -447,6 +469,7 @@ export function mountPlayer(main, route, ctx) {
     stopFrameLoop();
     for (const off of offMedia) off();
     offMedia = [];
+    angles.detach();
     if (media) media.destroy();
     media = null;
     setPlaying(false);
@@ -681,6 +704,7 @@ export function mountPlayer(main, route, ctx) {
     if (before !== S.subs.display) {
       chapters.rerender();
       renderChapterNow();
+      syncTranscriptChapters();
       if (S.kind === 'audio') renderAudioPanel();
     }
   }
@@ -707,6 +731,7 @@ export function mountPlayer(main, route, ctx) {
     ccPanel.refresh();
     chapters.rerender();
     renderChapterNow();
+    syncTranscriptChapters();
   }
 
   // ---------------------------------------------------------------- layout (P2)
@@ -732,7 +757,7 @@ export function mountPlayer(main, route, ctx) {
     if (S.kind === 'audio') {
       fr = { left: 0, top: 0, width: W, height: Math.max(0, H - bandH) };
     } else {
-      const aspect = (media && media.aspect()) || 16 / 9;
+      const aspect = angles.aspect() || (media && media.aspect()) || 16 / 9;
       const fullH = Math.min(H, W / aspect);
       const bandPicH = Math.min(H - bandH, W / aspect);
       // P2.3: not enough height below the picture → overlay
@@ -764,6 +789,7 @@ export function mountPlayer(main, route, ctx) {
     root.style.setProperty('--pl-ctl-h', `${controls.offsetHeight}px`);
     root.style.setProperty('--pl-stage-h', `${H}px`);
     root.style.setProperty('--pl-band-h', `${overlay || !showSubs ? 0 : bandH}px`);
+    angles.layout(fr, { W, H, overlay });
     sub.refit();
     if (changed) ccPanel.refresh();
   }
@@ -898,11 +924,23 @@ export function mountPlayer(main, route, ctx) {
 
   // A click on the picture plays / pauses; a double click toggles full screen.
   frame.addEventListener('click', (e) => {
-    if (S.kind === 'video' && e.target === media?.el) togglePlay();
+    if (S.kind === 'video' && e.target === angles.pictureEl()) togglePlay();
   });
   frame.addEventListener('dblclick', (e) => {
-    if (S.kind === 'video' && e.target === media?.el) toggleFullscreen();
+    if (S.kind === 'video' && e.target === angles.pictureEl()) toggleFullscreen();
   });
+
+  // The second angle was swapped, shown, hidden or lost: the picture's
+  // aspect may change, and the clock's frame loop depends on whether the
+  // main video is on screen.
+  function onAnglesChanged() {
+    if (!alive) return;
+    if (media && S.kind === 'video') {
+      startFrameLoop();
+      if (useRaf && !media.paused && !raf) raf = requestAnimationFrame(rafLoop);
+    }
+    layout();
+  }
 
   // ---------------------------------------------------------------- controls
 
@@ -972,10 +1010,15 @@ export function mountPlayer(main, route, ctx) {
   function renderChapterNow() {
     const list = chapters.chapters();
     const c = S.curChapter >= 0 ? list[S.curChapter] : null;
-    chapterNow.textContent = c ? chapters.title(c) : '';
-    if (c) chapterNow.lang = chapters.titleLang(c);
-    else chapterNow.removeAttribute('lang');
+    clear(chapterNow);
+    if (c) chapterNow.append(h('span', { class: 'pl-chapter-now-text', lang: chapters.titleLang(c) }, chapters.title(c)), pIcon('chevron-down', { size: 14 }));
     chapterNow.hidden = !c;
+  }
+
+  // ext web3: the chapters in the transcript stream (headings), in the
+  // display's language.
+  function syncTranscriptChapters() {
+    transcript.setChapters(chapters.chapters(), { title: (c) => chapters.title(c), lang: (c) => chapters.titleLang(c), onSeek: (ms) => seekTo(ms) });
   }
 
   function showNotice(ms) {
@@ -1124,6 +1167,7 @@ export function mountPlayer(main, route, ctx) {
     if (!alive) return;
     S.curChapter = -2;
     updateMarks();
+    syncTranscriptChapters();
     tick(S.t);
   }
 
@@ -1136,6 +1180,7 @@ export function mountPlayer(main, route, ctx) {
       S.lec = l;
       renderHead();
       syncEnglishOnly(wasEn);
+      angles.setAngles(lectureAngles(l));
       if (S.kind === 'audio') {
         renderAudioPanel();
         if (wasStream !== 'ready' && streamStatus() === 'ready') toast(t('player.audio.stream_ready_toast'), 'success');
@@ -1220,7 +1265,8 @@ export function mountPlayer(main, route, ctx) {
       }
       transcript.focusSearch();
     },
-    help: () => openHelp(),
+    help: () => openHelp({ angles: angles.available() }),
+    angle: () => angles.swap(),
   });
   root.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && S.sideOverlay && !document.querySelector('dialog[open], .ctx-menu')) toggleSideOverlay(false);
@@ -1274,6 +1320,7 @@ export function mountPlayer(main, route, ctx) {
     S.lec = lec;
     renderHead();
     syncEnglishOnly(wasEn);
+    angles.setAngles(lectureAngles(lec));
     if (!lec.playable) {
       showFatal('not_playable');
       return;
@@ -1343,6 +1390,7 @@ export function mountPlayer(main, route, ctx) {
       if (toasts && toasts.parentNode === root) document.body.append(toasts);
       if (fsObserver) fsObserver.disconnect();
       teardownMedia();
+      angles.destroy();
       unbindKeys();
       ro.disconnect();
       timeline.destroy();

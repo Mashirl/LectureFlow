@@ -20,6 +20,7 @@ import (
 	"lectureflow/internal/calendar"
 	"lectureflow/internal/cite"
 	"lectureflow/internal/db"
+	lfmedia "lectureflow/internal/media"
 	"lectureflow/internal/model"
 	"lectureflow/internal/sched"
 	"lectureflow/internal/subs"
@@ -119,10 +120,12 @@ func ExportDownloadName(label, title, name string) string {
 // "_", whitespace runs become one space, trailing dots/spaces are removed,
 // a reserved device name before the first dot (CON, NUL, COM1…) gets a "_"
 // appended to it, the length is capped at 100 characters, and an empty
-// result becomes "lecture".
+// result becomes "lecture". Bidirectional control characters are dropped
+// (lfmedia.StripBidi; test-media I8): a right-to-left override would make
+// the name show another extension than its own.
 func SafeFileName(title string) string {
 	var b strings.Builder
-	for _, r := range title {
+	for _, r := range lfmedia.StripBidi(title) {
 		switch {
 		case unicode.IsSpace(r):
 			b.WriteRune(' ')
@@ -165,10 +168,51 @@ func vttTime(ms int64) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", ms/3600000, ms/60000%60, ms/1000%60, ms%1000)
 }
 
-// cueText makes text safe inside a WebVTT cue: one line, no "-->".
+// cueText makes text safe inside a WebVTT cue: one line, and escaped by
+// the WebVTT cue text rules (security review 2, L3): "&" and "<" become
+// character references ("&amp;", "&lt;"; a raw "<" starts a cue tag and a
+// raw "&" a reference), and so does the ">" of a "-->", which a cue's text
+// must not contain. A player shows the references as the characters, so
+// "A --> B" and "x < y & z" still read as written.
 func cueText(s string) string {
-	s = strings.Join(strings.Fields(s), " ")
-	return strings.ReplaceAll(s, "-->", "->")
+	return vttEscaper.Replace(strings.Join(strings.Fields(s), " "))
+}
+
+var vttEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", "-->", "--&gt;")
+
+// mdText makes model output (and human edits) safe in bilingual.md
+// (security review 2, L3): a Markdown viewer renders raw HTML and images,
+// so a prompt-injected "<img src=…>" or "![](https://…)" would load remote
+// content when the file is opened. A "<" that can start an HTML tag,
+// comment, declaration or processing instruction (followed by a letter,
+// "/", "!" or "?") becomes "&lt;" (a character reference, which every
+// Markdown renderer shows as "<"; a backslash escape is not understood by
+// all of them), and the "[" of "![" is backslash-escaped ("!\["). Every
+// other character is kept as written: "a < b", "x <= y", "i < 10", "<-",
+// "&".
+func mdText(s string) string {
+	if !strings.ContainsAny(s, "<!") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + 16)
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		var next byte
+		if i+1 < len(s) {
+			next = s[i+1]
+		}
+		switch {
+		case c == '<' && (next >= 'a' && next <= 'z' || next >= 'A' && next <= 'Z' || next == '/' || next == '!' || next == '?'):
+			b.WriteString("&lt;")
+		case c == '!' && next == '[':
+			b.WriteString(`!\[`)
+			i++
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // oneLine collapses line breaks (human edits may contain them).
@@ -250,6 +294,7 @@ func MarkCiteExported(ctx context.Context, st db.Store, courseID string, at time
 
 type exportFile struct {
 	final string
+	tmp   string // what it is written to (tmpFor)
 	f     *os.File
 	w     *bufio.Writer
 }
@@ -299,10 +344,9 @@ func (s *exportStage) Run(ctx context.Context, lectureID string, progress func(f
 		return err
 	}
 	dir := filepath.Join(d.lectureDir(l), model.ExportDirName)
-	// Start from an empty export/ (old names of a renamed lecture go away).
-	if err := os.RemoveAll(dir); err != nil {
-		return err
-	}
+	// The old export stays as it is until the new one is complete
+	// (test-chaos 3): the new files are written to temporary names and put
+	// in place together at the end (commitExport).
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -321,17 +365,21 @@ func (s *exportStage) Run(ctx context.Context, lectureID string, progress func(f
 		closeAll()
 		for _, f := range files {
 			if f != nil {
-				os.Remove(f.final + ".tmp")
+				os.Remove(f.tmp)
 			}
 		}
 	}()
 	for i, name := range names {
 		final := filepath.Join(dir, name)
-		f, err := os.Create(final + ".tmp")
+		tmp, err := tmpFor(final)
+		if err != nil {
+			return inUseCoded(CodeExportFileInUse, err)
+		}
+		f, err := os.Create(tmp)
 		if err != nil {
 			return err
 		}
-		files[i] = &exportFile{final: final, f: f, w: bufio.NewWriter(f)}
+		files[i] = &exportFile{final: final, tmp: tmp, f: f, w: bufio.NewWriter(f)}
 	}
 	md, zhVTT, biVTT, en, citeW := files[0].w, files[1].w, files[2].w, files[3].w, files[4].w
 	zhVTT.WriteString("WEBVTT\n\n")
@@ -358,8 +406,9 @@ func (s *exportStage) Run(ctx context.Context, lectureID string, progress func(f
 				zh = MissingZh
 				missing++
 			}
-			// SPEC §6.6: "**[mm:ss]** English\n\nChinese\n", one paragraph per sentence.
-			fmt.Fprintf(md, "**[%s]** %s\n\n%s\n\n", mmss(x.StartMS), text, zh)
+			// SPEC §6.6: "**[mm:ss]** English\n\nChinese\n", one paragraph per
+			// sentence; the texts without raw HTML or images (mdText, L3)
+			fmt.Fprintf(md, "**[%s]** %s\n\n%s\n\n", mmss(x.StartMS), mdText(text), mdText(zh))
 			fmt.Fprintf(en, "%s\n", text)
 			written++
 		}
@@ -387,10 +436,8 @@ func (s *exportStage) Run(ctx context.Context, lectureID string, progress func(f
 		}
 		f.f = nil
 	}
-	for _, f := range files {
-		if err := os.Rename(f.final+".tmp", f.final); err != nil {
-			return err
-		}
+	if err := commitExport(dir, files); err != nil {
+		return inUseCoded(CodeExportFileInUse, err)
 	}
 	if missing > 0 {
 		slog.Warn("export: sentences without translation", "lecture", lectureID, "count", missing)
@@ -398,4 +445,35 @@ func (s *exportStage) Run(ctx context.Context, lectureID string, progress func(f
 	d.events().Changed("lecture", lectureID)
 	progress(1)
 	return nil
+}
+
+// commitExport puts the new export files in place of the old export, all or
+// nothing (replaceFiles): the files of the previous run are replaced, and
+// the other files in export/ (the old names of a renamed or renumbered
+// lecture) are removed with them, so export/ holds exactly this run's
+// files, as when it was emptied first. A file another program has open
+// (an editor, a download in progress) stops the commit before anything
+// changed: a *fileInUseError naming it.
+func commitExport(dir string, files []*exportFile) error {
+	pairs := make([]filePair, len(files))
+	keep := make(map[string]bool, len(files))
+	for i, f := range files {
+		pairs[i] = filePair{tmp: f.tmp, final: f.final}
+		keep[filepath.Base(f.final)] = true
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	var obsolete []string
+	for _, e := range entries {
+		name := e.Name()
+		// .tmp: this run's files, or what an earlier run left behind
+		// (startup recovery removes those)
+		if keep[name] || strings.HasSuffix(name, ".tmp") || !e.Type().IsRegular() {
+			continue
+		}
+		obsolete = append(obsolete, filepath.Join(dir, name))
+	}
+	return replaceFiles(pairs, obsolete)
 }

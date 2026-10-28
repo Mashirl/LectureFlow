@@ -12,10 +12,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/pyenv"
 )
 
 // runItem installs one component of a task. Every path keeps the rule that
@@ -575,7 +575,9 @@ func (m *Manager) checkImports(ctx context.Context, t *task, it *item, python st
 	m.setPhase(t, it, PhaseChecking)
 	cctx, cancel := context.WithTimeout(ctx, m.checkTimeout)
 	defer cancel()
-	out, err := m.run(cctx, python, []string{"-I", "-c", "import " + strings.Join(mods, ", ")})
+	// The telemetry packages are blocked first: `import openvino` alone
+	// used to report to Google Analytics (pyenv).
+	out, err := m.run(cctx, python, []string{"-I", "-c", pyenv.ImportCheck(mods)})
 	if err != nil {
 		if c := context.Cause(ctx); c != nil {
 			return c

@@ -403,12 +403,14 @@ func TestOldDataDir(t *testing.T) {
 	}
 	// The default data directory keeps location.json and the shell profile.
 	def := filepath.Dir(e.loc)
-	writeTree(t, def, map[string]string{relocate.DBName: "db", relocate.LocationName: "{}", "electron/Local State": "{}", "courses/a.mp4": "v"})
+	writeTree(t, def, map[string]string{relocate.DBName: "db", relocate.LocationName: "{}", "electron/Local State": "{}", "courses/a.mp4": "v",
+		"nmhost/launch.json": "{}", "run/nm.sock": ""})
 	e.st.SetKV(ctx, relocate.KVOldDataDir, def)
 	if st, code := del(def); st != http.StatusOK {
 		t.Fatalf("delete default: %d %s", st, code)
 	}
-	if !pathExists(e.loc) || !pathExists(filepath.Join(def, "electron", "Local State")) || pathExists(filepath.Join(def, relocate.DBName)) || pathExists(filepath.Join(def, "courses")) {
+	if !pathExists(e.loc) || !pathExists(filepath.Join(def, "electron", "Local State")) || !pathExists(filepath.Join(def, "nmhost", "launch.json")) ||
+		!pathExists(filepath.Join(def, "run", "nm.sock")) || pathExists(filepath.Join(def, relocate.DBName)) || pathExists(filepath.Join(def, "courses")) {
 		t.Fatal("default directory not emptied correctly")
 	}
 }

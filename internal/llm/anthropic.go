@@ -133,13 +133,13 @@ type anthropicResponse struct {
 //
 // stop_reason "max_tokens" is a failTruncated error that carries the
 // response's usage (the tokens were spent and billed).
-func parseAnthropic(body []byte) (Result, *attemptErr) {
+func parseAnthropic(body []byte, key string) (Result, *attemptErr) {
 	var ar anthropicResponse
 	if err := json.Unmarshal(body, &ar); err != nil {
-		return Result{}, &attemptErr{kind: failEnvelope, body: snippet(body), err: err}
+		return Result{}, &attemptErr{kind: failEnvelope, body: redactSnippet(body, key), err: err}
 	}
 	if ar.Content == nil {
-		return Result{}, &attemptErr{kind: failEnvelope, body: snippet(body), err: errors.New("no content in response")}
+		return Result{}, &attemptErr{kind: failEnvelope, body: redactSnippet(body, key), err: errors.New("no content in response")}
 	}
 	var sb strings.Builder
 	for _, b := range *ar.Content {

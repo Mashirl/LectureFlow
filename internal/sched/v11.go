@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -684,7 +685,26 @@ func (s *Scheduler) DeleteLecture(ctx context.Context, lectureID string, force b
 	if err := s.stopRuns(ctx, running); err != nil {
 		return err
 	}
+	// The tombstone first (test-chaos 2): if the directory cannot be
+	// removed below, or the program is killed in between, it marks the
+	// directory as one whose lecture was deleted, which a later try (and
+	// the next start: state.SweepLectureDirs) may remove.
+	ldir := model.LectureDir(s.dataDir, l.CourseID, l.ID)
+	tombstoned := false
+	if s.dataDir != "" {
+		switch err := state.WriteTombstone(ldir, l.ID, s.now()); {
+		case err == nil:
+			tombstoned = true
+		case !errors.Is(err, fs.ErrNotExist):
+			slog.Warn("lecture delete: no tombstone written; a directory left behind is only removed by this delete's retries", "lecture", l.ID, "err", err)
+		}
+	}
 	if err := s.st.DeleteLecture(ctx, l.ID); err != nil {
+		if tombstoned {
+			if rerr := state.RemoveTombstone(ldir); rerr != nil {
+				slog.Warn("lecture delete failed; its tombstone could not be removed (the next start removes it)", "lecture", l.ID, "err", rerr)
+			}
+		}
 		return err
 	}
 	// the kv record of its kind judgement goes with it (no cascade for kv)
@@ -701,7 +721,7 @@ func (s *Scheduler) DeleteLecture(ctx context.Context, lectureID string, force b
 	s.mu.Unlock()
 	// Only directories inside data_dir; the original media's own location
 	// (media_path may point anywhere) is never touched.
-	s.removeInDataDir(model.LectureDir(s.dataDir, l.CourseID, l.ID))
+	s.removeDir(ldir, l.ID, tombstoned)
 	for _, m := range bound {
 		s.removeInDataDir(model.MaterialDir(s.dataDir, m.CourseID, m.ID))
 	}
@@ -771,7 +791,18 @@ func (s *Scheduler) stopRuns(ctx context.Context, jobs []model.Job) error {
 }
 
 // removeInDataDir removes p only when it lies strictly inside data_dir.
-func (s *Scheduler) removeInDataDir(p string) {
+// The rows are gone already (§4.6: database first), so a directory that
+// cannot be removed now — a file in it is still open: the player streaming
+// stream.mp4, an external program (test-chaos 2) — is tried again later
+// (retryRemove).
+func (s *Scheduler) removeInDataDir(p string) { s.removeDir(p, "", false) }
+
+// removeDir is removeInDataDir; for the directory of lecture lectureID
+// (lectureID non-empty) the tries go through state.RemoveDeletedLectureDir:
+// only while the lecture does not exist and, when tombstoned, with the
+// tombstone removed last (so that a directory still left at the end is
+// removed at the next start by state.SweepLectureDirs).
+func (s *Scheduler) removeDir(p, lectureID string, tombstoned bool) {
 	if s.dataDir == "" {
 		slog.Warn("no data_dir configured; directory not removed", "path", p)
 		return
@@ -787,9 +818,64 @@ func (s *Scheduler) removeInDataDir(p string) {
 		slog.Warn("refusing to remove a path outside data_dir", "path", abs)
 		return
 	}
-	if err := os.RemoveAll(abs); err != nil {
-		slog.Warn("remove directory", "path", abs, "err", err)
+	remove := func(ctx context.Context) error {
+		if lectureID == "" {
+			return os.RemoveAll(abs)
+		}
+		return state.RemoveDeletedLectureDir(ctx, s.st, abs, lectureID, tombstoned)
 	}
+	switch err := remove(context.Background()); {
+	case err == nil:
+	case errors.Is(err, state.ErrKeepDir):
+		slog.Warn("directory of a deleted lecture kept", "path", abs, "err", err)
+	default:
+		slog.Warn("remove directory (a file in it may still be open); tried again later", "path", abs, "err", err)
+		s.retryRemove(abs, remove)
+	}
+}
+
+// DefaultRemoveRetry are the delays after which removeDir tries a
+// directory again (Options.RemoveRetry): long enough for a player to be
+// closed or a download to end.
+var DefaultRemoveRetry = []time.Duration{30 * time.Second, 2 * time.Minute, 10 * time.Minute, 30 * time.Minute}
+
+// retryRemove calls remove (of the directory abs) after each delay of
+// s.removeRetry until it succeeds or says the directory must stay
+// (state.ErrKeepDir). Only while the scheduler runs: a stopped or not yet
+// started scheduler leaves a tombstoned lecture directory to the next
+// start's sweep.
+func (s *Scheduler) retryRemove(abs string, remove func(context.Context) error) {
+	s.mu.Lock()
+	ctx := s.baseCtx
+	if ctx == nil || s.stopped || len(s.removeRetry) == 0 {
+		s.mu.Unlock()
+		return
+	}
+	s.wg.Add(1) // under s.mu: Stop sets stopped under it before it waits
+	s.mu.Unlock()
+	delays := s.removeRetry
+	go func() {
+		defer s.wg.Done()
+		for i, d := range delays {
+			t := time.NewTimer(d)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return
+			case <-t.C:
+			}
+			switch err := remove(ctx); {
+			case err == nil:
+				slog.Info("removed a directory left by a delete", "path", abs, "tries", i+2)
+				return
+			case errors.Is(err, state.ErrKeepDir):
+				slog.Warn("directory of a deleted lecture kept", "path", abs, "err", err)
+				return
+			default:
+				slog.Warn("directory still not removed", "path", abs, "err", err, "last", i == len(delays)-1)
+			}
+		}
+	}()
 }
 
 // GPUSlots reports the GPU slot usage for the resource observer (A10.1).

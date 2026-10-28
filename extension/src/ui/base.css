@@ -1,0 +1,99 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* Shared look of the popup and the options page (SPEC-ext 界面设计): the
+   main app's design tokens (ui/tokens.css, generated from web/style.css),
+   flat, no shadows or gradients, hairline borders, 8px controls, 12px
+   cards. Colours come only from tokens. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-1);
+  background: var(--bg-content);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-weight: 600; }
+p { margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent-text); }
+[hidden] { display: none !important; }
+
+.icon { width: 16px; height: 16px; flex: none; }
+.icon-lg { width: 20px; height: 20px; }
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3);
+  height: 32px; padding: 0 var(--sp-5);
+  border: 1px solid var(--border-2); border-radius: var(--r-md);
+  background: var(--bg-card); color: var(--text-1);
+  font-size: var(--fs-md); font-weight: 500; line-height: 1; white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur), border-color var(--dur), color var(--dur);
+}
+.btn:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-3); }
+.btn:focus-visible, .link-btn:focus-visible, .toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-sm { height: 26px; padding: 0 var(--sp-4); gap: var(--sp-2); font-size: var(--fs-sm); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn-ghost:hover:not(:disabled) { background: var(--bg-hover); border-color: transparent; color: var(--text-1); }
+.btn-warn { color: var(--warn); border-color: var(--warn); }
+.btn-warn:hover:not(:disabled) { background: var(--warn-soft); border-color: var(--warn); }
+
+.link-btn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 0; border: 0; background: none; color: var(--accent-text);
+  font-size: var(--fs-sm); cursor: pointer;
+}
+
+/* status tags: ok / run / warn / bad / idle */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-2); flex: none;
+  height: 20px; padding: 0 var(--sp-3);
+  border: 1px solid transparent; border-radius: var(--r-pill);
+  background: var(--bg-sunken); color: var(--text-2);
+  font-size: var(--fs-xs); font-weight: 500; line-height: 1; white-space: nowrap;
+}
+.chip .icon { width: 12px; height: 12px; }
+.chip-ok { background: var(--ok-soft); color: var(--ok); }
+.chip-run { background: var(--accent-soft); color: var(--accent-text); }
+.chip-warn { background: var(--warn-soft); color: var(--warn); }
+.chip-bad { background: var(--err-soft); color: var(--err); }
+.chip-idle { background: var(--bg-sunken); color: var(--text-3); }
+.chip-outline { background: transparent; border-color: var(--border-2); color: var(--text-2); }
+
+.muted { color: var(--text-2); }
+.faint { color: var(--text-3); }
+.small { font-size: var(--fs-sm); }
+
+.note {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--border-1);
+  border-radius: var(--r-md);
+  background: var(--bg-sunken);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+}
+.note-warn { background: var(--warn-soft); border-color: transparent; color: var(--warn); }
+.note-bad { background: var(--err-soft); border-color: transparent; color: var(--err); }
+.note-ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+
+.input {
+  height: 32px; min-width: 0; padding: 0 var(--sp-5);
+  border: 1px solid var(--border-2); border-radius: var(--r-md);
+  background: var(--bg-card); color: var(--text-1);
+}
+.input:focus { border-color: var(--accent); outline: 2px solid var(--accent-soft); }
+select.input { padding: 0 var(--sp-4); cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--accent); }

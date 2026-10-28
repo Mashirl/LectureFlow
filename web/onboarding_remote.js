@@ -8,8 +8,12 @@
 //   2. "sign in to Google": the in-app sign-in of colab_login.js (shared
 //      with the settings page's Colab section);
 //   3. once signed in: authorized, Colab is switched on (the user chose
-//      it), and the paid / free tier can be picked (PUT /api/colab/settings,
-//      the settings page's texts).
+//      it), and the account is shown (colab-obs, user decision 2026-10-27
+//      14:50: the tier follows the account, it is not picked here): paid /
+//      free, the paid balance, the free quota and the GPUs it may borrow;
+//      not read yet: "only the T4 for now, checked again by itself", with
+//      "重新查询". The account is read right after the sign-in; its SSE
+//      "changed colab" reloads the view.
 // Already signed in (GET /api/colab): straight to 3. Closing the app and
 // coming back resumes from the server's state (a sign-in still waiting is
 // followed again).
@@ -19,8 +23,7 @@ import { icon } from './icons.js';
 import { t } from './i18n.js';
 import { obApi } from './onboarding_api.js';
 import { createColabLogin } from './colab_login.js';
-
-const TIERS = ['paid', 'free'];
+import * as C from './settings_colab.js';
 
 export function remoteStep(env) {
   const S = {
@@ -28,7 +31,7 @@ export function remoteStep(env) {
     unavailable: false, // this server has no Colab back end (503)
     colab: null, // ColabView
     colabError: '',
-    saving: '',
+    refreshing: false, // "重新查询"
   };
   let alive = true;
   const login = createColabLogin({
@@ -82,40 +85,65 @@ export function remoteStep(env) {
     }
   }
 
-  async function setTier(tier) {
-    if (S.saving || !S.colab || S.colab.settings.tier === tier) return;
-    S.saving = 'tier';
+  // "重新查询": the account is read from Colab now (the answer is shown).
+  async function recheck() {
+    if (S.refreshing) return;
+    S.refreshing = true;
     env.rerender();
     try {
-      const v = await obApi.colabSettings({ tier });
-      if (alive && v) S.colab = v;
+      const v = await C.refreshAccount();
+      if (alive && v && v.status) S.colab = v;
     } catch {
-      // shown by the error handler
+      // shown by the error handler; Colab reads the account again by itself
     }
-    S.saving = '';
+    S.refreshing = false;
     if (alive) env.rerender();
   }
 
   // ---- render ----
 
-  function tierBlock() {
-    const s = S.colab.settings || {};
-    return h(
-      'fieldset',
-      { class: 'ob-field' },
-      h('legend', { class: 'ob-label' }, t('settings.colab.tier_label')),
-      h(
-        'div',
-        { class: 'ob-tiers', role: 'radiogroup' },
-        TIERS.map((tier) =>
+  // The account (no choice to make: the tier follows it): paid / free, the
+  // paid balance, the free quota, the GPUs it may borrow. Not read: only
+  // the T4 for now, read again by itself, and "重新查询".
+  function accountBlock() {
+    const st = S.colab.status || {};
+    const a = C.accountOf(st);
+    if (!a) return null; // a back end without the account
+    const known = C.accountKnown(a);
+    const paid = a.level === 'paid';
+    const balance = C.paidBalance(a);
+    const quota = C.freeQuotaText(a);
+    const sel = Array.isArray(st.selectable_accelerators) && st.selectable_accelerators.length ? st.selectable_accelerators : ['T4'];
+    const err = C.accountErrorText(a);
+    const notes = [];
+    if (!known) {
+      notes.push(
+        h(
+          'div',
+          { class: 'ob-callout is-warn', role: 'status', title: (err && (err.detail || err.text)) || undefined, style: { marginTop: '10px' } },
+          icon('lock', { size: 16 }),
           h(
-            'label',
-            { class: 'ob-tier' + (s.tier === tier ? ' is-on' : '') },
-            h('input', { type: 'radio', name: 'ob-colab-tier', value: tier, checked: s.tier === tier, disabled: !!S.saving, dataset: { fkey: 'ob:remote:tier:' + tier }, onchange: () => setTier(tier) }),
-            h('span', { class: 'ob-tier-text' }, h('span', { class: 'ob-tier-name' }, t(`settings.colab.tier.${tier}`)), h('span', { class: 'ob-tier-desc' }, t(`settings.colab.tier_${tier}_hint`))),
+            'div',
+            null,
+            h('p', null, t('onboarding.remote.account_unknown')),
+            btn(t('resources.remote.refresh'), { size: 'sm', icon: S.refreshing ? 'loader-circle' : 'refresh-cw', disabled: S.refreshing, fkey: 'ob:remote:recheck', onclick: recheck }),
           ),
         ),
+      );
+    } else if (!paid) notes.push(h('p', { class: 'ob-hint' }, t('settings.colab.tier_free_hint')));
+    return h(
+      'fieldset',
+      { class: 'ob-field ob-account' },
+      h('legend', { class: 'ob-label' }, t('settings.colab.account_label')),
+      h(
+        'div',
+        { class: 'acct-box' },
+        h('div', { class: 'acct-line' }, h('span', { class: 'chip ' + (paid ? 'chip-run' : 'chip-quiet') }, C.levelText(st))),
+        balance != null ? h('div', { class: 'acct-cu' }, h('span', { class: 'acct-num' }, C.cuText(balance)), h('span', { class: 'acct-unit' }, t('resources.remote.balance_k'))) : null,
+        quota ? h('div', { class: 'acct-quota small' }, icon('coins', { size: 13 }), h('span', null, quota)) : null,
+        h('div', { class: 'acct-line ob-account-gpus' }, h('span', { class: 'dim' }, t('settings.colab.accel_label')), known ? h('span', { class: 'mono' }, sel.join(' · ')) : h('span', null, t('resources.remote.cards_t4'))),
       ),
+      notes,
     );
   }
 
@@ -133,7 +161,7 @@ export function remoteStep(env) {
   function body() {
     if (S.loading || (!authorized() && login.loading)) return h('div', { class: 'ob-loading' }, icon('loader-circle', { size: 18, class: 'spin' }), h('span', null, t('onboarding.download.starting')));
     if (S.unavailable) return h('p', { class: 'ob-callout is-info' }, icon('info', { size: 16 }), h('span', null, t('settings.colab.unavailable')));
-    if (authorized()) return [h('p', { class: 'ob-callout is-ok', role: 'status' }, icon('circle-check', { size: 16 }), h('span', null, t('onboarding.remote.done'))), tierBlock()];
+    if (authorized()) return [h('p', { class: 'ob-callout is-ok', role: 'status' }, icon('circle-check', { size: 16 }), h('span', null, t('onboarding.remote.done'))), accountBlock()];
     const g = login.gcloudBlock();
     return [startFailed(), g ? h('div', { class: 'ob-section' }, g) : null, h('div', { class: 'ob-section' }, h('h2', { class: 'ob-h2' }, icon('key-round', { size: 16 }), t('onboarding.remote.login_title')), login.loginBlock())];
   }
@@ -156,6 +184,8 @@ export function remoteStep(env) {
     },
     onChanged(ev) {
       login.onChanged(ev);
+      // the account read after the sign-in (or again later) arrives as "changed colab"
+      if (ev && (ev.kind === 'colab' || ev.kind === 'settings') && authorized() && !S.refreshing) loadColab().then(() => alive && env.rerender());
     },
     destroy() {
       alive = false;

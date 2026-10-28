@@ -14,10 +14,30 @@ const { test, expect, waitForApp, request, fakeState, mainWindowVisible, DESKTOP
 const ELECTRON = require(path.join(DESKTOP, 'node_modules', 'electron'));
 const ERROR_PAGE = /splash\.html\?.*state=error/;
 
+// The URL the window shows, as the main process sees it.
+function windowUrl(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    return w && !w.isDestroyed() ? w.webContents.getURL() : '';
+  });
+}
+
 // The error page can replace the start screen within milliseconds; poll the
 // URL instead of waiting for a load event that may belong to the aborted page.
-async function waitForErrorPage(page) {
-  await expect.poll(() => page.url(), { timeout: 30_000 }).toMatch(ERROR_PAGE);
+// The main process's URL decides: at the first (cold) start of a run,
+// Playwright's Page object once missed both navigations (page.url() stayed
+// "" for 30 s; flake-hunt #12). If the Page object has not caught up a
+// moment after the main process, the window loads the error page again
+// (a static page, its texts in the query string; nothing else happens on
+// its load), a navigation the Page object then sees.
+async function waitForErrorPage(app, page) {
+  await expect.poll(() => windowUrl(app), { timeout: 30_000 }).toMatch(ERROR_PAGE);
+  try {
+    await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(ERROR_PAGE);
+  } catch {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.reload());
+    await expect.poll(() => page.url(), { timeout: 15_000 }).toMatch(ERROR_PAGE);
+  }
   await expect(page.locator('#retry')).toBeVisible();
 }
 
@@ -58,7 +78,7 @@ function waitExit(app, ms = 20_000) {
 
 test('a start failure shows the reason, Open logs and Try again (zh-CN); Try again recovers', async ({ launch }) => {
   const { app, page, dataDir } = await launch({ env: { FAKE_START_FAIL_TIMES: '1' }, lang: 'zh-CN' });
-  await waitForErrorPage(page);
+  await waitForErrorPage(app, page);
   await expect.poll(() => mainWindowVisible(app)).toBe(true);
   await expect(page.locator('#title')).toHaveText('LectureFlow 没能启动');
   await expect(page.locator('#detail')).toHaveText('open database: database is locked');
@@ -108,7 +128,7 @@ test('an unexpected stop shows the error page; Try again starts the service agai
   const { app, page, dataDir } = await launch();
   const { port } = await waitForApp(page);
   await request(port, '/test/exit?code=1');
-  await waitForErrorPage(page);
+  await waitForErrorPage(app, page);
   await expect(page.locator('#title')).toHaveText('The background service stopped unexpectedly');
   await expect(page.locator('#detail')).toHaveText('simulated failure for the test');
   expect(await mainWindowVisible(app)).toBe(true);
@@ -257,7 +277,7 @@ test('an unreadable location.json: "use the default location" renames it and sta
     fs.mkdirSync(root, { recursive: true });
     fs.writeFileSync(path.join(root, 'location.json'), '{"data_dir": "relative/path"}');
     const { app, page } = await launch({ appData });
-    await waitForErrorPage(page);
+    await waitForErrorPage(app, page);
     await expect(page.locator('#title')).toHaveText('The data folder setting cannot be read');
     await expect(page.locator('#restore')).toHaveText('Use the default location…');
     await app.evaluate(({ dialog }) => {
@@ -286,7 +306,7 @@ test('an unreadable location.json: "use the default location" renames it and sta
 });
 
 test('"use the default location" is not offered for other errors', async ({ launch }) => {
-  const { page } = await launch({ env: { FAKE_START_FAIL_TIMES: '1' } });
-  await waitForErrorPage(page);
+  const { app, page } = await launch({ env: { FAKE_START_FAIL_TIMES: '1' } });
+  await waitForErrorPage(app, page);
   await expect(page.locator('#restore')).toBeHidden();
 });

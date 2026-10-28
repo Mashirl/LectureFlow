@@ -22,6 +22,7 @@ import (
 	"lectureflow/internal/calendar"
 	"lectureflow/internal/db"
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
 	"lectureflow/internal/stages"
 	"lectureflow/internal/state"
 	"lectureflow/internal/wav"
@@ -92,14 +93,18 @@ func (s *Server) uploadLecture(w http.ResponseWriter, r *http.Request) {
 	}
 	l := model.Lecture{ID: db.NewID(), CourseID: courseID, CreatedAt: db.Now()}
 	dir := s.lectureDir(l)
-	up, err := s.receiveUpload(w, r, dir, "media", nil)
+	// security review 2 M3: a media extension, and no playlist (upload_media.go)
+	up, err := s.receiveUpload(w, r, dir, "media", acceptMediaName)
+	if err == nil {
+		err = s.checkMediaContent(ctx, up.path, up.filename)
+	}
 	if err != nil {
 		os.RemoveAll(dir)
 		s.fail(w, r, err)
 		return
 	}
-	stem := strings.TrimSuffix(up.filename, filepath.Ext(up.filename))
-	l.Title, l.TitleSource = strings.TrimSpace(up.fields["title"]), model.TitleSourceFilename
+	stem := titleFromFilename(up.filename)
+	l.Title, l.TitleSource = cleanLectureTitle(up.fields["title"]), model.TitleSourceFilename
 	switch {
 	case l.Title == "":
 		l.Title = stem
@@ -148,7 +153,7 @@ func (s *Server) patchLecture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "request.nothing_to_change", map[string]any{"fields": "title, title_zh, recorded_at"})
 		return
 	}
-	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
+	if req.Title != nil && cleanLectureTitle(*req.Title) == "" {
 		writeError(w, http.StatusBadRequest, "lecture.title_empty", nil)
 		return
 	}
@@ -198,10 +203,11 @@ func (s *Server) patchLecture(w http.ResponseWriter, r *http.Request) {
 		if req.Title != nil || req.TitleZh != nil {
 			title, zh := l.Title, l.TitleZh
 			if req.Title != nil {
-				title = strings.TrimSpace(*req.Title)
+				title = cleanLectureTitle(*req.Title)
 			}
 			if req.TitleZh != nil {
-				zh = strOrNil(ptrTrim(*req.TitleZh))
+				z := cleanLectureTitle(*req.TitleZh)
+				zh = strOrNil(&z)
 			}
 			if err := tx.SetLectureTitles(ctx, l.ID, title, zh, model.TitleSourceUser); err != nil {
 				return err
@@ -238,11 +244,6 @@ func (s *Server) patchLecture(w http.ResponseWriter, r *http.Request) {
 	s.respondLecture(w, r, l.ID, http.StatusOK)
 }
 
-func ptrTrim(v string) *string {
-	t := strings.TrimSpace(v)
-	return &t
-}
-
 // PUT /api/lectures/{id}/media, multipart file: replace the media of a
 // draft (v1.1 A3.1). Streamed like an upload (SPEC §17.4); the old file is
 // removed afterwards when it lies inside data_dir. v2 P13.3: the new file's
@@ -263,12 +264,27 @@ func (s *Server) replaceMedia(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	up, err := s.receiveUpload(w, r, s.lectureDir(l), "media", nil)
+	// security review 2 M3 (upload_media.go): the file arrives under a
+	// separate name and replaces media{ext} only once checked, so a refused
+	// file never overwrites the current media of the same extension.
+	dir := s.lectureDir(l)
+	up, err := s.receiveUpload(w, r, dir, mediaUploadBase, acceptMediaName)
+	if err == nil {
+		if err = s.checkMediaContent(ctx, up.path, up.filename); err != nil {
+			os.Remove(up.path)
+		}
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	newPath, _ := filepath.Abs(up.path)
+	final := filepath.Join(dir, "media"+filepath.Ext(up.path))
+	if err := replaceRetry(up.path, final); err != nil {
+		os.Remove(up.path)
+		s.fail(w, r, err)
+		return
+	}
+	newPath, _ := filepath.Abs(final)
 	err = s.st.Tx(ctx, func(tx db.Store) error {
 		cur, err := tx.GetLecture(ctx, l.ID)
 		if err != nil {
@@ -295,20 +311,37 @@ func (s *Server) replaceMedia(w http.ResponseWriter, r *http.Request) {
 	if s.sc != nil {
 		s.sc.RequestFilenameRule(l.CourseID)
 	}
-	if l.MediaPath != "" && !samePath(newPath, l.MediaPath) {
-		old := l.MediaPath
-		if !filepath.IsAbs(old) {
-			old = filepath.Join(s.lectureDir(l), old)
-		}
-		if s.inDataDir(old) {
-			if err := os.Remove(old); err != nil && !errors.Is(err, os.ErrNotExist) {
-				s.logWarn("remove replaced media", l.ID, err)
-			}
+	if old := s.replacedMediaToRemove(l, newPath); old != "" {
+		if err := os.Remove(old); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.logWarn("remove replaced media", l.ID, err)
 		}
 	}
 	s.hub.Changed("lecture", l.ID)
 	s.hub.Changed("course", l.CourseID)
 	s.respondLecture(w, r, l.ID, http.StatusOK)
+}
+
+// replacedMediaToRemove is the old media file a replacement deletes, or ""
+// when there is none to delete: no old media, the new file itself, a file
+// outside data_dir (the user's original, A7), or a stored path naming
+// another computer (state.StoredPathUnsafe; security review 2, M3): that
+// one is never stat'ed or removed, StoredPathUnsafe logs it once per process
+// (Warn) and the replacement goes on. Nothing here touches the disk.
+func (s *Server) replacedMediaToRemove(l model.Lecture, newPath string) string {
+	if l.MediaPath == "" || samePath(newPath, l.MediaPath) {
+		return ""
+	}
+	if state.StoredPathUnsafe(state.PathLectureMedia, l.ID, l.MediaPath) {
+		return ""
+	}
+	old := l.MediaPath
+	if !filepath.IsAbs(old) {
+		old = filepath.Join(s.lectureDir(l), old)
+	}
+	if !s.inDataDir(old) {
+		return ""
+	}
+	return old
 }
 
 func samePath(a, b string) bool {
@@ -415,12 +448,19 @@ func (s *Server) lectureStageAction(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if req.TextOnly && (stage != model.StageASR || action != model.ActionRerun) {
+		// "修复断句" is the asr rerun only (textrepair.go)
+		writeError(w, http.StatusBadRequest, "stage.invalid", map[string]any{"stage": stage, "action": action})
+		return
+	}
 	if _, err := s.getLectureRow(ctx, id); err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	var err error
 	switch {
+	case req.TextOnly:
+		err = s.rerunTextRepair(ctx, id, req.ModelChoice)
 	case stage == model.StageStream && action == model.ActionRetry && s.streamRetryIsNewRun(ctx, id):
 		// The playback file: "retry" also after a run that ended without
 		// one (audio_only, no_space) or a failure recorded by prep (no
@@ -884,10 +924,13 @@ func (s *Server) audio(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	if err := cmd.Start(); err != nil {
+	// Tied: ffmpeg ends with LectureFlow, also on a crash (test-chaos 1).
+	proc, err := procutil.Start(cmd, procutil.Tied)
+	if err != nil {
 		writeErrorInfo(w, http.StatusInternalServerError, model.ErrorInfo{Code: "audio.ffmpeg_failed", Detail: err.Error()})
 		return
 	}
+	defer proc.Close()
 	// Read the first bytes before committing to 200, so an ffmpeg failure
 	// still produces a JSON error.
 	head := make([]byte, 4096)

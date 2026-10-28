@@ -8,7 +8,13 @@ package colab
 // with a timestamp, and nothing that could carry text derived from the
 // audio. The parser is strict: anything else is CodeContractViolation and
 // the lecture goes back to the local devices. Python side: the EVENT_*
-// tables of worker/colab_remote.py, which must list the same keys.
+// tables of worker/colab_remote.py, which must list the same keys. The
+// memory event is the memory probe's only line (memory.go) and never part
+// of a transcription's output. The machine and sample events
+// (colab-obs-core: the runtime's own readings, fields in
+// internal/remote/sample.go, checked by remote.ReadMachine / ReadSample)
+// come from the attaching process: a machine first, then a sample every
+// 2 s; they are neither progress nor a stage (job.go lectureCell.onEvent).
 
 import (
 	"bytes"
@@ -21,6 +27,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"lectureflow/internal/remote"
 )
 
 const maxEventLine = 2048
@@ -38,8 +46,13 @@ var remoteErrorCodes = []string{
 var eventKeys = map[string]struct{ required, optional []string }{
 	"progress": {required: []string{"type", "ts", "fraction"}},
 	"stage":    {required: []string{"type", "ts", "stage"}},
-	"done":     {required: []string{"type", "ts", "result", "sha256", "bytes", "audio_s", "load_s", "transcribe_s", "sentences"}},
+	"done":     {required: []string{"type", "ts", "result", "sha256", "bytes", "audio_s", "load_s", "transcribe_s", "sentences"}, optional: []string{"mem_peak_mb", "mem_total_mb"}},
 	"error":    {required: []string{"type", "ts", "code", "retryable"}, optional: []string{"exc"}},
+	"memory":   {required: []string{"type", "ts", "mode", "base", "reason", "mem_total_mb", "mem_available_mb", "need_mb", "free_mb"}},
+	// colab-obs-core: every field of remote.MachineEventKeys /
+	// SampleEventKeys is required (-1 / "" = unknown)
+	remote.EventMachine: {required: append([]string{"type", "ts"}, remote.MachineEventKeys...)},
+	remote.EventSample:  {required: append([]string{"type", "ts"}, remote.SampleEventKeys...)},
 }
 
 var (
@@ -62,10 +75,18 @@ type remoteEvent struct {
 	LoadS       float64
 	TranscribeS float64
 	Sentences   int
+	// MemPeakMB, MemTotalMB: the runtime's peak used memory while the worker
+	// ran and its total (MiB; -1 when the worker could not read them).
+	MemPeakMB, MemTotalMB int64
+	// memory (the memory probe's only line)
+	Memory memoryDecision
 	// error
 	ErrCode   string
 	Retryable bool
 	Exc       string
+	// machine, sample (colab-obs-core)
+	Machine remote.MachineReading
+	Sample  remote.SampleReading
 }
 
 func violation(reason string) error {
@@ -203,8 +224,59 @@ func parseEvent(line string) (remoteEvent, error) {
 			return ev, err
 		}
 		var n int64
-		n, err = integer("sentences")
+		if n, err = integer("sentences"); err != nil {
+			return ev, err
+		}
 		ev.Sentences = int(n)
+		ev.MemPeakMB, ev.MemTotalMB = -1, -1
+		if _, ok := vals["mem_peak_mb"]; ok {
+			if ev.MemPeakMB, err = integer("mem_peak_mb"); err != nil {
+				return ev, err
+			}
+		}
+		if _, ok := vals["mem_total_mb"]; ok {
+			ev.MemTotalMB, err = integer("mem_total_mb")
+		}
+	case "memory":
+		d := &ev.Memory
+		strOf := func(k string) string { return vals[k].str }
+		for _, k := range []string{"mode", "base", "reason"} {
+			if vals[k].kind != "string" {
+				return ev, violation("bad value of " + k)
+			}
+		}
+		d.Mode, d.Base, d.Reason = strOf("mode"), strOf("base"), strOf("reason")
+		if err = checkMemoryEvent(*d); err != nil {
+			return ev, err
+		}
+		for _, f := range []struct {
+			k string
+			p *int64
+		}{{"mem_total_mb", &d.MemTotalMB}, {"mem_available_mb", &d.MemAvailableMB}, {"need_mb", &d.NeedMB}, {"free_mb", &d.FreeMB}} {
+			if *f.p, err = integer(f.k); err != nil {
+				return ev, err
+			}
+		}
+	case remote.EventMachine, remote.EventSample:
+		get := func(k string) (any, bool) {
+			v, ok := vals[k]
+			switch v.kind {
+			case "string":
+				return v.str, ok
+			case "number":
+				return v.num, ok
+			}
+			return v.b, ok
+		}
+		var bad string
+		if ev.Type == remote.EventMachine {
+			ev.Machine, bad = remote.ReadMachine(get)
+		} else {
+			ev.Sample, bad = remote.ReadSample(get)
+		}
+		if bad != "" {
+			return ev, violation("bad value of " + bad)
+		}
 	case "error":
 		if ev.ErrCode, err = str("code", func(s string) bool { return slices.Contains(remoteErrorCodes, s) }); err != nil {
 			return ev, err

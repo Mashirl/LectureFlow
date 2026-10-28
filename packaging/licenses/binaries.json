@@ -1,5 +1,5 @@
 {
-  "_doc": "Binaries shipped with the installer next to the server (SPEC-v3 V7, brief 1: resources/bin). Every entry needs name, version, license (SPDX expression) and source. Pinned downloads (url, sha256) and the build steps live in desktop/packaging/third-party.json and desktop/scripts/stage.js; keep both files in step. stage.js fails the build when the ffmpeg configure line contains --enable-gpl or --enable-nonfree.",
+  "_doc": "Binaries shipped with the installer next to the server (SPEC-v3 V7, brief 1: resources/bin). Every entry needs name, version, license (SPDX expression) and source. Pinned downloads (url, sha256) and the build steps live in desktop/packaging/third-party.json and desktop/scripts/stage.js; keep both files in step. stage.js fails the build when the ffmpeg configure line contains --enable-gpl or --enable-nonfree. aria2c (SPEC-ext) is GPL-2.0-or-later with an OpenSSL linking permission (note): a separate program LectureFlow starts in RPC mode, not linked into it; source_code lists where the corresponding source of ffmpeg and aria2c is: first the release attachment that desktop/scripts/sources.js builds for every release (the pinned upstream tarballs, unchanged, with our build scripts), then the upstream addresses of the same files; resources/licenses/{ffmpeg,aria2}/SOURCE.txt names the attachment of that version.",
   "binaries": [
     {
       "name": "ffmpeg / ffprobe (Windows build)",
@@ -7,6 +7,7 @@
       "license": "LGPL-2.1-or-later",
       "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
       "source_code": [
+        "https://github.com/ShouldBeQuincy/LectureFlow/releases",
         "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
         "https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz",
         "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz",
@@ -14,7 +15,7 @@
         "https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz",
         "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz",
         "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1",
-        "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1"
+        "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1"
       ],
       "component": "core",
       "platforms": [
@@ -22,7 +23,7 @@
       ],
       "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
       "configure": "--arch=x86_64 --target-os=mingw32 --cross-prefix=x86_64-w64-mingw32- --disable-gpl --disable-nonfree --disable-version3 --disable-autodetect --enable-w32threads --enable-zlib --enable-d3d11va --enable-dxva2 --enable-ffnvcodec --enable-nvenc --enable-libvpl --enable-libopenh264 --enable-libdav1d --enable-shared --disable-static --disable-doc --disable-ffplay --disable-debug",
-      "note": "Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264, libvpl and dav1d in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer.",
+      "note": "Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264, libvpl and dav1d in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-ffmpeg-windows-x64.tar (the pinned FFmpeg, zlib, nv-codec-headers, OpenH264, libvpl and dav1d tarballs, unchanged, with desktop/scripts/build-ffmpeg-windows.sh and its pins); resources/licenses/ffmpeg/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. The GCC and MinGW-w64 runtime sources are not attached: the GCC Runtime Library Exception 3.1 and the ZPL-2.1 ask for none; their Ubuntu source packages are listed.",
       "bundled": [
         {
           "name": "OpenH264",
@@ -63,7 +64,7 @@
           "name": "GCC runtime libraries (libgcc, libstdc++)",
           "version": "13.2.0 (Ubuntu 13.2.0-6ubuntu1+26.1)",
           "license": "GPL-3.0-or-later WITH GCC-exception-3.1",
-          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1",
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1",
           "note": "Linked statically (-static-libgcc; libstdc++ for OpenH264 and libvpl). The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL: no GPL obligations attach to ffmpeg."
         },
         {
@@ -81,6 +82,7 @@
       "license": "LGPL-2.1-or-later",
       "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
       "source_code": [
+        "https://github.com/ShouldBeQuincy/LectureFlow/releases",
         "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
         "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
       ],
@@ -90,7 +92,7 @@
       ],
       "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
       "configure": "--arch=arm64 --cc=clang --enable-pthreads --disable-gpl --disable-nonfree --disable-autodetect --enable-zlib --enable-videotoolbox --enable-audiotoolbox --enable-libdav1d --enable-static --disable-shared --disable-doc --disable-ffplay --disable-debug",
-      "note": "Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables; the one third-party library inside is dav1d (bundled), linked statically. zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically; the build checks that nothing else is. Corresponding source: the pinned ffmpeg-9.0.2.tar.xz, dav1d-1.5.4.tar.xz and that build script.",
+      "note": "Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables; the one third-party library inside is dav1d (bundled), linked statically. zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically; the build checks that nothing else is. Built for macOS 13.0 or later (the app's minimum). Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-ffmpeg-darwin-arm64.tar (the pinned ffmpeg-9.0.2.tar.xz and dav1d-1.5.4.tar.xz, unchanged, with that build script and its pins); resources/licenses/ffmpeg/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference.",
       "bundled": [
         {
           "name": "dav1d",
@@ -113,6 +115,121 @@
       ],
       "sha256": "windows uv-x86_64-pc-windows-msvc.zip 3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672; darwin uv-aarch64-apple-darwin.tar.gz cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2",
       "note": "Creates the component virtual environments (SPEC-v3 V3.1). LICENSE-MIT and LICENSE-APACHE of the 0.13.1 tag ship in resources/licenses/uv."
+    },
+    {
+      "name": "aria2c (Windows build)",
+      "version": "1.37.0 (official build aria2-1.37.0-win-64bit-build1)",
+      "license": "GPL-2.0-or-later",
+      "source": "https://github.com/aria2/aria2/releases/tag/release-1.37.0",
+      "source_code": [
+        "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+        "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz",
+        "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz",
+        "https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2",
+        "https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz",
+        "https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz",
+        "https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz",
+        "https://libssh2.org/download/libssh2-1.11.0.tar.bz2",
+        "https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1",
+        "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3"
+      ],
+      "component": "core",
+      "platforms": [
+        "windows"
+      ],
+      "sha256": "67d015301eef0b612191212d564c5bb0a14b5b9c4796b76454276a4d28d9b288 (aria2-1.37.0-win-64bit-build1.zip); aria2c.exe be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2",
+      "note": "Download tool of the browser extension's download queue (SPEC-ext), started by LectureFlow in RPC mode only. aria2 is under the GNU GPL version 2 or later with an additional permission to link with OpenSSL (COPYING, LICENSE.OpenSSL and the source file headers). Neither bundled build links OpenSSL: Windows uses WinTLS (SChannel), macOS AppleTLS (Security.framework). A separate program that LectureFlow starts and talks to over JSON-RPC; it is not linked into LectureFlow. The binary is upstream's own Windows build, used unchanged and pinned by the SHA-256 of the zip and of aria2c.exe (desktop/packaging/third-party.json); upstream's build scripts are Dockerfile.mingw and mingw-config in the 1.37.0 source tarball. Statically linked (README.mingw): GMP, Expat, SQLite, zlib, c-ares, libssh2, the WebSocket library wslay from the aria2 source, and the static parts of the GCC and MinGW-w64 runtimes; it imports only Windows system DLLs. Enabled features: Async DNS, BitTorrent, Firefox3 Cookie, GZip, HTTPS (WinTLS; TLS 1.3 does not work, README.mingw), Message Digest, Metalink, XML-RPC, SFTP. LectureFlow uses only HTTP(S) downloads over JSON-RPC. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-aria2c-windows-x64.tar (the aria2 1.37.0 source with upstream's Dockerfile.mingw and mingw-config, and the pinned GMP, Expat, SQLite, zlib, c-ares and libssh2 tarballs, unchanged); resources/licenses/aria2/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. The GCC and MinGW-w64 runtime sources are not attached: the GCC Runtime Library Exception 3.1 and the ZPL-2.1 ask for none; their Ubuntu source packages are listed. COPYING, LICENSE.OpenSSL, AUTHORS, README.mingw, SOURCE.txt and the libraries' license texts ship in resources/licenses/aria2.",
+      "bundled": [
+        {
+          "name": "GMP",
+          "version": "6.3.0",
+          "license": "LGPL-3.0-or-later OR GPL-2.0-or-later",
+          "url": "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz",
+          "note": "Multi-precision arithmetic (BitTorrent key exchange). Statically linked by upstream's build."
+        },
+        {
+          "name": "Expat",
+          "version": "2.5.0",
+          "license": "MIT",
+          "url": "https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2",
+          "note": "XML parser (Metalink, XML-RPC). Statically linked by upstream's build."
+        },
+        {
+          "name": "SQLite",
+          "version": "3.43.1",
+          "license": "blessing",
+          "url": "https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz",
+          "note": "Reads Firefox 3 / Chromium cookie files (--load-cookies); public-domain dedication, no license text required. Statically linked by upstream's build."
+        },
+        {
+          "name": "zlib",
+          "version": "1.3",
+          "license": "Zlib",
+          "url": "https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz",
+          "note": "gzip content encoding. Statically linked by upstream's build."
+        },
+        {
+          "name": "c-ares",
+          "version": "1.19.1",
+          "license": "MIT",
+          "url": "https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz",
+          "note": "Asynchronous DNS. Statically linked by upstream's build."
+        },
+        {
+          "name": "libssh2",
+          "version": "1.11.0",
+          "license": "BSD-3-Clause",
+          "url": "https://libssh2.org/download/libssh2-1.11.0.tar.bz2",
+          "note": "SFTP downloads. Statically linked by upstream's build."
+        },
+        {
+          "name": "wslay",
+          "version": "1.1.1 (deps/wslay of the aria2 1.37.0 source)",
+          "license": "MIT",
+          "url": "https://github.com/aria2/aria2/tree/release-1.37.0/deps/wslay",
+          "note": "WebSocket library of aria2's RPC interface, compiled in from the aria2 source; its COPYING ships in resources/licenses/aria2/thirdparty."
+        },
+        {
+          "name": "GCC runtime libraries (libgcc, libstdc++)",
+          "version": "10.3.0 (Ubuntu 22.04 gcc-mingw-w64 24.3, \"10-win32 20220113\")",
+          "license": "GPL-3.0-or-later WITH GCC-exception-3.1",
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3",
+          "note": "Linked statically by upstream's build. The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL-3.0 terms of these libraries (COPYING.RUNTIME ships in resources/licenses/aria2/thirdparty)."
+        },
+        {
+          "name": "MinGW-w64 runtime (static CRT parts)",
+          "version": "8.0.0 (Ubuntu 22.04 mingw-w64 8.0.0-1)",
+          "license": "ZPL-2.1",
+          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1",
+          "note": "Startup code and libmingwex helpers linked statically by upstream's build; some files are public domain. The C runtime itself is msvcrt.dll from Windows. COPYING.MinGW-w64-runtime.txt ships in resources/licenses/aria2/thirdparty."
+        }
+      ]
+    },
+    {
+      "name": "aria2c (macOS build)",
+      "version": "1.37.0 (built from aria2-1.37.0.tar.xz in CI)",
+      "license": "GPL-2.0-or-later",
+      "source": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz",
+      "source_code": [
+        "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+        "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz"
+      ],
+      "component": "core",
+      "platforms": [
+        "darwin"
+      ],
+      "sha256": "60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b",
+      "configure": "--with-appletls --without-openssl --without-gnutls --without-libnettle --without-libgmp --without-libgcrypt --without-libxml2 --without-libexpat --without-sqlite3 --without-libssh2 --without-libcares --without-libuv --without-tcmalloc --without-jemalloc --with-libz --disable-bittorrent --disable-metalink --disable-nls --without-libintl-prefix --without-libiconv-prefix ARIA2_STATIC=no",
+      "note": "Download tool of the browser extension's download queue (SPEC-ext), started by LectureFlow in RPC mode only. aria2 is under the GNU GPL version 2 or later with an additional permission to link with OpenSSL (COPYING, LICENSE.OpenSSL and the source file headers). Neither bundled build links OpenSSL: Windows uses WinTLS (SChannel), macOS AppleTLS (Security.framework). A separate program that LectureFlow starts and talks to over JSON-RPC; it is not linked into LectureFlow. Built by packaging/aria2c/build-aria2c-macos.sh with exactly the configure line above, for macOS 13.0 or later (the app's minimum). AppleTLS (Security.framework; certificates are checked against the system trust store); OpenSSL, GnuTLS, nettle, GMP, libgcrypt, libxml2, Expat, SQLite, libssh2, c-ares, BitTorrent and Metalink are off. Linked dynamically only to macOS system libraries (libz, libc++, libiconv, libSystem, CoreFoundation, Security); the build checks otool -L, the minimum macOS version and aria2c --version. The one third-party library inside is wslay (WebSocket, MIT), part of the aria2 source. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-aria2c-darwin-arm64.tar (the pinned aria2-1.37.0.tar.xz, unchanged, with that build script and its pins); resources/licenses/aria2/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. COPYING, LICENSE.OpenSSL, AUTHORS, BUILDINFO.txt, SOURCE.txt and wslay's COPYING ship in resources/licenses/aria2.",
+      "bundled": [
+        {
+          "name": "wslay",
+          "version": "1.1.1 (deps/wslay of the aria2 1.37.0 source)",
+          "license": "MIT",
+          "url": "https://github.com/aria2/aria2/tree/release-1.37.0/deps/wslay",
+          "note": "WebSocket library of aria2's RPC interface, compiled in from the aria2 source; its COPYING ships in resources/licenses/aria2/thirdparty."
+        }
+      ]
     }
   ]
 }

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"lectureflow/internal/db"
+	"lectureflow/internal/secrets"
 )
 
 // Import of an existing data directory (SPEC-v3 V1.3 "从开发版迁移", V4.2
@@ -257,6 +258,9 @@ func StageImport(ctx context.Context, o ImportOptions) (err error) {
 	if err := verifyFiles(staging, files); err != nil {
 		return err
 	}
+	if err := resealImported(ctx, d, src); err != nil {
+		return coded(CodeCopyFailed, map[string]any{"path": DBName}, err)
+	}
 	kv, err := carriedKV(ctx, dataDir)
 	if err != nil {
 		return coded(CodeCopyFailed, map[string]any{"path": DBName}, err)
@@ -410,26 +414,98 @@ func ApplyStaged(ctx context.Context, dataDir string) error {
 }
 
 // secretKVKeys are the kv rows the database an import replaced must not
-// keep in backups/: the Colab credential (colab.KVCredential: a
-// refresh_token and client_secret; v3 Gate round 1 item 9).
-var secretKVKeys = []string{"colab.credential"}
+// keep in backups/ (nor the one a move leaves behind): the Colab credential
+// (colab.KVCredential: a refresh_token and client_secret; v3 Gate round 1
+// item 9) and the other kv rows the Store keeps sealed (db.SealedKVKeys).
+// db.ScrubSecrets also empties the providers' API keys (sec2-app L5).
+var secretKVKeys = db.SealedKVKeys()
 
-// scrubBackup deletes secretKVKeys from the replaced database kept at path
-// (with its -wal), leaving no copy in free pages or the WAL (db.ScrubKV:
-// secure_delete, VACUUM, TRUNCATE checkpoint; closing the last connection
-// removes the WAL). A failure is logged and the import stands: the swap is
-// complete, and the backup stays where it is.
+// scrubBackup removes the credentials (secretKVKeys and the providers' API
+// keys) from the replaced database kept at path (with its -wal), leaving no
+// copy in free pages or the WAL (db.ScrubSecrets: secure_delete, VACUUM,
+// TRUNCATE checkpoint; closing the last connection removes the WAL). A
+// failure is logged and the import stands: the swap is complete, and the
+// backup stays where it is.
 func scrubBackup(ctx context.Context, path string) {
 	if _, err := os.Stat(path); err != nil {
 		return
 	}
 	d, err := openDB(path, false)
 	if err != nil {
-		slog.Warn("relocate: opening the replaced database to remove the Colab credential", "path", path, "err", err)
+		slog.Warn("relocate: opening the replaced database to remove its credentials", "path", path, "err", err)
 		return
 	}
 	defer d.Close()
-	if err := db.ScrubKV(ctx, d, secretKVKeys...); err != nil {
-		slog.Warn("relocate: removing the Colab credential from the replaced database", "path", path, "err", err)
+	if err := db.ScrubSecrets(ctx, d, secretKVKeys...); err != nil {
+		slog.Warn("relocate: removing the credentials from the replaced database", "path", path, "err", err)
 	}
+}
+
+// ImportBackupGlob matches, in a data directory, the databases imports
+// replaced (ApplyStaged; with -wal / -shm / -journal beside them).
+const ImportBackupGlob = "lectureflow-before-import-*.db"
+
+// ScrubImportBackups removes the credentials from every database an import
+// replaced in dataDir/backups (sec3 L1: 3.1 and earlier only removed the
+// Colab credential from them, the providers' API keys stayed in the
+// clear), the same way as scrubBackup. It returns how many it scrubbed;
+// the first failure is returned after trying the others. A missing
+// backups/ is nothing to do.
+func ScrubImportBackups(ctx context.Context, dataDir string) (int, error) {
+	paths, err := filepath.Glob(filepath.Join(dataDir, "backups", ImportBackupGlob))
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	var first error
+	for _, p := range paths {
+		if fi, err := os.Lstat(p); err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
+		if err := scrubDB(ctx, p); err != nil {
+			if first == nil {
+				first = fmt.Errorf("%s: %w", filepath.Base(p), err)
+			}
+			continue
+		}
+		n++
+	}
+	return n, first
+}
+
+// scrubDB opens the database at path and removes its credentials
+// (db.ScrubSecrets).
+func scrubDB(ctx context.Context, path string) error {
+	d, err := openDB(path, false)
+	if err != nil {
+		return err
+	}
+	if err := db.ScrubSecrets(ctx, d, secretKVKeys...); err != nil {
+		d.Close()
+		return err
+	}
+	return d.Close()
+}
+
+// resealImported brings the staged copy's credentials to this
+// installation's data key (cred-enc): plain ones (an older install) are
+// sealed, ones sealed with the imported directory's key are sealed again
+// when that key opens here (secrets.PeekKeyFile: the same account on this
+// computer). Credentials no key opens stay as they are: the providers ask
+// for their key again, Colab for a new authorisation. Without a data key
+// (a failed key setup) nothing changes; the next start seals them.
+func resealImported(ctx context.Context, d *sql.DB, src string) error {
+	var extra [][]byte
+	if k, err := secrets.PeekKeyFile(src); err == nil {
+		extra = append(extra, k)
+	}
+	res, err := db.SealSecrets(ctx, d, extra...)
+	if err != nil {
+		return err
+	}
+	if res.Changed() || res.Unreadable > 0 {
+		slog.Info("relocate: imported credentials sealed with this installation's key",
+			"sealed", res.Sealed, "resealed", res.Resealed, "unreadable", res.Unreadable)
+	}
+	return nil
 }

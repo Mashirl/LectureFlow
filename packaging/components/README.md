@@ -82,6 +82,21 @@ Component:
 }
 ```
 
+### The core component's bundled files
+
+`core` is part of the installer (`bundled: true`): it is never downloaded,
+and the validation skips its builds. Its `platforms` record the bundled
+third-party programs whose SHA-256 is known before packaging, for the
+diagnostics to compare with the file in use: today aria2c (SPEC-ext) on
+Windows, `files: [{"name": "bin/aria2c.exe", "url": "", "sha256", "size"}]`
+relative to the resources directory (`upstream` names the version, `aria2c
+--version` reports it). The values come from
+`desktop/packaging/third-party.json` (`bin_sha256` / `bin_size`);
+`desktop/scripts/stage.js` fails when the staged file differs and
+`desktop/test/unit/build.test.js` when the two files disagree. macOS has no
+entry (built in CI and re-signed by electron-builder: no SHA-256 is known
+before packaging). See `packaging/aria2c/README.md`.
+
 ### Installed sizes and path lengths of environments
 
 `installed_size` of a venv or python component is an estimate (`installed_size_estimated`):

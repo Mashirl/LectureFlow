@@ -28,6 +28,23 @@
 // installed" without one), the transcription devices with their own
 // model, precision and parallel tasks; nvidia-smi and the VRAM settings
 // only with an NVIDIA GPU (the server decides).
+// ext-step1 (SPEC-ext "主程序配套改动 1"): the server picks the rows by
+// hardware and transcription mode — NVIDIA: GPU, cuDNN, CUDA; Apple
+// silicon: the MLX group with its self-test; neither: the OpenVINO group and
+// the CPU self-test; only Colab: none of these but the "云端" group (gcloud,
+// authorisation, reachability). The page hides nothing; it only names the
+// new rows, links their hints and keeps NVIDIA out of its own texts where
+// the server shows no GPU row (the "check again" note, the configuration's
+// faster-whisper interpreter, OpenVINO's ignored devices).
+// ext web3 (SPEC-ext "2. 内建 aria2c", "3. Native Messaging 宿主"): the row
+// aria2c (version and SHA-256, as the server words them) joins the
+// environment; browser_ext gets its own group, "浏览器扩展", where the
+// server's row is followed by the registration of each browser, the latest
+// extension connection (when the row does not say it) and "重新登记"
+// (system_ext.js).
+// datadir-ui (sec-update M2): a data_dir row that other accounts can reach
+// (hint check.hint_data_dir_restrict) gets "收紧权限" in its hint
+// (system_datadir.js).
 
 import { api } from './api.js';
 import { h, clear, btn, skeleton, errorBlock, preserveFocus, copyText, toast } from './dom.js';
@@ -35,6 +52,9 @@ import { icon } from './icons.js';
 import * as U from './util.js';
 import { t } from './i18n.js';
 import { obApi } from './onboarding_api.js';
+import { LOCAL_ENTRY } from './asr_ready.js';
+import { createBrowserExt } from './system_ext.js';
+import { createDataDirRestrict, restrictable } from './system_datadir.js';
 
 // The detail code of a check that is still running (internal/api/system.go).
 const CHECK_PENDING = 'check.checking';
@@ -50,14 +70,41 @@ const INSTALL_HINTS = new Set([
   'check.hint_install_openvino',
   'check.hint_install_mlx_model',
   'check.hint_selftest_desktop',
+  // ext-step1
+  'check.hint_install_gcloud',
+  'check.hint_repair_local',
+  'check.hint_repair_openvino',
 ]);
+// ext-step1: hints with a link of their own — [href, label key]
+const HINT_LINKS = {
+  'check.hint_install_local': [LOCAL_ENTRY, 'system.install_local'],
+  'check.hint_colab_auth': ['#/settings/colab', 'system.open_colab'],
+  'check.hint_colab_reach': ['#/settings/colab', 'system.open_colab'],
+};
+// ext-step1: names of the new rows (products as they are, the others by
+// common.check.{name})
+const CHECK_NAMES = {
+  cudnn: () => 'cuDNN',
+  gcloud: () => 'Google Cloud CLI',
+  mlx_selftest: () => t('common.check.mlx_selftest'),
+  cpu_selftest: () => t('common.check.cpu_selftest'),
+  colab_auth: () => t('common.check.colab_auth'),
+  colab_reach: () => t('common.check.colab_reach'),
+  // ext web3 (the names are core3's, with the rows)
+  aria2c: () => t('common.check.aria2c'),
+  browser_ext: () => t('common.check.browser_ext'),
+};
+const checkName = (name) => (CHECK_NAMES[name] ? CHECK_NAMES[name]() : U.checkName(name));
 // The application's mode (GET /api/app), fetched once per page load.
 let appMode = null;
 const GROUPS = [
-  ['env', 'layers', (n) => ['data_dir', 'ffmpeg', 'python', 'faster-whisper', 'pypdf'].includes(n)],
-  ['gpu', 'cpu', (n) => n === 'gpu' || n === 'cuda'],
-  ['mlx', 'cpu', (n) => n === 'mlx_python' || n === 'mlx' || n === 'mlx_model'],
+  ['env', 'layers', (n) => ['data_dir', 'credentials', 'data_dir_location', 'ffmpeg', 'aria2c', 'python', 'faster-whisper', 'pypdf'].includes(n)],
+  ['gpu', 'cpu', (n) => n === 'gpu' || n === 'cudnn' || n === 'cuda'],
+  ['mlx', 'cpu', (n) => n === 'mlx_python' || n === 'mlx' || n === 'mlx_model' || n === 'mlx_selftest'],
   ['openvino', 'cpu', (n) => ['openvino_venv', 'openvino', 'openvino_devices', 'npu_driver'].includes(n)],
+  ['cpu', 'cpu', (n) => n === 'cpu_selftest'],
+  ['cloud', 'cloud', (n) => n === 'gcloud' || n === 'colab_auth' || n === 'colab_reach'],
+  ['ext', 'plug', (n) => n === 'browser_ext'],
   ['api', 'server', (n) => n.startsWith('api_key:') || n.startsWith('api:') || n.startsWith('role_model:')],
   ['disk', 'hard-drive', (n) => n === 'disk'],
 ];
@@ -142,7 +189,10 @@ export function mountSystem(root, ctx) {
   let checking = false;
   let error = '';
   let gpuKey = '';
+  let ext = null; // the browser extension's details (system_ext.js), once the row is there
   const el = h('div', { class: 'page page-system' });
+  // "收紧权限" of the data_dir row (system_datadir.js)
+  const dataDir = createDataDirRestrict({ refresh: () => refresh(), changed: () => alive && preserveFocus(render) });
   root.append(el);
   if (!appMode) {
     appMode = obApi
@@ -200,21 +250,34 @@ export function mountSystem(root, ctx) {
             'button',
             { type: 'button', class: 'btn btn-primary', disabled: checking, dataset: { fkey: 'sys:recheck' }, onclick: recheck },
             icon('rotate-cw', { size: 16, class: checking ? 'spin' : '' }),
-            h('span', { class: 'btn-label' }, checking ? t('system.rechecking') : t('system.recheck')),
+            h('span', { class: 'btn-label' }, checking ? recheckingText(sys) : t('system.recheck')),
           ),
         ),
       ),
     );
     if (!sys) {
+      // spread: the native append prints an array as "[object HTMLElement],…" (3.2.0 P1)
       el.append(
-        error
-          ? h('section', { class: 'card' }, h('div', { class: 'card-bd' }, errorBlock(error, () => ((error = ''), render(), refresh()))))
-          : [h('section', { class: 'card sys-summary is-loading' }, h('div', { class: 'card-bd' }, skeleton(2))), h('section', { class: 'card' }, h('div', { class: 'card-bd' }, skeleton(8)))],
+        ...(error
+          ? [h('section', { class: 'card' }, h('div', { class: 'card-bd' }, errorBlock(error, () => ((error = ''), render(), refresh()))))]
+          : [h('section', { class: 'card sys-summary is-loading' }, h('div', { class: 'card-bd' }, skeleton(2))), h('section', { class: 'card' }, h('div', { class: 'card-bd' }, skeleton(8)))]),
       );
       return;
     }
-    el.append(summary(sys), checksCard(sys), sys.devices || sys.openvino ? devicesCard(sys) : null, h('div', { class: 'sys-grid' }, nvidiaShown(sys) ? gpuCard(sys) : null, apiCard(sys), usageCard(sys), diskCard(sys)), configCard(sys.config || {}));
+    // ext-step1: only Colab has no device card (el.append would print a null)
+    el.append(
+      ...[summary(sys), checksCard(sys), sys.devices || sys.openvino ? devicesCard(sys) : null, h('div', { class: 'sys-grid' }, nvidiaShown(sys) ? gpuCard(sys) : null, apiCard(sys), usageCard(sys), diskCard(sys)), configCard(sys.config || {}, nvidiaShown(sys))].filter(Boolean),
+    );
     gpuKey = gpuSig();
+  }
+
+  // What "check again" runs (ext-step1): the CUDA self-test only with an
+  // NVIDIA GPU; another self-test (MLX, CPU); or no inference at all.
+  function recheckingText(sys) {
+    const names = new Set(((sys && sys.checks) || []).map((c) => c.name));
+    if (names.has('cuda')) return t('system.rechecking');
+    if (names.has('mlx_selftest') || names.has('cpu_selftest')) return t('system.rechecking_selftest');
+    return t('system.rechecking_plain');
   }
 
   // ---- summary ----
@@ -310,6 +373,7 @@ export function mountSystem(root, ctx) {
     const provider = c.name.startsWith('api_key:') || c.name.startsWith('api:') || c.name.startsWith('role_model:');
     const toComponents = desktopMode && st !== 'ok' && st !== 'pending' && !!c.hint_info && COMPONENT_HINTS.has(c.hint_info.code);
     const installLink = st !== 'ok' && st !== 'pending' && !!c.hint_info && INSTALL_HINTS.has(c.hint_info.code);
+    const ownLink = st !== 'ok' && st !== 'pending' && !!c.hint_info && HINT_LINKS[c.hint_info.code];
     return h(
       'li',
       { class: `sys-check is-${st}` },
@@ -317,7 +381,7 @@ export function mountSystem(root, ctx) {
       h(
         'div',
         { class: 'sys-check-main' },
-        h('div', { class: 'sys-check-name' }, U.checkName(c.name), st !== 'ok' && st !== 'pending' ? h('span', { class: `sys-check-state is-${st}` }, statusText(st)) : null),
+        h('div', { class: 'sys-check-name' }, checkName(c.name), st !== 'ok' && st !== 'pending' ? h('span', { class: `sys-check-state is-${st}` }, statusText(st)) : null),
         c.detail || c.detail_info ? h('div', { class: 'sys-check-detail' }, checkText(c.detail_info, c.detail)) : null,
         toComponents
           ? componentHint(c, st)
@@ -329,10 +393,20 @@ export function mountSystem(root, ctx) {
               h('span', null, checkText(c.hint_info, c.hint)),
               provider && st !== 'ok' ? h('a', { class: 'sys-hint-link', href: '#/settings', dataset: { fkey: `sys:goset:${c.name}` } }, t('system.open_settings'), icon('chevron-right', { size: 13 })) : null,
               installLink ? h('a', { class: 'sys-hint-link', href: '#/settings/components', dataset: { fkey: `sys:gocomp:${c.name}` } }, t('system.open_components'), icon('chevron-right', { size: 13 })) : null,
+              ownLink ? h('a', { class: 'sys-hint-link', href: ownLink[0], dataset: { fkey: `sys:golink:${c.name}` } }, t(ownLink[1]), icon('chevron-right', { size: 13 })) : null,
+              st !== 'pending' && restrictable(c) ? dataDir.button(c) : null,
             )
           : null,
+        c.name === 'browser_ext' ? extBlock(c) : null,
       ),
     );
+  }
+
+  // ext web3: the same element in every render (its state survives them)
+  function extBlock(c) {
+    if (!ext) ext = createBrowserExt({ recheck });
+    ext.setRow(c);
+    return ext.el;
   }
 
   // ---- resources ----
@@ -359,10 +433,11 @@ export function mountSystem(root, ctx) {
     return r && r.gpu ? `${r.gpu.name}|${r.gpu.backend}|${r.gpu.available}` : '';
   }
 
-  // With the device list the GPU card is the NVIDIA card's: only where the
-  // server shows the GPU check (an NVIDIA GPU; never on a Mac, mac-opti M3).
+  // The GPU card is the NVIDIA card's: only where the server shows the GPU
+  // check (an NVIDIA GPU; never on a Mac, mac-opti M3; ext-step1: not with
+  // only Colab, whose page has no device list either).
   function nvidiaShown(sys) {
-    return !sys.devices || (sys.checks || []).some((c) => c.name === 'gpu');
+    return (sys.checks || []).some((c) => c.name === 'gpu');
   }
 
   function gpuCard(sys) {
@@ -449,7 +524,9 @@ export function mountSystem(root, ctx) {
                   'ul',
                   { class: 'sys-ov-list' },
                   ov.ignored.map((x) => {
-                    const why = ['not_intel', 'second_intel_gpu', 'error'].includes(x.reason) ? t(`system.openvino.reason.${x.reason}`) : x.reason || '';
+                    // ext-step1: without an NVIDIA GPU another vendor's card is not "for CUDA"
+                    const reason = x.reason === 'not_intel' && !nvidiaShown(sys) ? 'not_intel_plain' : x.reason;
+                    const why = ['not_intel', 'not_intel_plain', 'second_intel_gpu', 'error'].includes(reason) ? t(`system.openvino.reason.${reason}`) : x.reason || '';
                     return h('li', null, h('span', { class: 'sys-dev-name', title: x.full_name || x.name }, x.full_name || x.name), h('span', { class: 'sys-dev-sub' }, [x.name, why].filter(Boolean).join(' · ')));
                   }),
                 ),
@@ -504,7 +581,7 @@ export function mountSystem(root, ctx) {
               h(
                 'div',
                 { class: 'sys-metric' },
-                h('div', { class: 'sys-metric-top' }, h('span', { class: 'sys-metric-k strong' }, name), h('span', { class: 'sys-metric-v' }, `${a.inflight} `, h('small', null, `/ ${t('system.api.limits', { max: a.max, rpm: a.rpm_limit })}`))),
+                h('div', { class: 'sys-metric-top' }, h('span', { class: 'sys-metric-k strong' }, name), h('span', { class: 'sys-metric-v' }, `${a.inflight} `, h('small', null, `/ ${a.rpm_limit > 0 ? t('system.api.limits', { max: a.max, rpm: a.rpm_limit }) : t('system.api.limits_unlimited', { max: a.max })}`))),
                 meter(a.max ? a.inflight / a.max : 0, a.inflight >= a.max && a.max ? 'warn' : 'accent'),
               ),
             ),
@@ -583,7 +660,9 @@ export function mountSystem(root, ctx) {
   // 3.1.0: the interpreters (python) and the devices (asr_devices) are
   // lists with a table each; the other sections are flattened key / value
   // rows. Tables in this order, then any other section.
-  function configCard(cfg) {
+  // nvidia: the server shows the GPU row (ext-step1: the faster-whisper
+  // interpreter is named after the CPU otherwise).
+  function configCard(cfg, nvidia) {
     const scalars = Object.entries(cfg).filter(([, v]) => v === null || typeof v !== 'object');
     const objects = Object.entries(cfg)
       .filter(([, v]) => v && typeof v === 'object')
@@ -596,7 +675,7 @@ export function mountSystem(root, ctx) {
         .filter(([k]) => !CONFIG_HIDDEN.has(k));
     const caption = (k) => h('caption', null, configLabel(k) ? t('system.config.caption', { label: configLabel(k), key: k }) : k);
     const section = (k, v) => {
-      if (k === 'python' && Array.isArray(v)) return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, v.map(pythonRow)));
+      if (k === 'python' && Array.isArray(v)) return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, v.map((p) => pythonRow(p, nvidia))));
       if (k === 'asr_devices' && Array.isArray(v)) {
         return h('table', { class: 'sys-cfg' }, caption(k), h('tbody', null, v.length ? v.map(deviceRow) : h('tr', null, h('td', { colspan: 2, class: 'dim' }, t('devices.empty_title')))));
       }
@@ -638,8 +717,8 @@ export function mountSystem(root, ctx) {
 
   // One interpreter: the backend with the component it belongs to, the
   // path and where it comes from; "not installed" without a path.
-  function pythonRow(p) {
-    const name = PYTHON_COMPONENT[p.backend];
+  function pythonRow(p, nvidia) {
+    const name = p.backend === 'faster-whisper' && !nvidia ? 'system.config.python.fw_cpu' : PYTHON_COMPONENT[p.backend];
     let value;
     if (p.source === 'none' || !p.path) {
       value = h('span', { class: 'dim' }, t('system.config.python.none'));
@@ -685,13 +764,18 @@ export function mountSystem(root, ctx) {
 
   return {
     refresh,
-    onSystemChanged: () => preserveFocus(render),
+    onSystemChanged: () => {
+      preserveFocus(render);
+      if (ext) ext.refresh();
+    },
     onCoursesChanged: () => preserveFocus(render),
     onResources() {
       if (ctx.system() && gpuSig() !== gpuKey) preserveFocus(render);
     },
     destroy() {
       alive = false;
+      if (ext) ext.destroy();
+      dataDir.destroy();
     },
   };
 }

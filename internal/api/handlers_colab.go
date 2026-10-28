@@ -31,6 +31,7 @@ func init() {
 		h("POST /api/colab/auth/check", s.checkColabAuth)
 		h("DELETE /api/colab/auth", s.deleteColabAuth)
 		h("POST /api/colab/shutdown", s.shutdownColab)
+		h("POST /api/colab/account/refresh", s.refreshColabAccount) // colab-obs-core: "重新查询"
 		h("POST /api/lectures/{id}/use-colab", s.useColab)
 		// the in-app Google sign-in (3.1.0, .claude/v31-brief.md §2.2)
 		h("POST /api/colab/auth/login", s.startColabLogin)
@@ -44,9 +45,14 @@ func init() {
 }
 
 // ColabSettingsView is the settings part of GET /api/colab: Colab's own
-// settings plus the scheduler's switches.
+// settings, memory mode and the scheduler's switches.
 type ColabSettingsView struct {
 	colab.Settings
+	// MemoryMode: the lecture's files, the model and the Python packages
+	// stay in the runtime's memory when they fit, else that lecture uses
+	// the disk (colab.Backend.MemoryMode; on unless the user switched it
+	// off).
+	MemoryMode    bool `json:"memory_mode"`
 	Enabled       bool `json:"enabled"`
 	BatteryPrefer bool `json:"battery_prefer"`
 }
@@ -71,9 +77,13 @@ type ColabView struct {
 	Held bool `json:"held"`
 }
 
-// ColabSettingsPatch is PUT /api/colab/settings (absent = unchanged).
+// ColabSettingsPatch is PUT /api/colab/settings (absent = unchanged). An
+// accelerator the account does not allow now is accepted and kept as the
+// user's choice (status.effective_accelerator says what is borrowed).
 type ColabSettingsPatch struct {
-	Accelerator       *string `json:"accelerator"`
+	Accelerator *string `json:"accelerator"`
+	// Tier is accepted and ignored (colab-obs-core, user decision
+	// 2026-10-27: the tier follows the account; status.account.level).
 	Tier              *string `json:"tier"`
 	MaxQueueWaitMin   *int    `json:"max_queue_wait_min"`
 	Model             *string `json:"model"`
@@ -81,6 +91,8 @@ type ColabSettingsPatch struct {
 	IdleReleaseMin    *int    `json:"idle_release_min"`
 	WindowCooldownMin *int    `json:"window_cooldown_min"`
 	HighMem           *bool   `json:"high_mem"`
+	FastMode          *bool   `json:"fast_mode"` // "极速模式" (colab-batch)
+	MemoryMode        *bool   `json:"memory_mode"`
 	Enabled           *bool   `json:"enabled"`
 	BatteryPrefer     *bool   `json:"battery_prefer"`
 }
@@ -152,19 +164,26 @@ func (s *Server) colabView(ctx context.Context) (ColabView, error) {
 	if err != nil {
 		return ColabView{}, err
 	}
+	mem, err := s.colab.MemoryMode(ctx)
+	if err != nil {
+		return ColabView{}, err
+	}
+	set := ColabSettingsView{Settings: s.colab.UserSettings(), MemoryMode: mem, Enabled: prefs.Enabled, BatteryPrefer: prefs.BatteryPrefer}
 	return ColabView{
 		Status:   s.colab.Status(ctx),
-		Settings: ColabSettingsView{Settings: s.colab.Settings(), Enabled: prefs.Enabled, BatteryPrefer: prefs.BatteryPrefer},
+		Settings: set,
 		ADC:      adcView(s.colab.DetectADC()),
 		Held:     s.sc.RemoteHeld(),
 	}, nil
 }
 
-// GET /api/colab
+// GET /api/colab. Showing the account renews a reading older than five
+// minutes in the background (SSE changed colab when it arrives).
 func (s *Server) getColab(w http.ResponseWriter, r *http.Request) {
 	if !s.colabReady(w) {
 		return
 	}
+	s.colab.TouchAccount(r.Context())
 	v, err := s.colabView(r.Context())
 	if err != nil {
 		s.fail(w, r, err)
@@ -186,7 +205,7 @@ func (s *Server) putColabSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	set := s.colab.Settings()
+	set := s.colab.UserSettings() // the user's pick, even one the account does not allow now
 	changed := false
 	str := func(dst *string, v *string) {
 		if v != nil && *v != *dst {
@@ -198,8 +217,12 @@ func (s *Server) putColabSettings(w http.ResponseWriter, r *http.Request) {
 			*dst, changed = *v, true
 		}
 	}
-	str(&set.Accelerator, p.Accelerator)
-	str(&set.Tier, p.Tier)
+	// colab-batch: a picked accelerator is the user's choice from now on
+	// (until then it follows the tier: L4 paid, T4 free).
+	if p.Accelerator != nil && (*p.Accelerator != set.Accelerator || !set.AcceleratorChosen) {
+		set.Accelerator, set.AcceleratorChosen, changed = *p.Accelerator, true, true
+	}
+	// p.Tier is ignored: the tier follows the account (colab-obs-core).
 	num(&set.MaxQueueWaitMin, p.MaxQueueWaitMin)
 	str(&set.Model, p.Model)
 	str(&set.ComputeType, p.ComputeType)
@@ -208,10 +231,28 @@ func (s *Server) putColabSettings(w http.ResponseWriter, r *http.Request) {
 	if p.HighMem != nil && *p.HighMem != set.HighMem {
 		set.HighMem, changed = *p.HighMem, true
 	}
+	if p.FastMode != nil && *p.FastMode != set.FastMode {
+		set.FastMode, changed = *p.FastMode, true
+	}
 	if changed {
 		if err := s.colab.SetSettings(ctx, set); err != nil {
 			s.fail(w, r, err)
 			return
+		}
+	}
+	// Memory mode is written only when the user changes it: a kv that never
+	// had it keeps following the default.
+	if p.MemoryMode != nil {
+		mem, err := s.colab.MemoryMode(ctx)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if *p.MemoryMode != mem {
+			if err := s.colab.SetMemoryMode(ctx, *p.MemoryMode); err != nil {
+				s.fail(w, r, err)
+				return
+			}
 		}
 	}
 	prefs, err := s.sc.RemotePrefs(ctx)
@@ -235,6 +276,9 @@ func (s *Server) putColabSettings(w http.ResponseWriter, r *http.Request) {
 		s.sc.RefreshRemote(ctx) // the row's label, model and precision follow
 	}
 	s.hub.Changed("settings", "")
+	if changed || np != prefs {
+		s.colabEnvChanged()
+	}
 	s.getColab(w, r)
 }
 
@@ -256,9 +300,21 @@ func (s *Server) importColabAuth(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	s.colab.RefreshAccountSoon(ctx) // which accelerators, the balance (colab-obs-core)
 	s.sc.RefreshRemote(ctx)
 	s.hub.Changed("settings", "")
+	s.colabEnvChanged()
 	writeJSON(w, http.StatusOK, info)
+}
+
+// colabEnvChanged runs the diagnostics' checks again soon (colabfix): the
+// Colab rows (authorisation, reachability) follow an import, a sign-in, a
+// disconnect or new settings without "重新检查" — the environment the
+// diagnostics compare (diagEnv) does not see a credential change.
+func (s *Server) colabEnvChanged() {
+	if s.diag != nil {
+		s.diag.envChanged()
+	}
 }
 
 // importLifecycle is the lifecycle a request asks for (days without a
@@ -316,10 +372,12 @@ func (s *Server) colabLogin() *colab.Login {
 // colab:remote, the settings page refetches), as POST /api/colab/auth/import.
 func (s *Server) colabLoginChanged(st colab.LoginStatus) {
 	if st.State == colab.LoginDone {
+		s.colab.RefreshAccountSoon(context.Background())
 		if s.sc != nil {
 			s.sc.RefreshRemote(context.Background())
 		}
 		s.hub.Changed("settings", "")
+		s.colabEnvChanged()
 	}
 	s.hub.Changed("colab", "")
 }
@@ -376,6 +434,7 @@ func (s *Server) checkColabAuth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	v := ColabCheckView{ADC: adcView(s.colab.DetectADC()), Auth: s.colab.Credential(ctx)}
 	s.sc.RefreshRemote(ctx)
+	s.colabEnvChanged() // an expired credential may just have been deleted
 	writeJSON(w, http.StatusOK, v)
 }
 
@@ -401,6 +460,7 @@ func (s *Server) deleteColabAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	s.sc.RefreshRemote(ctx)
 	s.hub.Changed("settings", "")
+	s.colabEnvChanged()
 	writeJSON(w, http.StatusOK, v)
 }
 
@@ -428,6 +488,23 @@ func (s *Server) shutdownColab(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	s.getColab(w, r)
+}
+
+// colabAccountTimeout bounds POST /api/colab/account/refresh.
+const colabAccountTimeout = 40 * time.Second
+
+// POST /api/colab/account/refresh: "重新查询" — read the account now; the
+// outcome is in status.account (read_ok, read_error), never an error
+// status. The view as GET /api/colab.
+func (s *Server) refreshColabAccount(w http.ResponseWriter, r *http.Request) {
+	if !s.colabReady(w) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), colabAccountTimeout)
+	defer cancel()
+	s.colab.RefreshAccount(ctx)
+	s.sc.RefreshRemote(r.Context()) // the colab:remote row follows the accelerator in effect
 	s.getColab(w, r)
 }
 
@@ -466,6 +543,7 @@ func RemoteSnapshot(b *colab.Backend, sc *sched.Scheduler) func(ctx context.Cont
 		if err != nil || !p.Enabled {
 			return colab.Status{}, false
 		}
+		b.TouchAccount(ctx) // the bar shows the account: a reading older than five minutes is renewed
 		return b.Status(ctx), true
 	}
 }

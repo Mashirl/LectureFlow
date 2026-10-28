@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -57,6 +58,10 @@ func (s *Server) providerView(ctx context.Context, p model.Provider, refs map[st
 		Models:       []string{},
 		// thinking per role: DeepSeek and Anthropic only (settings.SupportsThinking)
 		SupportsThinking: settings.SupportsThinking(p),
+		// cred-enc: "需要重新输入 key" (settings/keys.go)
+		KeyUnreadable:  s.set.KeyUnreadable(p.ID),
+		KeyErrorInfo:   s.set.KeyErrorInfo(p),
+		KeyUnprotected: s.set.KeyUnprotected(p.ID), // sec3 L2
 	}
 	if v.UsedByRoles == nil {
 		v.UsedByRoles = []string{}
@@ -153,11 +158,34 @@ func (s *Server) settingsView(ctx context.Context) (Settings, error) {
 			model.ProviderAnthropic: settings.DefaultBaseURL(model.ProviderAnthropic),
 		},
 	}
+	v.CredentialsErrorInfo = settings.CredentialsErrorInfo() // sec3 L2
 	if s.sc != nil {
-		v.GPUTotalMB = s.sc.GPUStatus(ctx).TotalMB
+		v.GPUTotalMB = s.sc.GPUTotalMB(ctx) // perf-fix: no nvidia-smi run per request
 	}
 	v.Devices = s.deviceViews(ctx) // SPEC-v2 I6: the 转写 section's device list
+	on, err := s.redecodeOn(ctx)
+	if err != nil {
+		return Settings{}, err
+	}
+	v.ASRRedecode = &on
 	return v, nil
+}
+
+// redecodeOn reads the switch "修复退化的转写窗口" (model.KVASRRedecode;
+// on unless switched off).
+func (s *Server) redecodeOn(ctx context.Context) (bool, error) {
+	v, ok, err := s.st.GetKV(ctx, model.KVASRRedecode)
+	if err != nil {
+		return true, err
+	}
+	return model.RedecodeEnabled(v, ok), nil
+}
+
+// asrSwitches are the fields of PUT /api/settings/asr that are not
+// model.ASRSettings (kept in kv, not in settings.asr).
+type asrSwitches struct {
+	// Redecode is Settings.ASRRedecode; nil = unchanged.
+	Redecode *bool `json:"redecode"`
 }
 
 func (s *Server) respondSettings(w http.ResponseWriter, r *http.Request) {
@@ -199,18 +227,39 @@ func (s *Server) putRole(w http.ResponseWriter, r *http.Request) {
 // keeps its value, so a client that does not know the 3b fields
 // (device_mode, multi_device, battery_aware, mem_reserve_mb) cannot reset
 // the booleans to false.
+//
+// "redecode" (Settings.ASRRedecode) is written to kv model.KVASRRedecode
+// after the settings were stored: model.ASRRedecodeOff or ASRRedecodeOn
+// (the switch turned on again; any value but off means on). It applies to
+// the transcriptions that start after it (no lecture becomes stale).
 func (s *Server) putASR(w http.ResponseWriter, r *http.Request) {
 	if !s.requireSettings(w) {
 		return
 	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		s.fail(w, r, apiErr(http.StatusBadRequest, "request.bad_json", nil))
+		return
+	}
 	in := s.set.ASR()
-	if err := decodeJSON(r, &in); err != nil {
-		s.fail(w, r, err)
+	var sw asrSwitches
+	if json.Unmarshal(body, &in) != nil || json.Unmarshal(body, &sw) != nil {
+		s.fail(w, r, apiErr(http.StatusBadRequest, "request.bad_json", nil))
 		return
 	}
 	if err := s.set.SetASR(r.Context(), in); err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	if sw.Redecode != nil {
+		v := model.ASRRedecodeOn
+		if !*sw.Redecode {
+			v = model.ASRRedecodeOff
+		}
+		if err := s.st.SetKV(r.Context(), model.KVASRRedecode, v); err != nil {
+			s.fail(w, r, err)
+			return
+		}
 	}
 	s.kick() // device mode, multi-device, battery and memory rules apply at the next scan
 	s.respondSettings(w, r)

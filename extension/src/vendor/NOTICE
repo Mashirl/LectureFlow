@@ -1,0 +1,19 @@
+Third-party files in this directory. They are copied unchanged from the
+npm packages below; do not edit them. Each keeps its own license, which is
+not the extension's (AGPL-3.0-or-later).
+
+browser-polyfill.js
+  Package:   webextension-polyfill 0.12.0 (dist/browser-polyfill.js)
+  Source:    https://registry.npmjs.org/webextension-polyfill/-/webextension-polyfill-0.12.0.tgz
+  Integrity: sha512-97TBmpoWJEE+3nFBQ4VocyCdLKfw54rFaJ6EVQYLBCXqCIpLSZkwGgASpv4oPt9gdKCJ80RJlcmNzNn008Ag6Q==
+  SHA-256 of the file: cfc53c3525587467c783ef1c6fdefbaf1d60ed197ea2fe0d45899b18069cf496
+  License:   MPL-2.0 (LICENSE.webextension-polyfill). The source form is this
+             file itself; the upstream repository is
+             https://github.com/mozilla/webextension-polyfill
+
+tabler/*.svg
+  Package:   @tabler/icons 3.49.0 (icons/outline/*.svg)
+  Source:    https://registry.npmjs.org/@tabler/icons/-/icons-3.49.0.tgz
+  Integrity: sha512-l+GnSkFETx0U26icxv1VUFnxxiTqXfCcVRiRAnyMwibupM2S2L/hSaZ9gmSgz01rkrsH/93NvLsxykqdanc6lw==
+  License:   MIT (tabler/LICENSE). scripts/build.mjs turns the path data
+             into ui/icons.js; the license travels with it.

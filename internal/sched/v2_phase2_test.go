@@ -310,7 +310,16 @@ func TestRequestFilenameRuleDuringRun(t *testing.T) {
 			first := e.job(model.ScopeCourse, e.course.ID, model.StageFilenameRule)
 			e.namedLecture("a_2026-10-07.mp4") // uploaded while the rule is generated
 			e.s.RequestFilenameRule(e.course.ID)
-			time.Sleep(100 * time.Millisecond) // the request is due while the run is running
+			// The request is due while the run is running: a scan finds the
+			// run and keeps the request for its end (fnRequest.waited). Not a
+			// fixed sleep: on a loaded machine the run could end first, and a
+			// request that never waited is a new trigger (flake-hunt #8).
+			e.waitFor("the request to wait for the run", 5*time.Second, func() bool {
+				e.s.mu.Lock()
+				defer e.s.mu.Unlock()
+				r := e.s.fnReq[e.course.ID]
+				return r != nil && r.waited
+			})
 			if j := e.job(model.ScopeCourse, e.course.ID, model.StageFilenameRule); j.ID != first.ID || j.Status != model.StatusRunning {
 				t.Fatalf("while running: %+v", j)
 			}

@@ -14,6 +14,7 @@ import (
 	"lectureflow/internal/ctxbuild"
 	"lectureflow/internal/db"
 	"lectureflow/internal/llm"
+	lfmedia "lectureflow/internal/media"
 	"lectureflow/internal/model"
 	"lectureflow/internal/state"
 )
@@ -125,8 +126,9 @@ func (e *titleRejected) Error() string { return strings.Join(e.Problems(), "; ")
 // checkTitleAnswer applies the limits of the P13.5 prompt; the error is a
 // *titleRejected naming every field that breaks them, with the counts.
 func checkTitleAnswer(a *titleAnswer) error {
-	a.TitleEn = oneLineTrim(a.TitleEn)
-	a.TitleZh = oneLineTrim(a.TitleZh)
+	// no bidirectional controls in a title (test-media I8)
+	a.TitleEn = oneLineTrim(lfmedia.StripBidi(a.TitleEn))
+	a.TitleZh = oneLineTrim(lfmedia.StripBidi(a.TitleZh))
 	a.BlurbEn = oneLineTrim(a.BlurbEn)
 	a.BlurbZh = oneLineTrim(a.BlurbZh)
 	a.Kind = looseString(strings.TrimSpace(string(a.Kind)))

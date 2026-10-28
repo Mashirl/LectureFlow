@@ -109,6 +109,12 @@ type LectureTime struct {
 	// kind from them (EffectiveKind).
 	Kind       string
 	KindSource string
+	// Override and OverrideWeek are the user's week override (course-ux,
+	// lecture_week_override): OverrideMakeup or OverrideSupplement with a
+	// teaching week ≥ 1; "" = none. LabelKinds applies it when the term
+	// start is known.
+	Override     string
+	OverrideWeek int
 }
 
 // Numbered is the computed number of one lecture.
@@ -132,6 +138,11 @@ type Numbered struct {
 	KindCount int    // how many lectures share that counter
 	ShowN     bool   // show KindN, by the course's numbering mode
 	CiteLabel string // the citation label (CiteLabels over the course): Label, or "W??-{id prefix}"
+
+	// Override is the week override LabelKinds applied (OverrideMakeup |
+	// OverrideSupplement; "" = none, or not applied for want of a term
+	// start). Week is then the override's week.
+	Override string
 }
 
 // LabelAll numbers every lecture of a course at once (P13.4, P13.3.4) with

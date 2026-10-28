@@ -18,13 +18,16 @@ import (
 	"time"
 )
 
-// cancelRunningJob cancels the running lecture with cause, as stopJob
+// cancelRunningJob cancels the running lecture with cause, as stopJobs
 // does, without waiting for Transcribe (it is called from Transcribe's own
 // goroutine).
 func cancelRunningJob(t *testing.T, b *Backend, cause error) {
 	t.Helper()
 	b.mu.Lock()
-	j := b.job
+	var j *jobState
+	if len(b.jobs) > 0 {
+		j = b.jobs[0]
+	}
 	b.mu.Unlock()
 	if j == nil {
 		t.Fatal("no running lecture to stop")
@@ -132,17 +135,25 @@ func TestReplayShutdownNowCallAfterResult(t *testing.T) {
 }
 
 // TestReplayShutdownNowDuringCleanupRetries: result.json cannot be deleted
-// and 立即关机 arrives between the retries. The retries stop at once (the
-// replay has no third attempt) and the runtime is released for "now", not
-// as a cleanup failure.
+// and 立即关机 arrives between the retries. 3.2.0: the lecture has already
+// returned (its files go in the background); the release stops the retries
+// at once (the replay has no third attempt) and the runtime is released for
+// "now", not as a cleanup failure.
 func TestReplayShutdownNowDuringCleanupRetries(t *testing.T) {
 	var written atomic.Bool
 	var e *testEnv
+	shut := make(chan error, 1)
 	e = newEnv(t, "cleanup_stopped.json", func(o *Options) {
 		sleep := o.Sleep
 		o.Sleep = func(ctx context.Context, d time.Duration) error {
 			if written.Load() && d == cleanupWaits[1] {
-				cancelRunningJob(t, e.b, errShutdownNow)
+				go func() { shut <- e.b.ShutdownNow(context.Background()) }()
+				select { // the release stops the retries: this wait ends
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(10 * time.Second):
+					t.Error("the release did not stop the retries")
+				}
 			}
 			return sleep(ctx, d)
 		}
@@ -152,7 +163,19 @@ func TestReplayShutdownNowDuringCleanupRetries(t *testing.T) {
 			written.Store(true)
 		}
 	})
-	checkStoppedAfterResult(t, e, path, err, ReleaseNow)
+	if err != nil {
+		t.Fatalf("Transcribe: %v", err)
+	}
+	select {
+	case serr := <-shut:
+		if serr != nil {
+			t.Fatalf("ShutdownNow: %v", serr)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("ShutdownNow did not return")
+	}
+	e.b.removalsSettled()
+	checkStoppedAfterResult(t, e, path, nil, ReleaseNow)
 	if st := e.b.Status(context.Background()); st.LastRelease.File != "" {
 		t.Errorf("release names a file: %+v", st.LastRelease)
 	}

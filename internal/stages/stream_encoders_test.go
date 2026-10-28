@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/sched"
 )
 
 // ---------- SPEC-v3 V7: choosing the H.264 encoder ----------
@@ -225,8 +226,8 @@ func TestEncoderCache(t *testing.T) {
 	}
 }
 
-// TestStreamEncoderSelection: makeStream (prep and the stream task)
-// transcodes with the first usable encoder, falls back to the next when it
+// TestStreamEncoderSelection: makeStream (the stream task, also when prep
+// queued it; stream-parallel) transcodes with the first usable encoder, falls back to the next when it
 // fails for a reason that is not the file's, records audio mode with
 // media.no_h264_encoder when none is usable, and never uses libx264. A
 // remux checks no encoder.
@@ -250,7 +251,7 @@ func TestStreamEncoderSelection(t *testing.T) {
 	t.Run("openh264 after a failed hardware check", func(t *testing.T) {
 		l, _ := e.mediaLecture("oh")
 		fm := &fakeMedia{probe: probeHEVC, encoders: []encoderCheck{{Name: encNVENC, Listed: true, Err: "no device"}, {Name: encQSV}, {Name: encVideoToolbox}, {Name: encOpenH264, Listed: true}}}
-		if r := e.run(&prepStage{d: e.deps(nil), media: fm}, l.ID); r.err != nil {
+		if _, r := e.prepThenStream(fm, l.ID); r.err != nil {
 			t.Fatal(r.err)
 		}
 		sc := fm.streamCalls()
@@ -272,8 +273,9 @@ func TestStreamEncoderSelection(t *testing.T) {
 		if r.err != nil || r.job.Status != model.StatusDone {
 			t.Fatalf("stream %v %s", r.err, r.job.Status)
 		}
+		// NVENC's own failure: run once more (qsv-retry), then OpenH264
 		sc := fm.streamCalls()
-		if len(sc) != 2 || !argsContain(sc[0], "-c:v", encNVENC) || !argsContain(sc[1], "-c:v", encOpenH264) {
+		if len(sc) != 3 || !argsContain(sc[0], "-c:v", encNVENC) || !argsContain(sc[1], "-c:v", encNVENC) || !argsContain(sc[2], "-c:v", encOpenH264) {
 			t.Errorf("stream calls %v", sc)
 		}
 		if st := e.streamState(l.ID); st.Status != StreamReady || !st.Transcoded {
@@ -291,8 +293,32 @@ func TestStreamEncoderSelection(t *testing.T) {
 		fm := &fakeMedia{probe: probeHEVC, fail: nvencFails}
 		r := e.run(&streamStage{d: e.deps(nil), media: fm}, l.ID)
 		var ce *model.CodedError
-		if r.err == nil || !errors.As(r.err, &ce) || ce.Info.Code != MediaFailed || len(fm.streamCalls()) != 1 {
+		// the only encoder failed itself, twice: media.encoder_failed (qsv-retry)
+		if r.err == nil || !errors.As(r.err, &ce) || ce.Info.Code != MediaEncoderFailed || len(fm.streamCalls()) != 2 ||
+			!paramsMatch(&ce.Info, "tried", encNVENC) || sched.IsPermanent(r.err) {
 			t.Errorf("err %v, calls %v", r.err, fm.streamCalls())
+		}
+	})
+
+	t.Run("another failure falls back at once", func(t *testing.T) {
+		// not the encoder's own failure (V7 ruling 4): the next encoder, no
+		// second run; when it fails too, its error is the result
+		l, _ := e.mediaLecture("other")
+		e.enqueueStream(l.ID)
+		fm := &fakeMedia{probe: probeHEVC,
+			fail: func(args []string) (string, error) {
+				if isStreamCall(args) {
+					return "Conversion failed!", errors.New("exit status 1")
+				}
+				return "", nil
+			},
+			encoders: []encoderCheck{{Name: encNVENC, Listed: true}, {Name: encOpenH264, Listed: true}}}
+		r := e.run(&streamStage{d: e.deps(nil), media: fm}, l.ID)
+		var ce *model.CodedError
+		sc := fm.streamCalls()
+		if r.err == nil || !errors.As(r.err, &ce) || ce.Info.Code != MediaFailed || len(sc) != 2 ||
+			!argsContain(sc[0], "-c:v", encNVENC) || !argsContain(sc[1], "-c:v", encOpenH264) {
+			t.Errorf("err %v, calls %v", r.err, sc)
 		}
 	})
 
@@ -318,7 +344,7 @@ func TestStreamEncoderSelection(t *testing.T) {
 				{Name: encNVENC, Listed: true, Err: "exit status 1: No capable devices found"}, {Name: encQSV}, {Name: encVideoToolbox}, {Name: encOpenH264}}}
 			var r runResult
 			if stage == "prep" {
-				r = e.run(&prepStage{d: e.deps(nil), media: fm}, l.ID)
+				_, r = e.prepThenStream(fm, l.ID) // stream-parallel: the task prep queued
 			} else {
 				e.enqueueStream(l.ID)
 				r = e.run(&streamStage{d: e.deps(nil), media: fm}, l.ID)
@@ -346,8 +372,9 @@ func TestStreamEncoderSelection(t *testing.T) {
 	t.Run("the encoder check fails", func(t *testing.T) {
 		l, _ := e.mediaLecture("encerr")
 		fm := &fakeMedia{probe: probeHEVC, encErr: errors.New("ffmpeg -encoders: exit status 1")}
-		if r := e.run(&prepStage{d: e.deps(nil), media: fm}, l.ID); r.err != nil {
-			t.Fatal(r.err)
+		// prep is done (prepThenStream checks it); the stream task it queued fails
+		if _, r := e.prepThenStream(fm, l.ID); r.job.Status != model.StatusFailed {
+			t.Fatalf("stream task %v %s", r.err, r.job.Status)
 		}
 		if info := streamError(t, e.streamState(l.ID)); info.Code != MediaFailed || !strings.Contains(info.Detail, "-encoders") {
 			t.Errorf("error %+v", info)

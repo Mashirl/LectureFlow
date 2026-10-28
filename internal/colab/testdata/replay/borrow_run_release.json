@@ -1,5 +1,5 @@
 {
- "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py（Client.assign、_get_assignment、_post_assignment、list_assignments、unassign、get_consumption_user_info）、colab_cli/contents.py（ContentsClient.upload/download/rm）、colab_cli/runtime.py（ColabRuntime.execute_code）、colab_cli/commands/run.py（run_command、_teardown）与 jupyter-kernel-client 0.9.0（manager.py KernelHttpManager.start_kernel、wsclient.py 默认协议）构造，非真实录制。远端 stdout 事件依据 worker/colab_remote.py 的契约。",
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py（Client.assign、_get_assignment、_post_assignment、list_assignments、unassign、get_consumption_user_info）、colab_cli/contents.py（ContentsClient.upload/download/rm）、colab_cli/runtime.py（ColabRuntime.execute_code）、colab_cli/commands/run.py（run_command、_teardown）与 jupyter-kernel-client 0.9.0（manager.py KernelHttpManager.start_kernel、wsclient.py 默认协议）构造，非真实录制。远端 stdout 事件依据 worker/colab_remote.py 的契约。 3.2.0：转写成功后，讲座的远端目录在讲座自己的内核里用一个单元格整体删除（shutil.rmtree，打印 LECTUREFLOW_REMOVED），代替逐个 DELETE。",
  "upstream": {
   "package": "google-colab-cli",
   "version": "0.7.5",
@@ -308,6 +308,35 @@
    }
   },
   {
+   "name": "upload textrepair.py",
+   "request": {
+    "method": "PUT",
+    "host": "runtime",
+    "path": "/api/contents/content/lectureflow/textrepair.py",
+    "query": {
+     "authuser": "0",
+     "colab-runtime-proxy-token": "proxy-token-replay-1"
+    },
+    "json": {
+     "name": "textrepair.py",
+     "path": "content/lectureflow/textrepair.py",
+     "type": "file",
+     "format": "base64",
+     "content": "{{any}}",
+     "chunk": 1
+    }
+   },
+   "response": {
+    "status": 201,
+    "json": {
+     "name": "textrepair.py",
+     "path": "content/lectureflow/textrepair.py",
+     "type": "file",
+     "format": null
+    }
+   }
+  },
+  {
    "name": "mkdir jobs",
    "request": {
     "method": "PUT",
@@ -351,6 +380,173 @@
      "path": "content/lectureflow/jobs/lecture-1",
      "type": "directory"
     }
+   }
+  },
+  {
+   "name": "kernel channels: run colab_remote.py",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "'--attach'"
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "execute_input",
+       "content": {
+        "code": "(the cell)",
+        "execution_count": 1
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260801.0,
+        "stage": "install"
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "parent": "other",
+       "content": {
+        "name": "stdout",
+        "text": "output of another request: Zebrafish\n"
+       }
+      }
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260840.0,
+        "stage": "download_model"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260870.0,
+        "stage": "load_model"
+       }
+      ]
+     },
+     {
+      "after": "upload job.json"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "stage",
+        "ts": 1793260880.0,
+        "stage": "check"
+       },
+       {
+        "type": "stage",
+        "ts": 1793260883.0,
+        "stage": "transcribe"
+       },
+       {
+        "type": "progress",
+        "ts": 1793260907.0,
+        "fraction": 0.25
+       }
+      ]
+     },
+     {
+      "stdout_raw": "{\"type\":\"progress\",\"ts\":1793260955.0,\"fra"
+     },
+     {
+      "stdout_raw": "ction\":0.75}\n"
+     },
+     {
+      "stdout_lines": [
+       {
+        "type": "progress",
+        "ts": 1793260979.25,
+        "fraction": 1.0
+       },
+       {
+        "type": "stage",
+        "ts": 1793260979.5,
+        "stage": "write"
+       },
+       {
+        "type": "done",
+        "ts": 1793261000.0,
+        "result": "result.json",
+        "sha256": "{{sha256:result_json}}",
+        "bytes": "{{len:result_json}}",
+        "audio_s": 600.0,
+        "load_s": 12.5,
+        "transcribe_s": 96.25,
+        "sentences": 1
+       }
+      ]
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "stream",
+       "content": {
+        "name": "stderr",
+        "text": "UserWarning: something about Zebrafish\n"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 1,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
    }
   },
   {
@@ -441,166 +637,6 @@
    }
   },
   {
-   "name": "kernel channels: run colab_remote.py",
-   "websocket": {
-    "path": "/api/kernels/kernel-replay-1/channels",
-    "query": {
-     "session_id": "{{any}}",
-     "token": "proxy-token-replay-1"
-    },
-    "headers": {
-     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
-     "X-Colab-Client-Agent": "lectureflow"
-    },
-    "script": [
-     {
-      "expect": {
-       "channel": "shell",
-       "msg_type": "execute_request",
-       "content_contains": {
-        "code": "colab_remote.py"
-       },
-       "content": {
-        "silent": false,
-        "store_history": false,
-        "allow_stdin": false
-       }
-      }
-     },
-     {
-      "send": {
-       "channel": "iopub",
-       "msg_type": "status",
-       "content": {
-        "execution_state": "busy"
-       }
-      }
-     },
-     {
-      "send": {
-       "channel": "iopub",
-       "msg_type": "execute_input",
-       "content": {
-        "code": "(the cell)",
-        "execution_count": 1
-       }
-      }
-     },
-     {
-      "stdout_lines": [
-       {
-        "type": "stage",
-        "ts": 1793260800.0,
-        "stage": "check"
-       },
-       {
-        "type": "stage",
-        "ts": 1793260801.0,
-        "stage": "install"
-       }
-      ]
-     },
-     {
-      "send": {
-       "channel": "iopub",
-       "msg_type": "stream",
-       "parent": "other",
-       "content": {
-        "name": "stdout",
-        "text": "output of another request: Zebrafish\n"
-       }
-      }
-     },
-     {
-      "stdout_lines": [
-       {
-        "type": "stage",
-        "ts": 1793260840.0,
-        "stage": "download_model"
-       },
-       {
-        "type": "stage",
-        "ts": 1793260870.0,
-        "stage": "load_model"
-       },
-       {
-        "type": "stage",
-        "ts": 1793260883.0,
-        "stage": "transcribe"
-       },
-       {
-        "type": "progress",
-        "ts": 1793260907.0,
-        "fraction": 0.25
-       }
-      ]
-     },
-     {
-      "stdout_raw": "{\"type\":\"progress\",\"ts\":1793260955.0,\"fra"
-     },
-     {
-      "stdout_raw": "ction\":0.75}\n"
-     },
-     {
-      "stdout_lines": [
-       {
-        "type": "progress",
-        "ts": 1793260979.25,
-        "fraction": 1.0
-       },
-       {
-        "type": "stage",
-        "ts": 1793260979.5,
-        "stage": "write"
-       },
-       {
-        "type": "done",
-        "ts": 1793261000.0,
-        "result": "result.json",
-        "sha256": "{{sha256:result_json}}",
-        "bytes": "{{len:result_json}}",
-        "audio_s": 600.0,
-        "load_s": 12.5,
-        "transcribe_s": 96.25,
-        "sentences": 1
-       }
-      ]
-     },
-     {
-      "send": {
-       "channel": "iopub",
-       "msg_type": "stream",
-       "content": {
-        "name": "stderr",
-        "text": "UserWarning: something about Zebrafish\n"
-       }
-      }
-     },
-     {
-      "send": {
-       "channel": "iopub",
-       "msg_type": "status",
-       "content": {
-        "execution_state": "idle"
-       }
-      }
-     },
-     {
-      "send": {
-       "channel": "shell",
-       "msg_type": "execute_reply",
-       "content": {
-        "status": "ok",
-        "execution_count": 1,
-        "user_expressions": {},
-        "payload": []
-       }
-      }
-     }
-    ]
-   }
-  },
-  {
    "name": "download result",
    "request": {
     "method": "GET",
@@ -627,108 +663,66 @@
    }
   },
   {
-   "name": "cleanup: delete audio.flac",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.flac",
+   "name": "cleanup: remove the job directory in the kernel",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
     "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 204
-   }
-  },
-  {
-   "name": "cleanup: delete audio.wav",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/audio.wav",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 404
-   }
-  },
-  {
-   "name": "cleanup: delete job.json",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/job.json",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 204
-   }
-  },
-  {
-   "name": "cleanup: delete result.json",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 204
-   }
-  },
-  {
-   "name": "cleanup: delete result.json.tmp",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/result.json.tmp",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 404
-   }
-  },
-  {
-   "name": "cleanup: delete stderr.log",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1/stderr.log",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 204
-   }
-  },
-  {
-   "name": "cleanup: delete the job directory",
-   "request": {
-    "method": "DELETE",
-    "host": "runtime",
-    "path": "/api/contents/content/lectureflow/jobs/lecture-1",
-    "query": {
-     "authuser": "0",
-     "colab-runtime-proxy-token": "proxy-token-replay-1"
-    }
-   },
-   "response": {
-    "status": 204
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "_lf_dir = \"/content/lectureflow/jobs/lecture-1\""
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "stdout_raw": "LECTUREFLOW_REMOVED\n"
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 2,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
    }
   },
   {

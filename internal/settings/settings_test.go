@@ -187,7 +187,7 @@ func TestImportSkippedWhenSettingsExist(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p, ok := s3.Provider("deepseek"); !ok || p.APIKey != fakeKey || p.MaxConcurrency != 8 || p.RPM != 300 {
+	if p, ok := s3.Provider("deepseek"); !ok || p.APIKey != fakeKey || p.MaxConcurrency != 64 || p.RPM != 0 {
 		t.Fatalf("default import: %+v", p)
 	}
 	// SPEC-v2 P12.1: the default model is deepseek-flash (was deepseek-chat).
@@ -450,8 +450,8 @@ func TestProviderCreateAndUpdate(t *testing.T) {
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("ftp://a.b")},
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("api.deepseek.com")},
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), MaxConcurrency: ip(0)},
-		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), MaxConcurrency: ip(65)},
-		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), RPM: ip(0)},
+		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), MaxConcurrency: ip(MaxConcurrencyLimit + 1)},
+		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), RPM: ip(-1)}, // 0 = no limit (perf-llm)
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), RPM: ip(10001)},
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), BalanceAPI: sp("openai")},
 		{Name: sp("x"), Type: sp("openai"), BaseURL: sp("https://a.b"), PriceOutput: fp(-1)},
@@ -489,7 +489,7 @@ func TestProviderCreateAndUpdate(t *testing.T) {
 	if _, err := s.UpdateProvider(bg(), p.ID, ProviderInput{Name: sp("Claude")}); !errors.Is(err, db.ErrDuplicate) {
 		t.Fatalf("rename to existing: %v", err)
 	}
-	if _, err := s.UpdateProvider(bg(), p.ID, ProviderInput{RPM: ip(0)}); !errors.Is(err, ErrInvalid) {
+	if _, err := s.UpdateProvider(bg(), p.ID, ProviderInput{RPM: ip(-1)}); !errors.Is(err, ErrInvalid) { // 0 = no limit (perf-llm)
 		t.Fatalf("invalid patch: %v", err)
 	}
 	if _, err := s.UpdateProvider(bg(), "missing", ProviderInput{Name: sp("z")}); !errors.Is(err, db.ErrNotFound) || codeOf(err) != CodeProviderNotFound {

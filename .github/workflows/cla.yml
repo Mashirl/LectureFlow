@@ -13,6 +13,15 @@
 #
 # pull_request_target runs in the context of the base repository; this job
 # never checks out or runs the pull request's code.
+#
+# Exemption (SPEC-ext 贡献与合并, CONTRIBUTING-profiles.md): platform
+# profiles and their fixtures are released under CC0 1.0
+# (extension/profiles/LICENSE), which already allows any use, so a pull
+# request that only adds, changes or deletes extension/profiles/<id>.json
+# and extension/fixtures/<id>/<name>.json needs no CLA. The list of changed
+# files comes from the API (file names are compared, never executed); a
+# rename counts with its old path too. Anything else in the pull request,
+# including extension/profiles/LICENSE, needs the CLA as before.
 name: CLA
 
 on:
@@ -36,7 +45,29 @@ jobs:
        (github.event.comment.body == 'recheck' ||
         github.event.comment.body == 'I have read the LectureFlow CLA Document and I hereby sign the CLA'))
     steps:
+      - name: Only platform profiles and fixtures (CC0)?
+        id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          files="repos/${GITHUB_REPOSITORY}/pulls/${PR}/files?per_page=100"
+          # Paths outside the exempt set, renames counted with their old path.
+          outside=$(gh api --paginate "$files" --jq '[.[] | .filename, (.previous_filename // empty)
+            | select(test("^extension/(profiles/[a-z][a-z0-9-]*[.]json|fixtures/[a-z][a-z0-9-]*/[a-z0-9][a-z0-9._-]*[.]json)$") | not)] | length' \
+            | awk '{ s += $1 } END { print s + 0 }')
+          listed=$(gh api --paginate "$files" --jq 'length' | awk '{ s += $1 } END { print s + 0 }')
+          # The files API stops at 3000 files; then the list is incomplete.
+          changed=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}" --jq '.changed_files')
+          if [ "$listed" -gt 0 ] && [ "$listed" -eq "$changed" ] && [ "$outside" -eq 0 ]; then
+            echo "exempt=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=CLA not required::This pull request only changes platform profiles and fixtures, which are released under CC0 1.0 (extension/profiles/LICENSE). / 本 PR 只改对策文件与 fixtures，它们以 CC0 1.0 发布，无需签署 CLA。"
+          else
+            echo "exempt=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: CLA Assistant Lite
+        if: ${{ steps.scope.outputs.exempt != 'true' }}
         uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

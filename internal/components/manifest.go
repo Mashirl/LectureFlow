@@ -44,6 +44,12 @@ const (
 const (
 	PlatformWindowsX64  = "windows-x64"
 	PlatformDarwinARM64 = "darwin-arm64"
+	// PlatformLinuxX64 is only a target of the SSH inference servers
+	// (ssh-mvp: lf-agent installs these builds on a remote Linux machine);
+	// it is never this machine's platform (CurrentPlatform gives
+	// "linux-amd64" on Linux), so the component manager never downloads,
+	// installs or activates a linux-x64 build here.
+	PlatformLinuxX64 = "linux-x64"
 )
 
 // Component ids (.claude/v3-brief.md §4) and the backends of Python /
@@ -433,7 +439,7 @@ func (m *Manifest) Validate() error {
 		}
 		for plat, b := range c.Platforms {
 			pw := where + " " + plat
-			if plat != PlatformWindowsX64 && plat != PlatformDarwinARM64 {
+			if plat != PlatformWindowsX64 && plat != PlatformDarwinARM64 && plat != PlatformLinuxX64 {
 				add("%s: unknown platform", pw)
 			}
 			if b == nil {

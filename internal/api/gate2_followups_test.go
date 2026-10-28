@@ -33,6 +33,9 @@ func TestMain(m *testing.M) {
 	if dir := os.Getenv(fakeExtractEnv); dir != "" {
 		os.Exit(fakeExtractPDF(dir, os.Args[1:]))
 	}
+	if mode := os.Getenv(fakePDFLimitsEnv); mode != "" { // syllabus_pdf_limits_test.go
+		os.Exit(fakePDFLimitsWorker(mode, os.Args[1:]))
+	}
 	os.Exit(m.Run())
 }
 

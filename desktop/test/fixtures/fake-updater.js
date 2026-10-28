@@ -4,11 +4,14 @@
 // Stand-in for electron-updater's autoUpdater in end-to-end tests of the
 // unpackaged app (LECTUREFLOW_FAKE_UPDATER). Always finds version 9.9.9;
 // "installing" writes LECTUREFLOW_FAKE_UPDATER_MARK instead of running an
-// installer.
+// installer. Loading it writes LECTUREFLOW_FAKE_UPDATER_LOADED (when set),
+// so tests can tell whether the electron-updater path was taken.
 'use strict';
 
 const fs = require('node:fs');
 const { EventEmitter } = require('node:events');
+
+if (process.env.LECTUREFLOW_FAKE_UPDATER_LOADED) fs.writeFileSync(process.env.LECTUREFLOW_FAKE_UPDATER_LOADED, String(Date.now()));
 
 class FakeUpdater extends EventEmitter {
   constructor() {

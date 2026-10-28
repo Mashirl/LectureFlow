@@ -1,0 +1,30 @@
+{
+  "kind": "lectureflow-detection-report",
+  "reportVersion": 1,
+  "generatedAt": "2026-10-27",
+  "extension": { "version": "0.1.0", "browser": "chrome" },
+  "page": { "url": "https://tenant.lectures.example.org/watch/{tok24-1}?start={num1-2}&t=" },
+  "profile": { "id": "demo", "version": "0.1.0", "reviewed": false },
+  "inputs": {
+    "resources": [
+      { "url": "https://media.lectures.example.org/sessions/00000000-0000-4000-8000-00000000000a/0000000000000003/00042/1AAaaaa0000aaAAAAaaa0aaa.m4a", "initiatorType": "media" },
+      { "url": "https://media.lectures.example.org/hls/master.m3u8?Policy={tok64-3}&Signature={tok52-4}&Key-Pair-Id={tok16-5}" }
+    ],
+    "fetches": [
+      {
+        "purpose": "manifest",
+        "text": "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-BYTERANGE:1000@2000\n#EXT-X-STREAM-INF:BANDWIDTH=4000000,RESOLUTION=1920x1080\nv/index.m3u8?Policy={tok64-3}\n"
+      },
+      {
+        "purpose": "manifest",
+        "text": "<MPD><ContentProtection schemeIdUri=\"urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\"/></MPD>"
+      }
+    ]
+  },
+  "dom": [{ "key": "title", "selector": "h1.lecture-title", "valueShape": "Xxxxxxx 00: Xxxxx xxx Xxxxxxx" }],
+  "expected": {
+    "tracks": [
+      { "id": "https://media.lectures.example.org/dash/a.mpd#lf=audio:en:0", "kind": "audio", "role": "primary-audio" }
+    ]
+  }
+}

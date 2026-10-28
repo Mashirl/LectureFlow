@@ -1,5 +1,5 @@
 {
- "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py Client.assign（412、502/503/504 重试）构造，非真实录制：等卡超过用户设定的上限（1 分钟），放弃并回到本机调度；放弃前用同一 notebook hash 再 GET 一次，确认没有已分配的运行时（上游的对账方式）。",
+ "_source": "依据上游 google-colab-cli 0.7.5 的 colab_cli/client.py Client.assign（412、502/503/504 重试）构造，非真实录制：等卡超过用户设定的上限（1 分钟），放弃并回到本机调度（等待 5、10、20 秒后重试，下一次 40 秒会超过上限）；放弃前用同一 notebook hash 再 GET 一次，确认没有已分配的运行时（上游的对账方式）。",
  "upstream": {
   "package": "google-colab-cli",
   "version": "0.7.5",
@@ -146,6 +146,112 @@
   },
   {
    "name": "assign try 2: POST (412)",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-assign-replay-1"
+    }
+   },
+   "response": {
+    "status": 412,
+    "body": "Precondition Failed"
+   }
+  },
+  {
+   "name": "assign try 3: GET",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "acc": "T4",
+     "nbh": "the_notebook_hash",
+     "token": "xsrf-assign-replay-1",
+     "variant": "GPU"
+    }
+   }
+  },
+  {
+   "name": "assign try 3: POST (412)",
+   "request": {
+    "method": "POST",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json",
+     "X-Goog-Colab-Token": "xsrf-assign-replay-1"
+    }
+   },
+   "response": {
+    "status": 412,
+    "body": "Precondition Failed"
+   }
+  },
+  {
+   "name": "assign try 4: GET",
+   "request": {
+    "method": "GET",
+    "host": "colab",
+    "path": "/tun/m/assign",
+    "query": {
+     "authuser": "0",
+     "nbh": "{{any}}",
+     "variant": "GPU",
+     "accelerator": "T4"
+    },
+    "headers": {
+     "Authorization": "Bearer ya29.replay-access-token-1",
+     "X-Colab-Client-Agent": "lectureflow",
+     "Accept": "application/json"
+    }
+   },
+   "response": {
+    "status": 200,
+    "xssi": true,
+    "json": {
+     "acc": "T4",
+     "nbh": "the_notebook_hash",
+     "token": "xsrf-assign-replay-1",
+     "variant": "GPU"
+    }
+   }
+  },
+  {
+   "name": "assign try 4: POST (412)",
    "request": {
     "method": "POST",
     "host": "colab",

@@ -26,7 +26,7 @@ ALLOWED = {
     "progress": ({"type", "ts", "fraction"}, set()),
     "stage": ({"type", "ts", "stage"}, set()),
     "done": ({"type", "ts", "result", "sha256", "bytes", "audio_s", "load_s",
-              "transcribe_s", "sentences"}, set()),
+              "transcribe_s", "sentences"}, {"mem_peak_mb", "mem_total_mb"}),
     "error": ({"type", "ts", "code", "retryable"}, {"exc"}),
 }
 
@@ -143,6 +143,16 @@ def make_fake_fw(state):
     return fw, utils
 
 
+def fake_vad(monkeypatch):
+    """asr.py's own VAD step (speech_audio + restore_times; the redecode, and the main pass
+    since textrepair-int) for the fake model, which answers with the lecture's times: the
+    whole audio is one speech chunk and the times stay as the fake gives them."""
+    if hasattr(asr, "speech_audio"):
+        monkeypatch.setattr(asr, "speech_audio", lambda audio: ([{"start": 0, "end": len(audio)}], audio))
+    if hasattr(asr, "restore_times"):
+        monkeypatch.setattr(asr, "restore_times", lambda segments, chunks: segments)
+
+
 @pytest.fixture
 def remote(tmp_path, monkeypatch):
     state = SimpleNamespace(loaded=[], transcribe_calls=[], downloads=[], load_error=None,
@@ -156,6 +166,9 @@ def remote(tmp_path, monkeypatch):
     ct2.get_cuda_device_count = lambda: state.cuda
     monkeypatch.setitem(sys.modules, "ctranslate2", ct2)
     monkeypatch.setattr(asr, "setup_cuda_libs", lambda: [])
+    fake_vad(monkeypatch)
+    # colab-batch: these tests drive pip; a uv on this machine's PATH is not used
+    monkeypatch.setattr(colab_remote, "find_uv", lambda: None)
 
     job_dir = tmp_path / "jobs" / "j1"
     job_dir.mkdir(parents=True)
@@ -173,7 +186,8 @@ def remote(tmp_path, monkeypatch):
         (job_dir / "job.json").write_text(json.dumps(j), encoding="utf-8")
         return str(job_dir / "job.json")
 
-    def install(reqs, log_path):
+    def install(reqs, log_path, target=None):
+        assert target is None  # disk mode: the runtime's site-packages, as before memory mode
         state.installs.append((list(reqs), log_path))
         with open(log_path, "a", encoding="utf-8") as f:
             f.write("Collecting quokka\n")  # pip's chatter goes to the log only
@@ -224,7 +238,9 @@ def test_success_stdout_is_only_events_and_result_matches(remote, capfd):
     # the same transcription parameters as the local worker
     call = remote.transcribe_calls[0]
     assert call["initial_prompt"] == "Vigenère, pterodactyl"
-    for k, v in asr.TRANSCRIBE_KWARGS.items():
+    # (asr.py decodes the speech-only audio of its own VAD step since textrepair-int:
+    # DECODE_KWARGS, i.e. TRANSCRIBE_KWARGS with vad_filter off)
+    for k, v in getattr(asr, "DECODE_KWARGS", asr.TRANSCRIBE_KWARGS).items():
         assert call[k] == v
     assert remote.loaded[0][1:] == ("cuda", "float16", 4)
     # the uploaded audio is removed once decoded
@@ -242,6 +258,44 @@ def test_shared_sentence_splitting(remote, capfd):
     from asr_common import remove_repeats, split_sentences
     words = [asr_common.as_word(w) for s in fake_segments() for w in s.words]
     assert result["sentences"] == split_sentences(remove_repeats(words))
+
+
+def test_redecode_counters_in_the_timing(remote, capfd):
+    # the second decode of degenerate windows runs remotely too (asr.transcribe_job); its
+    # counters reach result.json's timing as the local worker writes them, its log lines
+    # stay off stdout
+    rc, out, err = run_main(remote, capfd)
+    assert rc == 0
+    check_stdout(out)
+    timing = json.loads((remote.job_dir / "result.json").read_text(encoding="utf-8"))["timing"]
+    assert timing["postprocess"]["redecode"] == {
+        "windows": len(fake_segments()), "unpunctuated": 0, "uppercase": 0, "redecoded": 0,
+        "accepted": 0, "redecode_s": 0.0}
+    # the steps after decoding asr.py records (textrepair-int adds the text repair's)
+    assert set(timing["postprocess"]) <= {"redecode", "textrepair"}
+    assert "redecode: 0 of %d windows degenerate" % len(fake_segments()) in err
+    assert "redecode:" not in out
+
+
+def test_redecode_switch_reaches_the_remote_worker(remote, capfd, monkeypatch):
+    seen = []
+    real = asr.transcribe_job
+
+    def spy(model, audio, job, emit, **kw):
+        seen.append(job.redecode)
+        return real(model, audio, job, emit, **kw)
+
+    monkeypatch.setattr(asr, "transcribe_job", spy)
+    for value, want in ((None, True), (True, True), (False, False)):
+        changes = {} if value is None else {"redecode": value}
+        rc, out, _ = run_main(remote, capfd, remote.write_job(**changes))
+        assert rc == 0
+        timing = json.loads((remote.job_dir / "result.json").read_text(encoding="utf-8"))["timing"]
+        assert seen[-1] is want
+        assert timing["postprocess"]["redecode"].get("skipped", False) is (not want)
+        remote.job_dir.joinpath("audio.flac").write_bytes(b"fLaC fake audio bytes")
+    rc, out, _ = run_main(remote, capfd, remote.write_job(redecode="off"))
+    assert rc == 2 and check_stdout(out)[-1]["code"] == "bad_job"
 
 
 def test_cached_model_has_no_download_stage(remote, capfd):
@@ -298,7 +352,8 @@ def test_install_runs_pip_into_the_log_only(remote, capfd, monkeypatch):
     installed = {}
     monkeypatch.setattr(colab_remote, "installed_version", lambda name: installed.get(name))
 
-    def install(reqs, log_path):
+    def install(reqs, log_path, target=None):
+        assert target is None
         remote.installs.append((list(reqs), log_path))
         with open(log_path, "a", encoding="utf-8") as f:
             f.write("Collecting quokka\n")
@@ -401,8 +456,44 @@ def test_contract_tables_match_go():
     assert tuple(re.findall(r'"([^"]+)"', stages)) == colab_remote.STAGES
     codes = re.search(r"remoteErrorCodes = \[\]string\{([^}]*)\}", src, re.S).group(1)
     assert tuple(re.findall(r'"([^"]+)"', codes)) == colab_remote.ERROR_CODES
+    # colab-obs-core: machine / sample are built from internal/remote/sample.go's tables
+    # (type and ts first, every field required) and checked with its patterns and ranges.
+    sample_go = open(os.path.join(os.path.dirname(__file__), "..", "internal", "remote", "sample.go"),
+                     encoding="utf-8").read()
+    for typ, go_name, py in (("machine", "MachineEventKeys", colab_remote.MACHINE_KEYS),
+                             ("sample", "SampleEventKeys", colab_remote.SAMPLE_KEYS)):
+        m = re.search(r"%s\s*= \[\]string\{([^}]*)\}" % go_name, sample_go)
+        assert m, go_name
+        assert tuple(re.findall(r'"([^"]+)"', m.group(1))) == py, go_name
+        assert colab_remote.EVENT_KEYS[typ] == (("type", "ts") + py, ())
+        assert re.search(r'remote\.Event%s:\s*\{required: append\(\[\]string\{"type", "ts"\}, remote\.%s\.\.\.\)\}'
+                         % (typ.capitalize(), go_name), src), typ
+    for go_name, py in (("GPUNamePattern", "gpu_name"), ("GPUArchPattern", "gpu_arch"),
+                        ("DriverPattern", "driver"), ("VersionPattern", "cuda"),
+                        ("VersionPattern", "compute_cap"), ("StorageValuePattern", "storage")):
+        m = re.search(r"%s\s*= regexp\.MustCompile\(`\^(.*)\$`\)" % go_name, sample_go)
+        assert m and m.group(1) == colab_remote.READING_STRINGS[py].pattern, go_name
+    for go_name, py in (("MaxPct", colab_remote.MAX_PCT), ("MaxPowerW", colab_remote.MAX_POWER_W),
+                        ("MaxGPUs", colab_remote.MAX_GPUS), ("MaxVCPUs", colab_remote.MAX_VCPUS)):
+        m = re.search(r"%s\s*= (\d+)" % go_name, sample_go)
+        assert m and int(m.group(1)) == py, go_name
+    assert re.search(r"MaxMB\s*= 1 << 40", sample_go) and colab_remote.MAX_MB == 1 << 40
+    reading_go = open(os.path.join(os.path.dirname(__file__), "..", "internal", "remote", "reading.go"),
+                      encoding="utf-8").read()
+    assert int(re.search(r"MaxTempC = (\d+)", reading_go).group(1)) == colab_remote.MAX_TEMP_C
     for typ, (required, optional) in colab_remote.EVENT_KEYS.items():
+        if typ in ("machine", "sample"):
+            continue
         m = re.search(r'"%s":\s*\{required: \[\]string\{([^}]*)\}(?:, optional: \[\]string\{([^}]*)\})?\}' % typ, src)
         assert m, typ
         assert tuple(re.findall(r'"([^"]+)"', m.group(1))) == required
         assert tuple(re.findall(r'"([^"]+)"', m.group(2) or "")) == optional
+    # The memory probe's tables (internal/colab/memory.go).
+    mem = open(os.path.join(os.path.dirname(__file__), "..", "internal", "colab", "memory.go"),
+               encoding="utf-8").read()
+    for go_name, py in (("memoryBases", colab_remote.MEMORY_BASES),
+                        ("memoryModes", colab_remote.MEMORY_MODES),
+                        ("memoryReasons", colab_remote.MEMORY_REASONS)):
+        m = re.search(r"%s\s*= \[\]string\{([^}]*)\}" % go_name, mem)
+        assert m, go_name
+        assert tuple(re.findall(r'"([^"]+)"', m.group(1))) == py, go_name

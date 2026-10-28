@@ -5,6 +5,7 @@ package devices
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,6 +23,10 @@ import (
 // fakeProbeEnv set, init below plays the worker before any test runs (no
 // TestMain, which task D's tests may need in this package).
 const fakeProbeEnv = "LF_DEVICES_FAKE_PROBE"
+
+// fakeProbeEnvOut is the file the fake probe of mode "env" writes its
+// environment to (a JSON array of KEY=VALUE).
+const fakeProbeEnvOut = "LF_DEVICES_FAKE_PROBE_ENV_OUT"
 
 const fakeProbeJSON = `{"openvino":"2026.4.1","genai":"2026.4.1.0","devices":[{"name":"GPU.0","kind":"igpu","full_name":"Intel(R) Arc(TM) 140T GPU","vendor":"0x8086","luid":"0a0b","driver_version":"32.0.101.6881"}],"ignored":[{"name":"GPU.1","kind":"","full_name":"NVIDIA GeForce RTX","vendor":"0x10de","luid":"","driver_version":"","reason":"not_intel"}],"can_convert":false}`
 
@@ -52,6 +57,13 @@ func init() {
 		os.Exit(0)
 	case "badjson":
 		fmt.Println("PROBE {not json")
+		os.Exit(0)
+	case "env": // pyenv_test.go: the probe's environment goes to the file of fakeProbeEnvOut
+		b, _ := json.Marshal(os.Environ())
+		if os.WriteFile(os.Getenv(fakeProbeEnvOut), b, 0o644) != nil {
+			os.Exit(8)
+		}
+		fmt.Println("PROBE " + fakeProbeJSON)
 		os.Exit(0)
 	}
 	os.Exit(9)

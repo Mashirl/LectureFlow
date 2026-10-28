@@ -35,12 +35,16 @@ func KindCatalog(ks []model.LectureKind) []calendar.Kind {
 }
 
 // LectureTimes converts lectures (any order; results stay parallel) for
-// calendar.LabelKinds / LabelAll / Order, with their stored kinds.
+// calendar.LabelKinds / LabelAll / Order, with their stored kinds and week
+// overrides (course-ux).
 func LectureTimes(ls []model.Lecture) []calendar.LectureTime {
 	out := make([]calendar.LectureTime, len(ls))
 	for i, l := range ls {
 		out[i] = calendar.LectureTime{ID: l.ID, RecordedAt: calendar.RecordedTime(l.RecordedAt, time.Local),
 			OriginalFilename: l.OriginalFilename, Kind: l.Kind, KindSource: l.KindSource}
+		if o := l.WeekOverride; o != nil {
+			out[i].Override, out[i].OverrideWeek = o.Kind, o.Week
+		}
 	}
 	return out
 }
@@ -55,9 +59,15 @@ func NumberCourse(c model.Course, ls []model.Lecture, kinds []model.LectureKind)
 }
 
 // LectureWeek is the teaching week of lecture l in course c (0 = cannot be
-// computed): what decides which week-bound materials it uses.
+// computed): what decides which week-bound materials it uses. A week
+// override (course-ux) gives the week when the course has a term start —
+// the week calendar.LabelKinds numbers it in, so a make-up uses the slides
+// of the week whose content it is, a supplement those of its week.
 func LectureWeek(c model.Course, l model.Lecture) int {
 	ts, skips := calendar.CourseTerm(c.TermStart, c.SkipWeeks, time.Local)
+	if o := l.WeekOverride; o != nil && ts != nil && model.ValidWeekOverrideKind(o.Kind) && o.Week >= 1 {
+		return o.Week
+	}
 	w, ok := calendar.TeachingWeek(calendar.RecordedTime(l.RecordedAt, time.Local), ts, skips)
 	if !ok {
 		return 0

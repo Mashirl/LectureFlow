@@ -79,9 +79,42 @@ function withMock(path) {
   return path + (path.includes('?') ? '&' : '?') + 'mock=' + encodeURIComponent(MOCK_SCENARIO);
 }
 
+async function send(path, init) {
+  const res = await fetch(withMock(path), init);
+  const text = await res.text().catch(() => '');
+  return { res, text };
+}
+
+// perf-fix: GETs of the same read issued together share one request (on
+// load the dashboard and app.js both read /api/settings, the diagnostics
+// page and app.js /api/system; each of those used to run nvidia-smi). Only
+// the reads below, only while in flight and only within SHARE_MS of the
+// first; any write through request() and any server event end the sharing,
+// so a read issued after a change never gets an answer from before it.
+// Every caller parses the text itself: no two get the same object.
+const SHARED_GETS = new Set(['/api/settings', '/api/system', '/api/app']);
+const SHARE_MS = 100;
+const inflight = new Map(); // path → {p: Promise<{res, text}>, at}
+
+function sharedGet(path, init) {
+  const e = inflight.get(path);
+  if (e && performance.now() - e.at < SHARE_MS) return e.p;
+  const entry = { p: null, at: performance.now() };
+  entry.p = send(path, init).finally(() => {
+    if (inflight.get(path) === entry) inflight.delete(path);
+  });
+  inflight.set(path, entry);
+  return entry.p;
+}
+
+function forgetShared() {
+  inflight.clear();
+}
+
 // opts.quiet: do not toast failures (optional data the page can do without).
 // opts.signal: an AbortSignal; an aborted request rejects with the browser's
-// AbortError (name === 'AbortError') and is never toasted.
+// AbortError (name === 'AbortError') and is never toasted (a request with a
+// signal is never shared).
 async function request(method, path, body, opts = {}) {
   const fail = (err) => (opts.quiet ? err : report(err));
   const init = { method, cache: 'no-store', headers: {}, signal: opts.signal };
@@ -89,14 +122,17 @@ async function request(method, path, body, opts = {}) {
     init.headers['Content-Type'] = 'application/json';
     init.body = JSON.stringify(body);
   }
-  let res;
+  const write = method !== 'GET';
+  if (write) forgetShared();
+  let res, text;
   try {
-    res = await fetch(withMock(path), init);
+    ({ res, text } = !write && !opts.signal && SHARED_GETS.has(path) ? await sharedGet(path, init) : await send(path, init));
   } catch (e) {
     if (opts.signal && opts.signal.aborted) throw e;
     throw fail(new ApiError(0, t('common.net.unreachable')));
+  } finally {
+    if (write) forgetShared();
   }
-  const text = await res.text().catch(() => '');
   if (opts.signal && opts.signal.aborted) throw opts.signal.reason ?? new DOMException('Aborted', 'AbortError');
   if (!res.ok) {
     const b = parseBody(text);
@@ -123,6 +159,9 @@ export const api = {
   // §17.1
   system: () => get('/api/system'), // System
   recheck: () => post('/api/system/recheck'), // System
+  // sec-update M2: the data folder made private; quiet, system_datadir.js
+  // toasts the failure itself (data_dir.restrict_failed, kept until closed)
+  restrictDataDir: () => post('/api/system/data-dir/restrict', undefined, { quiet: true }), // {check: SystemCheck}
   setGPU: (paused, cancelRunning = false) => post('/api/system/gpu', { paused, cancel_running: cancelRunning }), // System
 
   // v1.1 A9, A10, A5. The dashboard, resources and settings reads are
@@ -177,6 +216,8 @@ export const api = {
   renameLecture: (id, title) => patch(`/api/lectures/${enc(id)}`, { title }), // Lecture
   deleteLecture: (id, force = false, opts) => del(`/api/lectures/${enc(id)}${force ? '?force=1' : ''}`, opts), // 204 | 409; opts {quiet}
   lectureStageAction: (id, stage, action, choice) => post(`/api/lectures/${enc(id)}/stages/${enc(stage)}/${enc(action)}`, choiceBody(choice)), // Lecture | 409
+  // "修复断句" (textrepair-int): the asr rerun with text_only
+  lectureTextRepair: (id, choice) => post(`/api/lectures/${enc(id)}/stages/asr/rerun`, { text_only: true, ...choiceBody(choice) }), // Lecture | 409
   launchLecture: (id) => post(`/api/lectures/${enc(id)}/launch`), // Lecture
   updateLecture: (id, choice) => post(`/api/lectures/${enc(id)}/update`, choiceBody(choice)), // Lecture | 409
   launchLectures: (ids) => post('/api/lectures/launch', { ids }), // BatchResponse
@@ -235,6 +276,12 @@ export const api = {
   patchKind: (id, input, opts) => patch(`/api/lecture-kinds/${enc(id)}`, input, opts), // LectureKind | 409 kind.in_use
   deleteKind: (id, opts) => del(`/api/lecture-kinds/${enc(id)}`, opts), // 204 | 409 kind.in_use
   setLectureKind: (id, kind, confirm, opts) => put(`/api/lectures/${enc(id)}/kind`, confirm ? { kind, confirm: true } : { kind }, opts), // Lecture | 409 RenumberConflict; kind "" = automatic
+  // course-ux (internal/api/types_course_ux.go): batch rerun of one stage; week overrides
+  // opts: {choice (model_choice), dryRun, quiet}
+  rerunCourse: (courseId, stage, ids, opts = {}) =>
+    post(`/api/courses/${enc(courseId)}/rerun`, { stage, lecture_ids: ids, ...(opts.choice ? { model_choice: opts.choice } : {}), ...(opts.dryRun ? { dry_run: true } : {}) }, opts), // CourseRerunResult | 409 needs_model_choice
+  setLectureWeek: (id, week, kind, confirm, opts) => put(`/api/lectures/${enc(id)}/week`, confirm ? { week, kind, confirm: true } : { week, kind }, opts), // Lecture | 409 RenumberConflict; kind supplement | makeup
+  clearLectureWeek: (id, confirm, opts) => del(`/api/lectures/${enc(id)}/week${confirm ? '?confirm=1' : ''}`, opts), // Lecture | 409 RenumberConflict
   regenerateTitle: (id, force, opts) => post(`/api/lectures/${enc(id)}/title`, force ? { force: true } : undefined, opts), // 202 | 409 title.user_set
   holidays: (opts) => get('/api/settings/holidays', opts), // HolidaysView
   saveHolidays: (years, opts) => put('/api/settings/holidays', { years }, opts), // HolidaysView; years null = the built-in data
@@ -366,7 +413,7 @@ export function attachDroppedPaths(files) {
 }
 
 // Same list as util.js MEDIA_EXTS (the system dialog filters by extension).
-const MEDIA_EXT_LIST = ['mp4', 'm4v', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'ts', 'mts', 'mpg', 'mpeg', '3gp', 'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus', 'wma', 'amr', 'aiff', 'aif'];
+const MEDIA_EXT_LIST = ['mp4', 'm4v', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'ts', 'mts', 'm2ts', 'mpg', 'mpeg', '3gp', 'ogv', 'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus', 'mka', 'wma', 'amr', 'aiff', 'aif'];
 const MIME_EXTS = { 'audio/*': MEDIA_EXT_LIST, 'video/*': MEDIA_EXT_LIST, 'application/pdf': ['pdf'], 'text/plain': ['txt'], 'text/markdown': ['md'] };
 
 // The system dialog's filters for an <input accept> value: the accepted
@@ -463,6 +510,48 @@ function upload(path, fields, file, onProgress, method = 'POST', opts = {}) {
   return { promise, abort: () => xhr.abort() };
 }
 
+// perf-fix: the back end samples the GPU (nvidia-smi every 2 s) only while
+// a page is shown (SPEC-v1.1 A10 "没有前端连接时停止采样", internal/api/
+// visibility.go). The stream says whether this page is shown when it
+// connects (?visible=) and every change is posted; a hidden page keeps its
+// stream, since the completion notices arrive through it. Shown = the
+// document is visible (Page Visibility) and, in the desktop app, the window
+// is not hidden to the tray or minimized: the shell dispatches
+// "lectureflow:window-visibility" {detail: {visible}} on hide and show.
+const clientId = newClientId();
+let visSeq = 0; // orders this page's reports (query and posts)
+let shellVisible = true;
+const visibilityHooks = new Set(); // the open streams' report functions
+// Registered when the module loads: the shell also reports on page load.
+window.addEventListener('lectureflow:window-visibility', (e) => {
+  shellVisible = !(e && e.detail && e.detail.visible === false);
+  for (const fn of visibilityHooks) fn();
+});
+
+function newClientId() {
+  try {
+    if (crypto.randomUUID) return crypto.randomUUID();
+  } catch {
+    // not a secure context: fall through
+  }
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
+function pageVisible() {
+  return document.visibilityState !== 'hidden' && shellVisible;
+}
+
+function postVisibility(visible, seq) {
+  // keepalive: the post still goes out while the page is being hidden
+  fetch(withMock('/api/events/visibility'), {
+    method: 'POST',
+    cache: 'no-store',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client: clientId, visible, seq }),
+  }).catch(() => {}); // unreachable: the stream drops too and the reconnect sends the state
+}
+
 // SSE with manual reconnect: 3 seconds after a drop (SPEC §8.2).
 // handlers: onJob(JobEvent), onChanged(ChangedEvent), onResources(Resources),
 // onComponents({tasks}) (SPEC-v3; also delivered to onComponentsEvent
@@ -472,8 +561,20 @@ export function connectEvents(handlers) {
   let timer = null;
   let down = false; // true between an error and the next successful open
   let stopped = false;
+  let opened = false; // the current stream is registered on the server
+  let reported = true; // the visibility the server has for the current stream
+  // A change before the stream is open is sent by the open handler.
+  const report = () => {
+    const v = pageVisible();
+    if (stopped || !opened || v === reported) return;
+    reported = v;
+    postVisibility(v, ++visSeq);
+  };
+  document.addEventListener('visibilitychange', report);
+  visibilityHooks.add(report);
   const listen = (name, fn) => {
     es.addEventListener(name, (e) => {
+      forgetShared(); // something changed: the next read asks the server again
       let ev;
       try {
         ev = JSON.parse(e.data);
@@ -485,8 +586,12 @@ export function connectEvents(handlers) {
   };
   const open = () => {
     if (stopped) return;
-    es = new EventSource(withMock('/api/events'));
+    opened = false;
+    reported = pageVisible();
+    es = new EventSource(withMock(`/api/events?client=${encodeURIComponent(clientId)}&visible=${reported ? 1 : 0}&seq=${++visSeq}`));
     es.addEventListener('open', () => {
+      opened = true;
+      report(); // shown or hidden while connecting
       const reconnected = down;
       down = false;
       handlers.onUp && handlers.onUp(reconnected);
@@ -500,6 +605,7 @@ export function connectEvents(handlers) {
     });
     es.onerror = () => {
       componentsEventAt = 0; // pollers take over until the stream is back
+      opened = false;
       es.close();
       if (!down) {
         down = true;
@@ -513,6 +619,8 @@ export function connectEvents(handlers) {
   return () => {
     stopped = true;
     clearTimeout(timer);
+    document.removeEventListener('visibilitychange', report);
+    visibilityHooks.delete(report);
     if (es) es.close();
   };
 }

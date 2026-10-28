@@ -12,13 +12,31 @@
 // SPEC-v3 V14.5: an asr stage that runs (or ran) on Google Colab carries a
 // small remote mark on its segment; while it runs, its card lists the
 // remote steps 等卡 → 上传音频 → 远端转写 → 下载结果 → 校验 with the current
-// one marked and the time left (stats.remote).
+// one marked and the time left. 3.2.0 fix: stats.remote is only what the
+// lecture was loaded with (job events carry the progress alone, so the
+// views do not reload while the stage runs, and the card stayed on 等卡);
+// the steps now follow the device's card in the resources (remotes[].jobs[]
+// of this lecture, opts.lecture, every 2 s), redrawn when the card opens and
+// with every progress event, and fall back to stats.remote. The other lines
+// that change while a stage runs or waits are redrawn the same way: the time
+// it has run (it stayed at what it was when the lecture was loaded), the
+// waiting reason (live numbers) and the tokens; and when a card opens on a
+// running stage the resources do not list (or that counts tokens), or on a
+// queued stage that waits, the lecture is read again — at most once per
+// lecture in LECTURE_REFRESH_MS — and those lines follow it, without
+// reloading the view (freshStage).
+// stream-parallel: a source that must be transcoded gets its playback file
+// from a background task after prep, in parallel with asr (opts.stream =
+// Lecture.stream): while it runs the prep segment carries a small play mark,
+// and prep's card has a "播放文件" line (generating n%, ready, failed…),
+// updated in place by setProgress('stream', p).
 
-import { h, toast, confirmDialog, copyText } from './dom.js';
+import { h, toast, confirmDialog, copyText, everySecond, stopEverySecond } from './dom.js';
 import { icon } from './icons.js';
 import * as U from './util.js';
 import { t } from './i18n.js';
 import * as C from './settings_colab.js';
+import { api } from './api.js';
 
 let cardSeq = 0;
 
@@ -28,6 +46,8 @@ let cardSeq = 0;
 //   onAction  (stage, action) => Promise, called after confirmation
 //   size      "sm" (default) | "lg" (stage names under the bar)
 //   pct       show the running percentage next to the bar (default true)
+//   stream    Lecture.stream (the playback file), shown with prep
+//   lecture   the lecture's id: a remote stage's live steps (remotes[].jobs[])
 export function pipelineBar(stages, opts) {
   const size = opts.size || 'sm';
   const segs = h('div', { class: 'pipe-segs' });
@@ -48,7 +68,15 @@ export function pipelineBar(stages, opts) {
   };
   syncPct();
   // In-place progress update from an SSE job event (no re-render, keeps hover/focus).
+  // 'stream' (the background playback file) updates prep's card line.
   bar.setProgress = (stage, progress) => {
+    if (stage === 'stream') {
+      if (!streamGenerating(opts.stream)) return;
+      opts.stream.progress = progress;
+      const line = bar.querySelector('.card-stream');
+      if (line) line.textContent = streamText(opts.stream);
+      return;
+    }
     const wrap = bar.querySelector(`.seg-wrap[data-stage="${CSS.escape(stage)}"]`);
     if (!wrap) return;
     const st = stages.find((s) => s.stage === stage);
@@ -58,16 +86,61 @@ export function pipelineBar(stages, opts) {
     if (fill) fill.style.width = p != null ? U.pct(p) : '';
     const status = wrap.querySelector('.card-status-text');
     if (status && st) status.textContent = U.stageStatusText(st);
+    if (wrap.refresh) wrap.refresh(); // the lines that change while it runs follow (3.2.0)
     const btn = wrap.querySelector('.seg');
-    if (btn && st) btn.setAttribute('aria-label', segLabel(st));
+    if (btn && st) btn.setAttribute('aria-label', segLabel(st, opts));
     syncPct();
   };
   return bar;
 }
 
-function segLabel(st) {
+function segLabel(st, opts) {
   const label = t('common.pipe.seg_label', { stage: U.stageName(st.stage), status: U.stageStatusText(st) });
+  if (streamMark(st, opts)) return U.clauseJoin([label, t('common.pipe.stream_bg_label')]);
   return C.stageOnColab(st) ? U.clauseJoin([label, t('common.pipe.remote_label')]) : label;
+}
+
+// ---- the playback file (stream-parallel) ----
+
+function streamGenerating(stream) {
+  return !!stream && stream.status === 'generating';
+}
+
+// prep's segment carries the mark while the playback file is made in the background
+function streamMark(st, opts) {
+  return st.stage === 'prep' && streamGenerating(opts && opts.stream);
+}
+
+// A job event of lec's playback-file task (stage "stream", one of lec.aux):
+// a progress event of the status lec already shows updates lec and bar
+// (when given) in place and returns true; anything else (a status change,
+// another stage) returns false and the caller reloads as before. Keeps the
+// minutes of a background transcode from reloading a view every 500 ms.
+export function streamProgress(lec, bar, ev) {
+  if (!lec || !ev || ev.stage !== 'stream') return false;
+  const job = (lec.aux || []).find((a) => a.stage === 'stream');
+  if (!job || job.status !== ev.status) return false;
+  job.progress = ev.progress;
+  if (bar) bar.setProgress('stream', ev.progress);
+  else if (streamGenerating(lec.stream)) lec.stream.progress = ev.progress;
+  return true;
+}
+
+// The "播放文件" line of prep's card (Lecture.stream.status).
+function streamText(stream) {
+  switch (stream.status) {
+    case 'generating':
+      return t('common.pipe.stream_generating', { pct: U.pct(stream.progress) });
+    case 'ready':
+      return stream.transcoded ? t('common.pipe.stream_ready_transcoded') : t('common.stream_status.ready');
+    case 'pending':
+      return t('common.pipe.stream_pending');
+    case 'audio_only':
+    case 'no_space':
+    case 'failed':
+      return t(`common.stream_status.${stream.status}`);
+  }
+  return '';
 }
 
 function segment(st, i, n, opts) {
@@ -80,7 +153,7 @@ function segment(st, i, n, opts) {
       type: 'button',
       class: 'seg' + (U.hasWarning(st) ? ' seg-warn' : ''),
       dataset: { st: ds, fkey },
-      'aria-label': segLabel(st),
+      'aria-label': segLabel(st, opts),
       'aria-describedby': cardId,
     },
     h('span', { class: 'seg-bar' }, h('span', { class: 'seg-fill', style: { width: U.barProgress(st) != null ? U.pct(U.barProgress(st)) : '' } })),
@@ -88,22 +161,105 @@ function segment(st, i, n, opts) {
   const card = h('div', { class: 'seg-card' + (i >= n / 2 ? ' seg-card-end' : ''), id: cardId, role: 'tooltip' }, cardBody(st, opts));
   const remote = C.stageOnColab(st);
   if (remote) btn.append(h('span', { class: 'seg-remote', 'aria-hidden': 'true' }, icon('server', { size: 9 })));
+  if (streamMark(st, opts)) {
+    // the remote mark's look (settings_v3.css), placed on the segment like it
+    btn.style.position = 'relative';
+    btn.append(h('span', { class: 'seg-remote seg-bg', 'aria-hidden': 'true' }, icon('play', { size: 9 })));
+  }
   const wrap = h('div', { class: 'seg-wrap' + (remote ? ' is-remote' : ''), dataset: { stage: st.stage } }, btn, card);
   if (opts.size === 'lg') wrap.append(h('span', { class: 'seg-name', 'aria-hidden': 'true' }, U.stageName(st.stage)));
-  // open the card upwards when there is no room below it
+  // the lines that change while the stage runs (3.2.0): redrawn from st and
+  // the latest system / resources
+  wrap.refresh = () => refreshCard(card, st, opts);
+  // open the card upwards when there is no room below it; bring it up to
+  // date (and read the lecture again when only that can)
   const flip = () => {
     const r = wrap.getBoundingClientRect();
     wrap.classList.toggle('seg-up', r.bottom + 300 > window.innerHeight && r.top > 320);
+    wrap.refresh();
+    const fresh = freshStage(st, opts);
+    if (fresh)
+      fresh.then((f) => {
+        if (!f || f.status !== st.status) return; // a status change reloads the view anyway
+        // the progress stays the job events' (newer than a stats flush)
+        Object.assign(st, { stats: f.stats, waiting_for: f.waiting_for, started_at: f.started_at });
+        wrap.refresh();
+      });
   };
-  wrap.addEventListener('pointerenter', flip);
-  wrap.addEventListener('focusin', flip);
+  // The card is open while the pointer is over the segment or the focus is
+  // in it, unless Esc closed it. While it is open, a stage that runs or
+  // waits has its lines redrawn every second (the time it has run, a
+  // retry's countdown: 3.2.0 L12); a closed card runs no timer.
+  let hovered = false;
+  let focused = false;
+  const isOpen = () => (hovered || focused) && !wrap.classList.contains('is-dismissed');
+  const tick = () => {
+    if (!isOpen()) return false;
+    wrap.refresh();
+    return true;
+  };
+  const opened = () => {
+    flip();
+    if (st.status === 'running' || st.waiting_for) everySecond(wrap, tick);
+  };
+  const closed = () => {
+    if (hovered || focused) return;
+    wrap.classList.remove('is-dismissed'); // the next hover or focus opens it again
+    stopEverySecond(wrap);
+  };
+  // Esc closes the card — under the pointer too (WCAG 1.4.13) — and leaves
+  // the focus on the segment (3.2.0 L13; blur() left it on the page). true
+  // when there was an open card to close.
+  wrap.dismiss = () => {
+    if (!isOpen()) return false;
+    const a = document.activeElement;
+    if (a && a !== btn && wrap.contains(a)) btn.focus({ preventScroll: true });
+    wrap.classList.add('is-dismissed');
+    stopEverySecond(wrap);
+    return true;
+  };
+  wrap.addEventListener('pointerenter', () => {
+    hovered = true;
+    hoveredWrap = wrap;
+    watchEscape();
+    wrap.classList.remove('is-dismissed');
+    opened();
+  });
+  wrap.addEventListener('pointerleave', () => {
+    hovered = false;
+    if (hoveredWrap === wrap) hoveredWrap = null;
+    closed();
+  });
+  wrap.addEventListener('focusin', () => {
+    if (!focused) wrap.classList.remove('is-dismissed'); // the focus came from outside
+    focused = true;
+    opened();
+  });
+  wrap.addEventListener('focusout', (e) => {
+    focused = !!(e.relatedTarget && wrap.contains(e.relatedTarget));
+    closed();
+  });
   wrap.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && wrap.contains(document.activeElement)) {
-      e.stopPropagation();
-      document.activeElement.blur();
-    }
+    if (e.key === 'Escape' && wrap.dismiss()) e.stopPropagation();
   });
   return wrap;
+}
+
+// Esc while the pointer rests on a segment (the focus elsewhere) closes its
+// card (3.2.0 L13); one listener for every bar, added with the first hover.
+let hoveredWrap = null;
+let escapeWatched = false;
+function watchEscape() {
+  if (escapeWatched) return;
+  escapeWatched = true;
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !hoveredWrap) return;
+    if (!hoveredWrap.isConnected) {
+      hoveredWrap = null;
+      return;
+    }
+    hoveredWrap.dismiss();
+  });
 }
 
 // The text of key with the params named in whole each in an unbreakable
@@ -137,9 +293,12 @@ function cardBody(st, opts) {
     const reason = U.stageStaleText(st) || t('stale.reason.input_changed');
     rows.push(h('p', { class: 'card-note card-note-stale' }, t('stale.card', { reason })));
   }
-  if (st.waiting_for) rows.push(kv(t('common.pipe.k_wait'), U.waitingForText(st.waiting_for, sys, res)));
-  // SPEC-v3 V14.5: the remote steps of a Colab run
-  if (st.stats && st.stats.remote && st.status === 'running') rows.push(...remoteSteps(st.stats.remote, sys, res));
+  // the lines that change while the stage runs or waits are redrawn in place
+  // (refreshCard, 3.2.0); a queued stage's waiting reason may appear later
+  if (st.waiting_for || st.status === 'queued') rows.push(liveLine(t('common.pipe.k_wait'), U.stageWaitingText(st, sys, res), 'card-wait'));
+  // SPEC-v3 V14.5: the remote steps of a Colab (or SSH) run, live (3.2.0)
+  const rs = remoteNow(st, opts);
+  if (st.status === 'running') rows.push(h('div', { class: 'card-remote', style: { display: 'contents' } }, ...(rs ? remoteSteps(rs, sys, res) : [])));
   // power management: how far the checkpoint of a queued stage reaches (the
   // status above says how much is done)
   if (U.checkpointProgress(st) != null) {
@@ -148,10 +307,16 @@ function cardBody(st, opts) {
   }
   const note = U.noteText(st);
   if (note) rows.push(kv(t('common.pipe.k_note'), note));
+  // stream-parallel: the playback file, made after prep (in the background for a transcode)
+  if (st.stage === 'prep' && opts.stream && streamText(opts.stream)) {
+    rows.push(kv(U.stageName('stream'), h('span', { class: 'card-stream' }, streamText(opts.stream))));
+  }
   if (st.attempt > 0) rows.push(kv(t('common.pipe.k_attempts'), t('common.pipe.attempts', { n: st.attempt })));
   const time = timeText(st);
-  if (time) rows.push(kv(t('common.pipe.k_time'), time));
-  if (U.hasUsage(st.stats)) rows.push(kv(t('common.pipe.k_tokens'), U.usageText(st.stats)));
+  if (time || st.status === 'running') rows.push(liveLine(t('common.pipe.k_time'), time, 'card-time'));
+  // tokens: a running stage's first usage arrives with a stats flush
+  const hasUsage = U.hasUsage(st.stats);
+  if (hasUsage || st.status === 'running') rows.push(liveLine(t('common.pipe.k_tokens'), hasUsage ? U.usageText(st.stats) : '', 'card-tokens'));
   // asr (SPEC-v2 I6): "device · model · precision · language"
   if (st.model && st.model.label) rows.push(kv(st.stage === 'asr' ? t('common.pipe.k_device') : t('common.pipe.k_model'), U.modelLabel(st.model)));
   // power management: a run resumed from its checkpoint on another device
@@ -208,11 +373,13 @@ function cardBody(st, opts) {
       'button',
       {
         type: 'button',
-        class: a === 'retry' ? 'btn btn-sm btn-primary' : a === 'cancel' ? 'btn btn-sm btn-danger' : 'btn btn-sm',
+        class: a === 'retry' || a === 'use_colab' ? 'btn btn-sm btn-primary' : a === 'cancel' ? 'btn btn-sm btn-danger' : 'btn btn-sm',
         dataset: { fkey: `${opts.key}:act:${st.stage}:${a}` },
         onclick: () => runAction(st, a, opts),
       },
-      icon(a === 'retry' ? 'rotate-cw' : a === 'cancel' ? 'ban' : 'refresh-cw', { size: 13 }),
+      // use_colab: "改用 Colab 处理" (colabfix; its own confirmation, actions.js);
+      // rerun_text_only: "修复断句" (textrepair-int; confirmTextRepair)
+      icon(a === 'retry' ? 'rotate-cw' : a === 'cancel' ? 'ban' : a === 'use_colab' ? 'upload' : a === 'rerun_text_only' ? 'wand-sparkles' : 'refresh-cw', { size: 13 }),
       U.actionName(a),
     ),
   );
@@ -220,12 +387,158 @@ function cardBody(st, opts) {
   return h('div', { class: 'seg-card-body' }, rows);
 }
 
+const REMOTE_STEPS = ['wait_accelerator', 'upload_audio', 'remote_transcribe', 'download_result', 'verify'];
+
+// The card lines that change while a stage runs or waits (3.2.0), redrawn in
+// place: the time it has run, the waiting reason (live numbers of system /
+// resources, e.g. free VRAM), the tokens and the remote steps. These lines
+// are built for every stage that may show them (hidden while empty), so a
+// value that appears later has its place; the other lines change only with
+// the status, which reloads the view.
+function refreshCard(card, st, opts) {
+  const sys = opts.sys ? opts.sys() : null;
+  const res = opts.res ? opts.res() : null;
+  setLine(card.querySelector('.card-time'), timeText(st));
+  setLine(card.querySelector('.card-wait'), U.stageWaitingText(st, sys, res)); // a retry counts down (L12)
+  setLine(card.querySelector('.card-tokens'), U.hasUsage(st.stats) ? U.usageText(st.stats) : '');
+  const box = card.querySelector('.card-remote');
+  const rs = remoteNow(st, opts);
+  if (box) box.replaceChildren(...(rs ? remoteSteps(rs, sys, res) : []));
+}
+
+// A card line (kv) with its value replaced; hidden while it has none.
+function setLine(line, text) {
+  if (!line) return;
+  line.style.display = text ? '' : 'none';
+  const v = line.querySelector('.card-v');
+  if (v && text) v.textContent = text;
+}
+
+// A card that opens reads the lecture again (job events carry the progress
+// alone; stats and waiting_for are what the lecture was loaded with): on a
+// running stage whose device's card in the resources does not list the
+// lecture (the remote steps fall back to stats.remote; tokens), or that
+// counts tokens; on a queued stage with a waiting reason (the scheduler's
+// reason changes without an event). At most once per lecture in
+// LECTURE_REFRESH_MS; the promise of the stage as read (null when it could
+// not be read), or null when there is nothing to read or it was read just
+// now.
+export const LECTURE_REFRESH_MS = 5000;
+const lectureReads = new Map(); // lecture id → when it was last read
+
+export function freshStage(st, opts) {
+  const id = opts && opts.lecture;
+  if (!id || !st) return null;
+  // running: the resources do not list the lecture, it counts tokens, or the
+  // lecture was loaded before the first stats flush of the run (no
+  // stats.remote yet: the steps are the card's, its accelerator the stats')
+  const want =
+    st.status === 'running'
+      ? !cardJob(opts) || U.hasUsage(st.stats) || !(st.stats && st.stats.remote)
+      : st.status === 'queued' && !!st.waiting_for;
+  if (!want) return null;
+  const now = Date.now();
+  const last = lectureReads.get(id);
+  if (last != null && now - last < LECTURE_REFRESH_MS) return null;
+  lectureReads.set(id, now);
+  return api
+    .lecture(id, { quiet: true })
+    .then((lec) => (lec && Array.isArray(lec.stages) ? lec.stages.find((s) => s.stage === st.stage) || null : null))
+    .catch(() => null);
+}
+
+// The lecture's job on its device's card in the resources, with the card
+// (null: none).
+function cardJob(opts) {
+  const res = opts && opts.res ? opts.res() : null;
+  const id = opts && opts.lecture;
+  if (!id || !res || !Array.isArray(res.remotes)) return null;
+  for (const card of res.remotes) {
+    for (const j of (card && card.jobs) || []) if (j.lecture_id === id) return { job: j, card };
+  }
+  return null;
+}
+
+// The remote state of a running stage (null when it does not run remotely):
+// for asr, its device's card in the resources (remotes[].jobs[] of
+// opts.lecture) when it lists the lecture — live, even when the lecture was
+// loaded before the run's first stats flush (no stats.remote: the five
+// steps, the card's accelerator when it names one) — else stats.remote (as
+// the lecture was loaded, or read again when the card opened). kind and
+// label say where it runs (remoteWhere).
+export function remoteNow(st, opts) {
+  if (!st || st.status !== 'running') return null;
+  const rs = st.stats && st.stats.remote;
+  const on = st.stage === 'asr' ? cardJob(opts) : null;
+  if (!on) return rs ? { ...rs, kind: deviceKind(st) } : null;
+  const { job: j, card } = on;
+  const m = cardStep(j.stage);
+  return {
+    steps: REMOTE_STEPS,
+    ...rs,
+    accelerator: (rs && rs.accelerator) || cardAccelerator(card),
+    kind: card.kind || deviceKind(st),
+    label: card.label || '',
+    step: m.step,
+    stage: m.stage,
+    // waiting reasons are the stage's own (stats); only while it waits
+    waiting_for: m.step === 'wait_accelerator' && rs ? rs.waiting_for : undefined,
+    eta_sec: typeof j.eta_sec === 'number' ? j.eta_sec : -1,
+  };
+}
+
+// The accelerator a device's card names: Colab's session (Card.colab is its
+// colab.Status), an SSH server's name (stats.remote.accelerator of an SSH
+// run is the device's label too); '' when it names none.
+function cardAccelerator(card) {
+  if (card.kind === 'ssh') return card.label || '';
+  return (card.colab && card.colab.accelerator) || '';
+}
+
+// "ssh" for a stage bound to an SSH server, else "colab".
+function deviceKind(st) {
+  const a = st.model && st.model.asr;
+  return a && typeof a.device_id === 'string' && a.device_id.startsWith('ssh:') ? 'ssh' : 'colab';
+}
+
+// Where a remote run is: an SSH server by its name; Colab with its
+// accelerator, or the card's label ("Google Colab") while the accelerator
+// is not known; '' when nothing says (the line is left out).
+function remoteWhere(rs) {
+  if (rs.kind === 'ssh') return rs.accelerator || rs.label || '';
+  if (rs.accelerator) return t('common.pipe.remote_where', { accelerator: rs.accelerator });
+  return rs.label || '';
+}
+
+// A card job's stage as a remote step and the worker's stage: SSH cards name
+// the step itself; Colab's name the worker's stage while it transcribes
+// (check, install, download_model, load_model, transcribe, write) and wait,
+// upload, download or verify otherwise (internal/resources/remotes.go).
+export function cardStep(stage) {
+  if (REMOTE_STEPS.includes(stage)) return { step: stage, stage: '' };
+  switch (stage) {
+    case 'wait':
+    case '':
+    case undefined:
+    case null:
+      return { step: 'wait_accelerator', stage: '' };
+    case 'upload':
+      return { step: 'upload_audio', stage: '' };
+    case 'download':
+      return { step: 'download_result', stage: '' };
+    case 'verify':
+      return { step: 'verify', stage: '' };
+  }
+  return { step: 'remote_transcribe', stage };
+}
+
 // The five remote steps (stats.remote.steps, in order) with the current one
 // marked, its worker stage or waiting reason, and the time left.
-function remoteSteps(rs, sys, res) {
-  const steps = rs.steps && rs.steps.length ? rs.steps : ['wait_accelerator', 'upload_audio', 'remote_transcribe', 'download_result', 'verify'];
+export function remoteSteps(rs, sys, res) {
+  const steps = rs.steps && rs.steps.length ? rs.steps : REMOTE_STEPS;
   const at = steps.indexOf(rs.step);
-  const out = [kv(t('common.pipe.k_remote'), t('common.pipe.remote_where', { accelerator: rs.accelerator || '' }))];
+  const where = remoteWhere(rs);
+  const out = where ? [kv(t('common.pipe.k_remote'), where, 'card-where')] : [];
   const items = steps.map((s, i) => {
     const state = at < 0 ? 'todo' : i < at ? 'done' : i === at ? 'now' : 'todo';
     let detail = '';
@@ -244,8 +557,15 @@ function remoteSteps(rs, sys, res) {
   return out;
 }
 
-function kv(k, v) {
-  return h('div', { class: 'card-line' }, h('span', { class: 'card-k' }, k), h('span', { class: 'card-v' }, v));
+function kv(k, v, cls) {
+  return h('div', { class: cls ? `card-line ${cls}` : 'card-line' }, h('span', { class: 'card-k' }, k), h('span', { class: 'card-v' }, v));
+}
+
+// A card line refreshCard redraws (class cls), hidden while text is empty.
+function liveLine(k, text, cls) {
+  const line = kv(k, text, cls);
+  if (!text) line.style.display = 'none';
+  return line;
 }
 
 function timeText(st) {
@@ -267,6 +587,7 @@ export function rerunText(stage) {
 // Confirmation for the destructive stage actions (SPEC §4.6); true = go on.
 export async function confirmStageAction(stage, action) {
   const name = U.stageName(stage);
+  if (action === 'rerun_text_only') return confirmTextRepair();
   if (action === 'rerun') {
     return confirmDialog({
       title: t('common.rerun.title', { stage: name }),
@@ -287,11 +608,38 @@ export async function confirmStageAction(stage, action) {
   return true;
 }
 
+// "修复断句" (textrepair-int; the asr stage's rerun_text_only): says what it
+// does not do (transcribe again), what it keeps (the sentences a person
+// edited), what runs again and what it costs, and what is cleared (the
+// review's accept / reject records).
+function confirmTextRepair() {
+  return confirmDialog({
+    title: t('lecture.text_repair.title'),
+    message: t('lecture.text_repair.message'),
+    body: h(
+      'ul',
+      { class: 'dlg-list' },
+      ['no_transcribe', 'keep_reviewed', 'downstream', 'patches'].map((k) => h('li', null, t(`lecture.text_repair.${k}`))),
+    ),
+    okText: t('lecture.text_repair.ok'),
+  });
+}
+
+// A card's action while the same one is on its way (a double click on
+// "重试": two requests, two model-choice dialogs) does nothing (3.2.0 P2);
+// this covers every bar (lectures, materials, the course's stages).
+const acting = new Set(); // `${opts.key}|${stage}|${action}`
+
 async function runAction(st, action, opts) {
-  if (!(await confirmStageAction(st.stage, action))) return;
+  const k = `${opts.key}|${st.stage}|${action}`;
+  if (acting.has(k)) return;
+  acting.add(k);
   try {
+    if (!(await confirmStageAction(st.stage, action))) return;
     await opts.onAction(st.stage, action);
   } catch {
     // the API layer already showed the error
+  } finally {
+    acting.delete(k);
   }
 }

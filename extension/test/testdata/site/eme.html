@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. -->
+<html lang="en">
+<head><meta charset="utf-8"><title>EME</title></head>
+<body>
+  <h1>EME (test page)</h1>
+  <video id="v" src="/media/protected.mp4" preload="none" muted></video>
+  <script>
+    // Clear Key is built into Chromium: enough to attach MediaKeys to the
+    // element, which is what the extension looks for.
+    (async () => {
+      try {
+        await (await fetch('/dash/protected.mpd')).text();
+        const access = await navigator.requestMediaKeySystemAccess('org.w3.clearkey', [{
+          initDataTypes: ['cenc'],
+          videoCapabilities: [{ contentType: 'video/mp4; codecs="avc1.42E01E"' }],
+        }]);
+        const keys = await access.createMediaKeys();
+        await document.getElementById('v').setMediaKeys(keys);
+        document.title = 'eme-ready';
+      } catch (e) {
+        document.title = 'eme-failed: ' + e.name;
+      }
+    })();
+  </script>
+</body>
+</html>

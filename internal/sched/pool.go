@@ -91,11 +91,37 @@ type PoolOptions struct {
 	OffpeakPoll time.Duration
 }
 
-// prio orders waiting API requests: the FIFO of SPEC §5 (scope object
-// creation time, then job creation time), requests without a job last,
-// arrival order as the final tie-breaker.
+// Request classes of the API pool (perf-llm, NOTES.md): the few requests
+// on a lecture's critical path (summary, repair, title, chapters, the
+// course stages) go before the bulk per-sentence translation of other
+// lectures, which would otherwise hold them behind hundreds of requests.
+const (
+	classUrgent = 0 // every API stage but translate
+	classBulk   = 1 // translate: one request per sentence
+)
+
+// UrgentBurst is how many requests of the urgent class the pool grants in a
+// row while bulk (translate) requests wait; the next grant then goes to the
+// best bulk request, so translation keeps at least 1/(UrgentBurst+1) of the
+// grants and is never starved.
+const UrgentBurst = 3
+
+// classOf returns the request class of an API stage.
+func classOf(stage string) int {
+	if stage == model.StageTranslate {
+		return classBulk
+	}
+	return classUrgent
+}
+
+// prio orders waiting API requests: jobs before requests without a job,
+// then the urgent class before the bulk class (perf-llm), then the FIFO of
+// SPEC §5 (scope object creation time, then job creation time), arrival
+// order as the final tie-breaker. pickLocked lets a bulk request through
+// after UrgentBurst urgent grants in a row.
 type prio struct {
 	noJob        bool
+	class        int
 	scopeCreated string
 	scopeID      string
 	jobCreated   string
@@ -106,6 +132,9 @@ type prio struct {
 func (a prio) less(b prio) bool {
 	if a.noJob != b.noJob {
 		return !a.noJob
+	}
+	if a.class != b.class {
+		return a.class < b.class
 	}
 	if a.scopeCreated != b.scopeCreated {
 		return a.scopeCreated < b.scopeCreated
@@ -124,11 +153,19 @@ func (a prio) less(b prio) bool {
 
 // Pool implements APIPool (SPEC §5): per provider max_concurrency slots and
 // a token bucket of requests_per_minute (burst = one second's worth, at
-// least 1). A request is granted a slot and a token together; waiting
-// requests are served in priority order (prio), so the oldest lecture's
-// requests go first. The daily budget (SPEC §17.7) is checked before
-// queueing. Acquire never touches the database except for the budget
-// check, which is cached.
+// least 1; rpm 0 = no per-minute limit). A request is granted a slot and a
+// token together; waiting requests are served in priority order (prio), so
+// the oldest lecture's requests go first, and a lecture's summary / repair /
+// title go before other lectures' translation (perf-llm). The daily budget
+// (SPEC §17.7) is checked before queueing. Acquire never touches the
+// database except for the budget check, which is cached.
+//
+// Adaptive concurrency (perf-llm): the llm client reports throttling (HTTP
+// 429 / 503 / 529) and answers (Throttled, Succeeded). A throttle halves the
+// provider's effective limit (from what was in flight, at least 1); every
+// `limit` answers in a row raise it by one, back up to max_concurrency
+// (AIMD). The retries of the throttled requests then queue in the pool
+// instead of hammering the provider.
 //
 // Providers are keyed by provider id. NewPoolWithSettings follows the
 // settings service: edits of max_concurrency/rpm apply immediately (A5.4)
@@ -193,6 +230,15 @@ type providerPool struct {
 	last     time.Time
 	timer    *time.Timer // re-dispatch when the next token is due
 	removed  bool        // the provider was deleted (settings mode)
+
+	// adaptive concurrency (perf-llm): limit is the effective number of
+	// slots, 1..max; cutAt the last time it was lowered; okRun the answers
+	// since the last change.
+	limit int
+	cutAt time.Time
+	okRun int
+	// urgentRun counts urgent grants in a row while bulk requests waited.
+	urgentRun int
 }
 
 func newProviderPool(name string, max, rpm int) *providerPool {
@@ -205,9 +251,13 @@ func newProviderPool(name string, max, rpm int) *providerPool {
 
 // setLimitsLocked applies max_concurrency and requests_per_minute. Requests
 // in flight are not affected; a larger limit lets waiters through at once.
+// A changed max_concurrency also resets the adaptive limit to it.
 func (pp *providerPool) setLimitsLocked(max, rpm int) {
 	if max < 1 {
 		max = 1
+	}
+	if max != pp.max {
+		pp.limit, pp.okRun = max, 0
 	}
 	pp.max = max
 	if rpm == pp.rpm && (pp.rate > 0) == (rpm > 0) {
@@ -335,7 +385,7 @@ func (p *Pool) provider(id string) *providerPool {
 // setPriority registers the FIFO key of a running job (scheduler, at start).
 func (p *Pool) setPriority(j model.Job, scopeCreated string) {
 	p.mu.Lock()
-	p.prios[j.ID] = prio{scopeCreated: scopeCreated, scopeID: j.ScopeID, jobCreated: j.CreatedAt, jobID: j.ID}
+	p.prios[j.ID] = prio{class: classOf(j.Stage), scopeCreated: scopeCreated, scopeID: j.ScopeID, jobCreated: j.CreatedAt, jobID: j.ID}
 	p.mu.Unlock()
 }
 
@@ -358,7 +408,7 @@ func (p *Pool) priorityOf(ctx context.Context) prio {
 	}
 	// Not started by this scheduler: same order as ListCurrentJobsByStatus's
 	// COALESCE(..., job.created_at).
-	return prio{scopeCreated: j.CreatedAt, scopeID: j.ScopeID, jobCreated: j.CreatedAt, jobID: j.ID}
+	return prio{class: classOf(j.Stage), scopeCreated: j.CreatedAt, scopeID: j.ScopeID, jobCreated: j.CreatedAt, jobID: j.ID}
 }
 
 // Acquire implements APIPool: it waits for the daily budget and, for a
@@ -436,10 +486,10 @@ func (pp *providerPool) removeLocked(w *waiter) {
 }
 
 // dispatchLocked grants slots+tokens to the best waiters while both are
-// available; when only the token is missing it schedules itself for the
-// moment the next token is due.
+// available (slots: the adaptive limit); when only the token is missing it
+// schedules itself for the moment the next token is due.
 func (pp *providerPool) dispatchLocked() {
-	for len(pp.waiters) > 0 && pp.inflight < pp.max {
+	for len(pp.waiters) > 0 && pp.inflight < pp.limit {
 		if pp.rate > 0 {
 			now := time.Now()
 			pp.tokens += now.Sub(pp.last).Seconds() * pp.rate
@@ -461,18 +511,102 @@ func (pp *providerPool) dispatchLocked() {
 			}
 			pp.tokens--
 		}
-		best := 0
-		for i := 1; i < len(pp.waiters); i++ {
-			if pp.waiters[i].p.less(pp.waiters[best].p) {
-				best = i
-			}
-		}
+		best := pp.pickLocked()
 		w := pp.waiters[best]
 		pp.waiters = append(pp.waiters[:best], pp.waiters[best+1:]...)
 		w.granted = true
 		pp.inflight++
 		close(w.ch)
 	}
+}
+
+// pickLocked returns the index of the waiter to grant next: the best by
+// prio, except that after UrgentBurst urgent grants in a row while bulk
+// requests wait, the best bulk request (perf-llm: translation is never
+// starved by a stream of critical-path requests).
+func (pp *providerPool) pickLocked() int {
+	best, bestBulk := 0, -1
+	for i, w := range pp.waiters {
+		if i > 0 && w.p.less(pp.waiters[best].p) {
+			best = i
+		}
+		if !w.p.noJob && w.p.class == classBulk && (bestBulk < 0 || w.p.less(pp.waiters[bestBulk].p)) {
+			bestBulk = i
+		}
+	}
+	b := pp.waiters[best].p
+	switch {
+	case b.noJob || b.class != classUrgent || bestBulk < 0:
+		pp.urgentRun = 0
+	case pp.urgentRun >= UrgentBurst:
+		pp.urgentRun = 0
+		return bestBulk
+	default:
+		pp.urgentRun++
+	}
+	return best
+}
+
+// throttled lowers the effective limit after a throttling answer to a
+// request sent at sent (perf-llm). A request sent before the last cut does
+// not cut again: the burst it belonged to was already answered for.
+func (pp *providerPool) throttled(sent time.Time) {
+	pp.mu.Lock()
+	defer pp.mu.Unlock()
+	if !sent.After(pp.cutAt) {
+		return
+	}
+	// The request has already released its slot: count it as in flight.
+	from := pp.limit
+	pp.limit = max(1, min(pp.limit, pp.inflight+1)/2)
+	pp.cutAt, pp.okRun = time.Now(), 0
+	slog.Warn("LLM provider is throttling; lowering the concurrency", "provider", pp.name, "from", from, "to", pp.limit, "max", pp.max)
+}
+
+// succeeded counts an answer; every `limit` answers in a row raise a lowered
+// limit by one (perf-llm).
+func (pp *providerPool) succeeded() {
+	pp.mu.Lock()
+	defer pp.mu.Unlock()
+	if pp.limit >= pp.max {
+		return
+	}
+	if pp.okRun++; pp.okRun < pp.limit {
+		return
+	}
+	pp.limit++
+	pp.okRun = 0
+	if pp.limit == pp.max {
+		slog.Info("LLM provider concurrency restored", "provider", pp.name, "max", pp.max)
+	}
+	pp.dispatchLocked()
+}
+
+// Throttled implements llm.RateFeedback: provider answered a request sent at
+// sent with HTTP 429 (or 503 / 529); its effective concurrency is halved.
+func (p *Pool) Throttled(provider string, sent time.Time) {
+	if pp := p.provider(provider); pp != nil {
+		pp.throttled(sent)
+	}
+}
+
+// Succeeded implements llm.RateFeedback: provider answered a request.
+func (p *Pool) Succeeded(provider string) {
+	if pp := p.provider(provider); pp != nil {
+		pp.succeeded()
+	}
+}
+
+// Limit returns the effective (adaptive) concurrency limit of provider and
+// its max_concurrency; ok is false for an unknown provider.
+func (p *Pool) Limit(provider string) (limit, max int, ok bool) {
+	pp := p.provider(provider)
+	if pp == nil {
+		return 0, 0, false
+	}
+	pp.mu.Lock()
+	defer pp.mu.Unlock()
+	return pp.limit, pp.max, true
 }
 
 func (pp *providerPool) status() (inflight, waiting int) {
@@ -487,14 +621,16 @@ func (pp *providerPool) stat() APIStat {
 	return APIStat{Name: pp.name, Inflight: pp.inflight, Max: pp.max, RPM: pp.rpm}
 }
 
-// Full reports whether every concurrency slot of provider is in use.
+// Full reports whether every concurrency slot of provider is in use (the
+// adaptive limit while the provider is throttling).
 func (p *Pool) Full(provider string) bool {
 	pp := p.provider(provider)
 	if pp == nil {
 		return false
 	}
-	st := pp.stat()
-	return st.Inflight >= st.Max
+	pp.mu.Lock()
+	defer pp.mu.Unlock()
+	return pp.inflight >= pp.limit
 }
 
 // Status returns name/inflight/max/rpm per provider id (diagnostics page;

@@ -43,13 +43,18 @@ type Config struct {
 	// ResourcesDir is the packaged resources directory of the desktop
 	// application (command-line -resources, SPEC-v3 V1, v3-brief §1):
 	// DIR/worker/, DIR/bin/ffmpeg(.exe), DIR/bin/ffprobe(.exe),
-	// DIR/bin/uv(.exe), DIR/components.json. Empty in development. When set,
-	// WorkerDir, FFmpeg and UV are taken from it where the file exists
-	// (applyResources).
+	// DIR/bin/uv(.exe), DIR/bin/aria2c(.exe), DIR/components.json. Empty
+	// in development. When set, WorkerDir, FFmpeg, UV and Aria2c are taken
+	// from it where the file exists (applyResources).
 	ResourcesDir string `toml:"resources_dir"`
 	// UV is the uv executable (DIR/bin/uv(.exe) of ResourcesDir when it
 	// exists); empty = not available.
 	UV string `toml:"uv"`
+	// Aria2c is the aria2c executable of the download queue (SPEC-ext
+	// "内建 aria2c", ext-brief §6.1): DIR/bin/aria2c(.exe) of ResourcesDir
+	// when it exists (bundled with the installer), else the configured
+	// value, else "aria2c" from PATH.
+	Aria2c string `toml:"aria2c"`
 	// PythonMLX is the interpreter of worker/asr_mlx.py (SPEC-v3 V5): the
 	// separate .venv-mlx environment. Default .venv-mlx/bin/python
 	// (.venv-mlx\Scripts\python.exe on Windows, for symmetry only). When it
@@ -185,6 +190,13 @@ const (
 // old one).
 const DefaultDeepSeekModel = "deepseek-flash"
 
+// DeepSeekMaxConcurrency is the default max_concurrency of a DeepSeek
+// provider (perf-llm, NOTES.md): DeepSeek limits concurrent requests per
+// account (2500 for deepseek-flash) and has no per-minute limit; 64 at a
+// time translates a lecture in seconds and leaves the account room for the
+// user's other programs.
+const DeepSeekMaxConcurrency = 64
+
 // Load reads path (missing file = all defaults) and applies defaults.
 func Load(path string) (*Config, error) {
 	return LoadWith(path, Overrides{})
@@ -249,7 +261,7 @@ const SampleAudioFile = "sample-lecture.flac"
 // the working directory; development runs from the repository root).
 var DevSampleDir = filepath.Join("assets", "sample")
 
-// applyResources takes the worker directory, ffmpeg and uv from
+// applyResources takes the worker directory, ffmpeg, uv and aria2c from
 // ResourcesDir where they exist (v3-brief §1). A missing file keeps the
 // configured value or the default (development: ffmpeg from PATH, worker/
 // of the repository). ffprobe needs no field: the stages look for it next
@@ -266,6 +278,9 @@ func (c *Config) applyResources() {
 	}
 	if p := filepath.Join(c.ResourcesDir, "bin", exe("uv")); isFile(p) {
 		c.UV = p
+	}
+	if p := filepath.Join(c.ResourcesDir, "bin", exe("aria2c")); isFile(p) {
+		c.Aria2c = p
 	}
 	if dir := filepath.Join(c.ResourcesDir, "sample"); isFile(filepath.Join(dir, SampleAudioFile)) {
 		c.SampleDir = dir
@@ -301,7 +316,7 @@ func (c *Config) absPaths() error {
 	abs(&c.ASR.FakeResultOpenVINO)
 	// Executables given with a directory part are paths; bare names are
 	// looked up in PATH and stay as they are.
-	for _, p := range []*string{&c.Python, &c.PythonOpenVINO, &c.FFmpeg, &c.NvidiaSMI, &c.UV, &c.PythonMLX} {
+	for _, p := range []*string{&c.Python, &c.PythonOpenVINO, &c.FFmpeg, &c.NvidiaSMI, &c.UV, &c.PythonMLX, &c.Aria2c} {
 		if filepath.Base(*p) != *p {
 			abs(p)
 		}
@@ -413,6 +428,10 @@ func (c *Config) applyDefaults() {
 		c.NvidiaSMI = "nvidia-smi"
 	}
 	c.NvidiaSMI = exe(c.NvidiaSMI)
+	if c.Aria2c == "" {
+		c.Aria2c = "aria2c"
+	}
+	c.Aria2c = exe(c.Aria2c)
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
 	}
@@ -462,14 +481,21 @@ func (c *Config) applyDefaults() {
 				p.APIKeyEnv = "DEEPSEEK_API_KEY"
 			}
 		}
+		// DeepSeek limits concurrent requests per account and has no
+		// per-minute limit (perf-llm, NOTES.md): 64 at a time and
+		// requests_per_minute 0 = no limit. Other providers keep 8 / 300.
+		deepseek := name == "deepseek" || strings.Contains(strings.ToLower(p.BaseURL), "api.deepseek.com")
 		if p.MaxConcurrency == 0 {
-			if p.Local {
+			switch {
+			case p.Local:
 				p.MaxConcurrency = 1 // SPEC §17.2
-			} else {
+			case deepseek:
+				p.MaxConcurrency = DeepSeekMaxConcurrency
+			default:
 				p.MaxConcurrency = 8
 			}
 		}
-		if p.RequestsPerMinute == 0 {
+		if p.RequestsPerMinute == 0 && !deepseek {
 			p.RequestsPerMinute = 300
 		}
 		l.Providers[name] = p

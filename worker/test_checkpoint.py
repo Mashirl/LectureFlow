@@ -473,10 +473,11 @@ class _Tok:
 class FakeFW:
     """faster-whisper shaped. transcribe(audio, vad_filter=True): the whole lecture,
     decoded on the speech-only time line and mapped back (as faster-whisper does);
-    transcribe(speech-only audio, vad_filter=False, clip_timestamps=[seek / 100]): the
-    windows from that seek, times on the speech-only line. fail_at = i raises when
-    segment i of the run is requested (a killed worker); on_segment(i) runs before
-    segment i is yielded."""
+    transcribe(speech-only audio, vad_filter=False[, clip_timestamps=[seek / 100]]): the
+    windows from that seek (from the start without clip_timestamps), times on the
+    speech-only line; asr.py makes every call this way since it runs the VAD itself
+    (textrepair-int). fail_at = i raises when segment i of the run is requested (a
+    killed worker); on_segment(i) runs before segment i is yielded."""
 
     def __init__(self, script=SCRIPT, fail_at=None, on_segment=None):
         self.script, self.fail_at, self.on_segment = script, fail_at, on_segment
@@ -490,7 +491,7 @@ class FakeFW:
             segs = _restored(fw_compact_segments(self.script, CHUNKS))
         else:
             assert len(audio) == SPEECH_SAMPLES          # the speech-only audio
-            (clip,) = kwargs["clip_timestamps"]
+            (clip,) = kwargs.get("clip_timestamps", [0.0])
             segs = fw_compact_segments(self.script, CHUNKS, int(round(clip * 100)))
 
         def gen():
@@ -556,9 +557,15 @@ def test_fw_result_unchanged_by_the_checkpoint_object(fw):
     assert not os.path.exists(fw.ckpt)
     model = FakeFW()
     r1, lines1 = fw.run(model, checkpoint_obj(fw.ckpt))
-    # the uninterrupted run is the same call as without checkpoints, no VAD of its own
-    assert model.calls[0]["vad_filter"] is True and "clip_timestamps" not in model.calls[0]
-    assert fw.vad_calls == []
+    # the uninterrupted run is the same call as without checkpoints: the worker's VAD of
+    # the whole lecture (once per run, textrepair-int), its speech-only audio decoded
+    # from the start with the prompt
+    (call,) = model.calls
+    assert call["vad_filter"] is False and "clip_timestamps" not in call
+    assert call["samples"] == SPEECH_SAMPLES
+    assert call["initial_prompt"] == "cache, write-back, TLB"
+    from faster_whisper.vad import VadOptions
+    assert fw.vad_calls == [(TOTAL_SAMPLES, VadOptions())] * 2
     t0, t1 = r0.pop("timing"), r1.pop("timing")
     assert t0["audio_s"] == t1["audio_s"] == TOTAL_S
     parts = r1.pop("parts")
@@ -672,9 +679,9 @@ def test_fw_interrupted_then_resumed_matches_the_uninterrupted_run(fw):
          "precision": "int8"}]
     # scheme B: the VAD of the whole lecture (default options), its speech-only audio
     # decoded from the checkpoint's seek, without initial_prompt and without VAD of its own
-    (n, options), = fw.vad_calls
+    # (one VAD per run: the uninterrupted, the interrupted and the resumed one)
     from faster_whisper.vad import VadOptions
-    assert n == TOTAL_SAMPLES and options == VadOptions()
+    assert fw.vad_calls == [(TOTAL_SAMPLES, VadOptions())] * 3
     (call,) = model.calls
     assert call["samples"] == SPEECH_SAMPLES
     assert call["clip_timestamps"] == [60.0] and call["initial_prompt"] is None
@@ -739,8 +746,9 @@ def test_fw_checkpoint_of_another_job_or_engine_starts_over(fw, changes):
     model = FakeFW()
     r, lines = fw.run(model, checkpoint_obj(fw.ckpt))
     (call,) = model.calls
-    assert call["initial_prompt"] == "cache, write-back, TLB" and call["vad_filter"] is True
-    assert call["samples"] == TOTAL_SAMPLES
+    assert call["initial_prompt"] == "cache, write-back, TLB" and call["vad_filter"] is False
+    assert "clip_timestamps" not in call                     # from the start
+    assert call["samples"] == SPEECH_SAMPLES
     assert r["sentences"] == r0["sentences"]
     assert r["parts"] == [{"from_ms": 0, "to_ms": 150000, "device_id": "cuda:0",
                            "model": "large-v3", "precision": "auto"}]
@@ -825,7 +833,8 @@ class WhisperModel:
         if kw["vad_filter"]:
             segs = list(fw_restore(fw_compact_segments(SCRIPT, CHUNKS), CHUNKS))
         else:
-            segs = fw_compact_segments(SCRIPT, CHUNKS, int(round(kw["clip_timestamps"][0] * 100)))
+            clip = (kw.get("clip_timestamps") or [0.0])[0]
+            segs = fw_compact_segments(SCRIPT, CHUNKS, int(round(clip * 100)))
 
         def gen():
             for i, s in enumerate(segs):
@@ -945,7 +954,7 @@ def test_fw_process_killed_then_resumed(tmp_path, lecture_wav):
     assert [x["device_id"] for x in result["parts"]] == ["cuda:0", "fw:cpu"]
     assert result["parts"][0]["to_ms"] == result["parts"][1]["from_ms"] == END_W[0]
     logged = [json.loads(l) for l in calls.read_text(encoding="utf-8").splitlines()]
-    assert logged == [{"samples": TOTAL_SAMPLES, "vad_filter": True, "clip_timestamps": None,
+    assert logged == [{"samples": SPEECH_SAMPLES, "vad_filter": False, "clip_timestamps": None,
                        "initial_prompt": "cache, write-back, TLB"},
                       {"samples": SPEECH_SAMPLES, "vad_filter": False,
                        "clip_timestamps": [30.0], "initial_prompt": None}]

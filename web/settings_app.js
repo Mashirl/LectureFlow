@@ -19,6 +19,7 @@ import { t } from './i18n.js';
 import * as U from './util.js';
 import { MOCK, MOCK_SCENARIO, ApiError, errorText } from './api.js';
 import { createUpdateHint } from './update_hint.js';
+import { createUpdateSection } from './settings_update.js';
 
 function withMock(path) {
   if (!MOCK) return path;
@@ -101,11 +102,14 @@ export function createAppSection(ui) {
   let restarting = false;
   // SPEC-v3 V8: the update status next to the channel (desktop app only)
   const updateHint = createUpdateHint({ variant: 'settings' });
+  // SPEC-ext 4: the in-app update rows after the channel (settings_update.js)
+  const updUI = createUpdateSection(ui);
 
   const desktop = () => !!app && app.mode === 'desktop';
   const redraw = () => alive && ui.rerender();
 
   async function load() {
+    updUI.load();
     try {
       const [a, s] = await Promise.all([loadAppInfo(true), appRequest('GET', '/api/app/settings')]);
       if (!alive) return;
@@ -442,6 +446,7 @@ export function createAppSection(ui) {
         closeRow(),
         sleepRow(),
         channelRow(),
+        updUI.rows(),
         onboardingRow(),
         diagRow(),
       ),
@@ -459,6 +464,7 @@ export function createAppSection(ui) {
     load,
     // SSE "changed settings": another window or the desktop shell changed them
     async onSettingsChanged() {
+      updUI.onSettingsChanged();
       if (saving) return;
       try {
         const s = await appRequest('GET', '/api/app/settings');
@@ -474,10 +480,12 @@ export function createAppSection(ui) {
     // SSE "changed update": the desktop main process reported a new update state
     onChanged(ev) {
       updateHint.onChanged(ev);
+      updUI.onChanged(ev); // SPEC-ext 4: "changed selfupdate"
     },
     destroy() {
       alive = false;
       updateHint.destroy();
+      updUI.destroy();
       clearTimeout(pollTimer);
       clearTimeout(restartTimer);
     },

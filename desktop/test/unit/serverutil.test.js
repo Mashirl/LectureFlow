@@ -76,8 +76,46 @@ test('server command: packaged, development, Node script', () => {
     u.resolveServerCommand({ isPackaged: false, resourcesPath: 'x', env: { LECTUREFLOW_SERVER: 'C:\\t\\fake-server.js' }, repoRoot: 'C:\\repo', platform: 'win32', execPath: 'C:\\e\\electron.exe', pathMod: p }),
     { command: 'C:\\e\\electron.exe', prefixArgs: ['C:\\t\\fake-server.js'], resourcesDir: 'C:\\repo', extraEnv: { ELECTRON_RUN_AS_NODE: '1' } },
   );
-  assert.equal(
-    u.resolveServerCommand({ isPackaged: true, resourcesPath: '/Applications/LectureFlow.app/Contents/Resources', env: {}, repoRoot: '/r', platform: 'darwin', execPath: 'x', pathMod: path.posix }).command,
-    '/Applications/LectureFlow.app/Contents/Resources/bin/lectureflow',
+  assert.deepEqual(
+    u.resolveServerCommand({ isPackaged: true, resourcesPath: '/Applications/LectureFlow.app/Contents/Resources', env: {}, repoRoot: '/r', platform: 'darwin', execPath: 'x', pathMod: path.posix }),
+    {
+      command: '/Applications/LectureFlow.app/Contents/Resources/bin/lectureflow',
+      prefixArgs: [],
+      resourcesDir: '/Applications/LectureFlow.app/Contents/Resources',
+      // no worker/__pycache__ inside the signed bundle (mac-accept 3.2.0)
+      extraEnv: { PYTHONDONTWRITEBYTECODE: '1' },
+    },
   );
+  assert.deepEqual(
+    u.resolveServerCommand({ isPackaged: false, resourcesPath: 'x', env: {}, repoRoot: '/r', platform: 'darwin', execPath: 'x', pathMod: path.posix }).extraEnv,
+    {},
+    'development runs (the repository’s worker/) keep writing bytecode',
+  );
+});
+
+test('the service starts without usage reporting (NOTES.md "无遥测")', () => {
+  assert.deepEqual(u.NO_TELEMETRY_ENV, {
+    HF_HUB_DISABLE_TELEMETRY: '1', HF_HUB_DISABLE_IMPLICIT_TOKEN: '1', HF_XET_TELEMETRY_ENABLED: '0', DO_NOT_TRACK: '1',
+  });
+  assert.ok(Object.isFrozen(u.NO_TELEMETRY_ENV));
+  const env = u.serviceEnv(
+    { PATH: 'C:\\bin', hf_hub_disable_telemetry: '0', DO_NOT_TRACK: '0', HF_HUB_DISABLE_IMPLICIT_TOKEN: '', hf_xet_telemetry_enabled: '1' },
+    { ELECTRON_RUN_AS_NODE: '1' },
+  );
+  assert.deepEqual(env, {
+    PATH: 'C:\\bin',
+    HF_HUB_DISABLE_TELEMETRY: '1',
+    HF_HUB_DISABLE_IMPLICIT_TOKEN: '1',
+    HF_XET_TELEMETRY_ENABLED: '0',
+    DO_NOT_TRACK: '1',
+    ELECTRON_RUN_AS_NODE: '1',
+  }, 'the user’s values of these keys (any case) are replaced; extraEnv is kept');
+  assert.deepEqual(u.serviceEnv(undefined), { ...u.NO_TELEMETRY_ENV });
+});
+
+test('the shell starts the service with serviceEnv', () => {
+  const fs = require('node:fs');
+  const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'main', 'shell.js'), 'utf8');
+  assert.match(src, /env: serviceEnv\(process\.env, cmd\.extraEnv\)/);
+  assert.doesNotMatch(src, /env: \{ \.\.\.process\.env, \.\.\.cmd\.extraEnv \}/);
 });

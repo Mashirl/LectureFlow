@@ -1,10 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
 #
-# Continuous integration (SPEC-v3 V10): on every push and pull request, on
-# Windows x64 and macOS arm64, in parallel jobs: Go vet and tests, the
-# Python worker tests, the desktop shell's unit tests. The licence audit is
-# license.yml. Every action is pinned to a commit.
+# Continuous integration (SPEC-v3 V10): on every branch push and pull
+# request, on Windows x64 and macOS arm64, in parallel jobs: Go vet and
+# tests, the Python worker tests, the desktop shell's unit tests. The licence
+# audit is license.yml. Every action is pinned to a commit.
+#
+# Not on tag pushes: a version tag is pushed only after the CI of its main
+# commit has passed, so a run on the tag tested the same commit again (and
+# took macOS runners from release.yml). The cla-signatures branch holds only
+# the CLA signatures. A newer push to a pull request cancels the run of the
+# older one; branch pushes and manual runs are never cancelled.
 #
 # Python: the worker tests run against worker/requirements.txt (CPU wheels
 # of faster-whisper, pypdf, pytest). A smaller set (pytest, numpy, pypdf)
@@ -16,20 +22,35 @@
 # (desktop/scripts/build-ffmpeg-windows.sh, cached by the hash of the script
 # and of desktop/packaging/third-party.json); the Windows tests run the Go
 # tests that need a real ffmpeg against that build.
+#
+# aria2c for macOS (the browser extension's download tool; aria2 publishes
+# no macOS binary) is built from its pinned source on macos-14
+# (packaging/aria2c/build-aria2c-macos.sh), cached by the hash of the script
+# and of desktop/packaging/third-party.json; release.yml reads the same cache.
+# ffmpeg for macOS likewise (desktop/scripts/build-ffmpeg-macos.sh).
 name: CI
 
 on:
   push:
+    branches: ["**", "!cla-signatures"]
   pull_request:
   # Run it by hand from the Actions tab when a push did not start it.
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
+# timeout-minutes: several times the longest run seen (a cache miss that
+# builds from source), so that only a hung step reaches it instead of the
+# default six hours.
 jobs:
   ffmpeg-windows:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -55,6 +76,52 @@ jobs:
           # as a hidden directory unless told otherwise.
           include-hidden-files: true
 
+  # Builds (or finds in the cache) the macOS aria2c, so a broken build script
+  # shows up on push rather than at release time. The script checks the
+  # result itself: AppleTLS, only system libraries (otool -L), the minimum
+  # macOS version, aria2c --version.
+  aria2c-macos:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache
+        with:
+          path: desktop/.cache/aria2c-macos-*
+          key: aria2c-macos-${{ hashFiles('packaging/aria2c/build-aria2c-macos.sh', 'desktop/packaging/third-party.json') }}
+      - name: Build aria2c for macOS (AppleTLS, from the pinned source)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash packaging/aria2c/build-aria2c-macos.sh
+      - name: Show the build
+        run: cat desktop/.cache/aria2c-macos-*/BUILDINFO.txt
+
+  # The same for the macOS ffmpeg (LGPL, dav1d inside). The script checks
+  # the configure line and config.h (LGPL 2.1), that only system libraries
+  # are linked, the minimum macOS of ffmpeg, ffprobe and libdav1d.a
+  # (third-party.json macos), arm64 and the libdav1d decoder.
+  ffmpeg-macos:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: cache
+        with:
+          path: desktop/.cache/ffmpeg-macos-*
+          key: ffmpeg-macos-${{ hashFiles('desktop/scripts/build-ffmpeg-macos.sh', 'desktop/packaging/third-party.json') }}
+      - name: Build ffmpeg for macOS (LGPL, from the pinned sources)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash desktop/scripts/build-ffmpeg-macos.sh
+      - name: Show the build
+        run: cat desktop/.cache/ffmpeg-macos-*/BUILDINFO.txt
+
   go:
     needs: ffmpeg-windows
     strategy:
@@ -62,6 +129,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       # Windows: real-time scanning slows every file the tests write (temp
       # directories, SQLite, atomic replaces), and the default temp
@@ -93,8 +161,27 @@ jobs:
 
       - name: Go vet
         run: go vet ./...
+      # The same packages as `go test -p 4 ./...`, each once, with the same
+      # flags; only the order changes. Each package runs its tests one after
+      # another, and go test starts packages in the order given, so the
+      # longest ones go first instead of starting last (alphabetical order
+      # left internal/stages and internal/sched as the tail). A name in the
+      # list that no longer exists is left out; new packages run after it.
       - name: Go tests
-        run: go test -p 4 ./...
+        shell: pwsh
+        run: |
+          $all = @(go list ./...)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $slow = 'internal/stages', 'internal/sched', 'cmd/lectureflow', 'internal/api', 'internal/state',
+            'internal/agent', 'internal/fetch', 'internal/api/mockserve', 'internal/colab', 'internal/components',
+            'internal/sshremote'
+          $first = @($slow | ForEach-Object { "lectureflow/$_" } | Where-Object { $all -contains $_ })
+          $pkgs = $first + @($all | Where-Object { $first -notcontains $_ })
+          if ($pkgs.Count -ne $all.Count -or @($pkgs | Sort-Object -Unique).Count -ne $all.Count) {
+            throw "package order: $($pkgs.Count) packages, go list has $($all.Count)"
+          }
+          go test -p 4 @pkgs
+          exit $LASTEXITCODE
       - name: Go build for macOS arm64
         if: runner.os == 'macOS'
         env:
@@ -111,6 +198,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - name: Speed up the Windows runner
         if: runner.os == 'Windows'
@@ -137,6 +225,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-14]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     steps:
       - name: Speed up the Windows runner
         if: runner.os == 'Windows'
@@ -154,7 +243,13 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
       - name: Desktop dependencies
         working-directory: desktop
-        run: npm ci
+        # electron 44 downloads its binary at the first require('electron'),
+        # not at install: node --test runs the test files in parallel and
+        # several of them would download it at once (seen on a Mac: EEXIST,
+        # one test file failed). Fetch it once here.
+        run: |
+          npm ci
+          node node_modules/electron/install.js
       - name: Desktop unit tests
         working-directory: desktop
         run: npm test

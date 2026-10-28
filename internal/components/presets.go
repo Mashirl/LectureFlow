@@ -70,7 +70,10 @@ type PresetProvider struct {
 	// where to create the key, roughly what it costs".
 	StepsKeys []string `json:"steps_keys"`
 	CostKey   string   `json:"cost_key"`
-	// Rate hints for the provider row (0 = the application's defaults).
+	// Rate limits of the provider created from the preset: MaxConcurrency 0
+	// = the application's default; RPM 0 (or absent) = no per-minute limit
+	// (perf-llm: DeepSeek limits concurrency per account, not requests per
+	// minute).
 	MaxConcurrency int `json:"max_concurrency,omitempty"`
 	RPM            int `json:"rpm,omitempty"`
 	// BalanceAPI as in the provider settings ("deepseek" | "").

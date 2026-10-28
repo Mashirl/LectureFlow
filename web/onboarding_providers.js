@@ -192,7 +192,7 @@ export function providersStep(env) {
         const input = { name: pp.name, type: pp.type, base_url: pp.base_url, api_key: key };
         if (pp.balance_api) input.balance_api = pp.balance_api;
         if (pp.max_concurrency) input.max_concurrency = pp.max_concurrency;
-        if (pp.rpm) input.rpm = pp.rpm;
+        input.rpm = pp.rpm || 0; // a preset without rpm: no per-minute limit (perf-llm; DeepSeek)
         if (S.providers.some((x) => x.name === pp.name)) input.name = `${pp.name} (${pp.id})`;
         await obApi.createProvider(input);
       }

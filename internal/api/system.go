@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"lectureflow/internal/components"
 	"lectureflow/internal/config"
 	"lectureflow/internal/devices"
+	"lectureflow/internal/dirperm"
 	"lectureflow/internal/hwdetect"
 	"lectureflow/internal/model"
 	"lectureflow/internal/settings"
@@ -54,9 +56,15 @@ type diagnostics struct {
 	goos    string
 	desktop bool
 
-	mu       sync.Mutex
-	checks   []SystemCheck
-	cuda     SystemCheck // last CUDA self-test result (kept across rechecks without it)
+	mu     sync.Mutex
+	checks []SystemCheck
+	// kept: the last result of each self-test (selftestChecks), kept
+	// across the runs without them.
+	kept map[string]SystemCheck
+	// ranEnv is the environment of the last run (ext-step1): the snapshot
+	// runs the checks again when it changed (ran: a run has started).
+	ranEnv   diagEnv
+	ran      bool
 	ready    chan struct{}
 	stop     context.CancelFunc // cancels the startup checks (StopStartupChecks)
 	running  sync.Mutex         // serialises check runs
@@ -79,16 +87,26 @@ type diagnostics struct {
 	ctx     context.Context
 	rerunMu sync.Mutex
 	rerun   *time.Timer
+
+	// the remembered hardware detection (kv hardware.last, ext-step1;
+	// handlers_hardware.go): hwRead once it was read, hwLast nil = none.
+	hwMu   sync.Mutex
+	hwLast *HardwareLast
+	hwRead bool
 }
 
 func newDiagnostics(s *Server) *diagnostics {
-	return &diagnostics{
+	d := &diagnostics{
 		s:       s,
 		goos:    devices.GOOS,
 		desktop: s.desktop != nil,
 		ready:   make(chan struct{}),
-		cuda:    checkWith(SystemCheck{Name: "cuda", Status: statusWarn}, "check.not_run", nil),
+		kept:    map[string]SystemCheck{},
 	}
+	for _, n := range selftestChecks {
+		d.kept[n] = checkWith(SystemCheck{Name: n, Status: statusWarn}, "check.not_run", nil)
+	}
+	return d
 }
 
 // start runs the startup checks in the background. Until a check finishes
@@ -117,6 +135,9 @@ func (d *diagnostics) start() {
 		close(d.ready)
 		d.s.hub.Changed("system", "")
 	}()
+	// ext-step1: no hardware detection remembered yet (first start after
+	// an update): detect once in the background; the checks follow.
+	d.s.detectHardwareAtStartup(ctx)
 	if d.s.comps != nil {
 		d.s.comps.Subscribe(func(ev components.Event) {
 			if ev.Type == components.EventComponents {
@@ -134,17 +155,24 @@ var rerunDelay = 2 * time.Second
 // componentsChanged schedules a run of the checks without the CUDA
 // self-test, rerunDelay after the last call, once the startup checks are
 // done. Not after stop (shutdown) or once the event hub is closed.
-func (d *diagnostics) componentsChanged() {
+func (d *diagnostics) componentsChanged() { d.rerunAfter(rerunDelay, true) }
+
+// rerunAfter schedules a run of the checks without the self-tests, delay
+// from now. A pending run is postponed to delay after this call when
+// postpone is set, else left as it is.
+func (d *diagnostics) rerunAfter(delay time.Duration, postpone bool) {
 	d.rerunMu.Lock()
 	defer d.rerunMu.Unlock()
 	if d.ctx == nil || d.ctx.Err() != nil {
 		return
 	}
 	if d.rerun != nil {
-		d.rerun.Reset(rerunDelay)
+		if postpone {
+			d.rerun.Reset(delay)
+		}
 		return
 	}
-	d.rerun = time.AfterFunc(rerunDelay, func() {
+	d.rerun = time.AfterFunc(delay, func() {
 		d.rerunMu.Lock()
 		d.rerun = nil
 		d.rerunMu.Unlock()
@@ -184,36 +212,64 @@ type checkSpec struct {
 
 // specs lists the checks in the display order of SPEC §17.1 (disk is added
 // live by snapshot). mac-opti M3: the checks follow the platform and the
-// installed components. Windows (and other systems) keep the list of
-// before: Python, faster-whisper, pypdf, GPU, CUDA (the GPU and CUDA rows
-// are shown only with an NVIDIA GPU, snapshot); macOS checks Python and
-// pypdf in the python component's environment and MLX instead of
-// faster-whisper and CUDA (mlx_model is live, snapshot).
-func (d *diagnostics) specs(withCUDA bool) []checkSpec {
+// installed components; ext-step1: they follow the hardware and the
+// transcription mode (diagEnv, system_env.go):
+//   - NVIDIA: Python, faster-whisper, pypdf, GPU, cuDNN, CUDA (the
+//     OpenVINO rows follow live, snapshot);
+//   - macOS: Python and pypdf in the python component's environment, MLX,
+//     the MLX self-test (mlx_model is live, snapshot);
+//   - otherwise: Python, pypdf, the CPU self-test (the OpenVINO rows live);
+//   - only Colab (remote): Python and pypdf, no local inference row;
+//   - the Colab rows (gcloud, authorisation, reachability) with remote or
+//     Colab switched on.
+//
+// The self-tests (CUDA, MLX, CPU) run only when withSelftest ("重新检查");
+// otherwise their last result is kept.
+func (d *diagnostics) specs(env diagEnv, withSelftest bool) []checkSpec {
 	s := d.s
+	selftest := func(name string, fn func(context.Context) SystemCheck) checkSpec {
+		if !withSelftest {
+			fn = nil
+		}
+		return checkSpec{name, fn}
+	}
 	specs := []checkSpec{
 		{"data_dir", s.checkDataDir},
 		{"ffmpeg", s.checkFFmpeg},
+		{checkAria2c, s.checkAria2c}, // system_ext.go (the browser extension)
+		{"python", func(ctx context.Context) SystemCheck { return s.checkPython(ctx, d.versionPython(env)) }},
 	}
-	if d.mac() {
+	switch {
+	case env.macRows():
 		specs = append(specs,
-			checkSpec{"python", func(ctx context.Context) SystemCheck { return s.checkPython(ctx, d.versionPython()) }},
 			checkSpec{"pypdf", s.checkPyPDF},
 			checkSpec{checkMLXPython, func(ctx context.Context) SystemCheck { return s.checkMLXPython(ctx) }},
 			checkSpec{checkMLX, s.checkMLXImport},
+			selftest(checkMLXSelftest, s.checkMLXSelftest),
 		)
-	} else {
+	case env.nvidiaRows():
 		specs = append(specs,
-			checkSpec{"python", func(ctx context.Context) SystemCheck { return s.checkPython(ctx, d.versionPython()) }},
 			checkSpec{"faster-whisper", s.checkFasterWhisper},
 			checkSpec{"pypdf", s.checkPyPDF},
 			checkSpec{"gpu", s.checkGPU},
-			checkSpec{"cuda", nil}, // only on recheck; otherwise the last result is kept
+			checkSpec{checkCUDNN, s.checkCUDNN},
+			selftest(checkCUDA, s.checkCUDA),
 		)
-		// The CUDA self-test only where its row is shown (an NVIDIA GPU).
-		if withCUDA && s.nvidiaChecks() {
-			specs[len(specs)-1].fn = s.checkCUDA
-		}
+	case env.cpuRows():
+		specs = append(specs,
+			checkSpec{"pypdf", s.checkPyPDF},
+			selftest(checkCPUSelftest, s.checkCPUSelftest),
+		)
+	default: // only Colab
+		specs = append(specs, checkSpec{"pypdf", s.checkPyPDF})
+	}
+	if env.cloud {
+		remote := env.remote
+		specs = append(specs,
+			checkSpec{checkGcloud, s.checkGcloud},
+			checkSpec{checkColabAuth, func(ctx context.Context) SystemCheck { return s.checkColabAuthRow(ctx, remote) }},
+			checkSpec{checkColabReach, s.checkColabReach},
+		)
 	}
 	providers := s.diagProviders()
 	for _, p := range providers {
@@ -225,22 +281,31 @@ func (d *diagnostics) specs(withCUDA bool) []checkSpec {
 	return specs
 }
 
-// run executes every check in parallel (the CUDA self-test only when
-// withCUDA); each result replaces its row as soon as it is known.
-func (d *diagnostics) run(ctx context.Context, withCUDA bool) {
+// run executes every check in parallel (the self-tests only when
+// withSelftest); each result replaces its row as soon as it is known. A
+// row keeps its last value until then (check.checking the first time; a
+// self-test that does not run keeps its last result).
+func (d *diagnostics) run(ctx context.Context, withSelftest bool) {
 	d.running.Lock()
 	defer d.running.Unlock()
-	specs := d.specs(withCUDA)
+	env := d.environment(ctx)
+	specs := d.specs(env, withSelftest)
 	d.mu.Lock()
-	if len(d.checks) != len(specs) {
-		d.checks = make([]SystemCheck, len(specs))
-		for i, sp := range specs {
-			d.checks[i] = checkWith(SystemCheck{Name: sp.name, Status: statusWarn}, checkPending, nil)
-			if sp.name == "cuda" {
-				d.checks[i] = d.cuda
-			}
+	prev := make(map[string]SystemCheck, len(d.checks))
+	for _, c := range d.checks {
+		prev[c.Name] = c
+	}
+	rows := make([]SystemCheck, len(specs))
+	for i, sp := range specs {
+		if c, ok := d.kept[sp.name]; ok { // a self-test: its last result until the new one
+			rows[i] = c
+		} else if c, ok := prev[sp.name]; ok {
+			rows[i] = c
+		} else {
+			rows[i] = checkWith(SystemCheck{Name: sp.name, Status: statusWarn}, checkPending, nil)
 		}
 	}
+	d.checks, d.ranEnv, d.ran = rows, env, true
 	d.mu.Unlock()
 	var wg sync.WaitGroup
 	for i, sp := range specs {
@@ -261,9 +326,11 @@ func (d *diagnostics) run(ctx context.Context, withCUDA bool) {
 				res = sp.fn(ctx)
 			}()
 			d.mu.Lock()
-			d.checks[i] = res
-			if sp.name == "cuda" {
-				d.cuda = res
+			if i < len(d.checks) && d.checks[i].Name == sp.name {
+				d.checks[i] = res
+			}
+			if isSelftestCheck(sp.name) {
+				d.kept[sp.name] = res
 			}
 			d.mu.Unlock()
 		}(i, sp)
@@ -271,48 +338,76 @@ func (d *diagnostics) run(ctx context.Context, withCUDA bool) {
 	wg.Wait()
 }
 
-// snapshot returns the cached checks followed by a live disk check. With
+// snapshot returns the cached checks followed by a live disk check, and
+// the live browser_ext row before the providers (system_ext.go). With
 // the device registry (SPEC-v2 I10) the OpenVINO checks follow the CUDA
 // one; they are live too, read from the registry's last detection (which
 // "重新检查" refreshes) rather than from a process of their own.
 //
 // mac-opti M3: the GPU and CUDA rows are left out without an NVIDIA GPU
-// (nvidiaChecks), the OpenVINO rows without an Intel device or OpenVINO
+// (hasNVIDIA), the OpenVINO rows without an Intel device or OpenVINO
 // environment (openVINOVisible); on macOS the live MLX model check follows
 // the MLX import check, then the OpenVINO rows (if any).
+//
+// ext-step1: the rows follow the environment now (diagEnv): a row of
+// another environment is left out at once (e.g. right after the
+// transcription mode changed), and the checks run again soon to fill in the
+// rows of the new one. The OpenVINO rows follow the CUDA row (NVIDIA) or
+// pypdf (no NVIDIA), mlx_model the MLX import.
 func (d *diagnostics) snapshot() []SystemCheck {
+	s := d.s
+	env := d.environment(context.Background())
 	d.mu.Lock()
 	cached := append([]SystemCheck(nil), d.checks...)
+	stale := d.ran && env != d.ranEnv
 	d.mu.Unlock()
-	s := d.s
+	if stale {
+		d.envChanged() // waits for the startup checks; a pending run is not postponed
+	}
 	var live []SystemCheck
-	anchor := "cuda"
-	if d.mac() {
+	anchor := ""
+	switch {
+	case env.macRows():
 		anchor = checkMLX
 		live = append(live, s.mlxModelCheck())
+	case env.nvidiaRows():
+		anchor = checkCUDA
+		live = append(live, s.openVINOChecks(env)...)
+	case env.cpuRows():
+		anchor = "pypdf"
+		live = append(live, s.openVINOChecks(env)...)
 	}
-	live = append(live, s.openVINOChecks()...)
-	at := len(cached)
+	at := -1
 	for i, c := range cached {
 		if c.Name == anchor {
-			at = i + 1
+			at = i
 		}
 	}
-	hideGPU := !d.mac() && !s.nvidiaChecks()
 	out := make([]SystemCheck, 0, len(cached)+len(live)+1)
+	if at < 0 {
+		// the anchor did not run yet (another environment): after the
+		// local rows that are there, before the Colab and provider rows
+		for i, c := range cached {
+			if checkAllowed(c.Name, env) && (c.Name == "pypdf" || c.Name == "python" || c.Name == "ffmpeg" || c.Name == "data_dir") {
+				at = i
+			}
+		}
+	}
 	for i, c := range cached {
+		if checkAllowed(c.Name, env) {
+			out = append(out, c)
+		}
 		if i == at {
 			out = append(out, live...)
 		}
-		if hideGPU && (c.Name == "gpu" || c.Name == "cuda") {
-			continue
-		}
-		out = append(out, c)
 	}
-	if at == len(cached) {
+	if at < 0 {
 		out = append(out, live...)
 	}
-	return append(out, s.checkDisk())
+	out = s.withDataDirAccess(out) // other accounts and the data directory, live (system_datadir.go)
+	out = append(out, s.checkDisk())
+	// the browser extension's connection, live: before the providers
+	return insertBeforeProviders(out, s.browserExtCheck())
 }
 
 // courseSizes returns MB per course directory, of the whole data dir and of
@@ -436,7 +531,7 @@ func lastLine(s string) string {
 
 func (s *Server) checkDataDir(ctx context.Context) SystemCheck {
 	c := SystemCheck{Name: "data_dir", Status: statusOK}
-	err := os.MkdirAll(s.dataDir, 0o755)
+	_, err := dirperm.MkdirPrivate(s.dataDir) // a data directory made here is private (sec-update M2)
 	if err == nil {
 		var f *os.File
 		if f, err = os.CreateTemp(s.dataDir, "write-check-*.tmp"); err == nil {
@@ -755,7 +850,7 @@ func (s *Server) checkCUDA(ctx context.Context) SystemCheck {
 	}
 	total := 0
 	if s.sc != nil {
-		total = s.sc.GPUStatus(ctx).TotalMB
+		total = s.sc.GPUTotalMB(ctx)
 	}
 	script := filepath.Join(s.cfg.WorkerDir, "asr.py")
 	out, errOut, err := s.pyCmd(ctx, selftestTimeout, python.path, script, "--selftest",
@@ -999,14 +1094,14 @@ func (s *Server) diagInterp(backend string) diagPython {
 	return diagPython{path: p}
 }
 
-// versionPython is the interpreter of the Python check: on macOS the
-// python component's (pypdf; MLX has its own check), elsewhere the
-// faster-whisper worker's as before, in desktop mode falling back to the
-// python component's when asr-cuda is not installed (the faster-whisper
-// check reports that).
-func (d *diagnostics) versionPython() diagPython {
+// versionPython is the interpreter of the Python check: with an NVIDIA GPU
+// (local) the faster-whisper worker's as before, in desktop mode falling
+// back to the python component's when asr-cuda is not installed (the
+// faster-whisper check reports that); otherwise (macOS: MLX has its own
+// check; no NVIDIA, only Colab: ext-step1) the python component's (pypdf).
+func (d *diagnostics) versionPython(env diagEnv) diagPython {
 	s := d.s
-	if d.mac() {
+	if !env.nvidiaRows() {
 		return s.diagInterp(config.ComponentBase)
 	}
 	if p := s.diagInterp(model.BackendFasterWhisper); p.ok || !s.desktopDiag() {
@@ -1059,36 +1154,11 @@ func (s *Server) backendFail(backend string) string {
 	return statusError
 }
 
-// nvidiaChecks reports whether the GPU and CUDA rows are shown (mac-opti
-// M3: only with an NVIDIA GPU): never on macOS; without the registry
-// always (as before); else when the last detection named an NVIDIA GPU, a
-// CUDA device has a row (seen before; also one nvidia-smi does not answer
-// for now: the GPU check then tells why), or the hardware detection of
-// this run found one (also through the system's device list when
-// nvidia-smi fails: a missing driver).
-func (s *Server) nvidiaChecks() bool {
-	if s.diag != nil && s.diag.mac() {
-		return false
-	}
-	if s.dev == nil {
-		return true
-	}
-	if s.dev.LastDetection().CUDAName != "" {
-		return true
-	}
-	for _, d := range s.dev.List() {
-		if model.DeviceKind(d.ID) == model.DeviceKindCUDA {
-			return true
-		}
-	}
-	hw, ok := s.cachedHW()
-	return ok && len(hw.NVIDIA) > 0
-}
-
 // openVINOVisible reports whether the OpenVINO rows are shown (mac-opti
 // M3): with an Intel GPU or NPU (found by the last probe, a row of one, or
-// the hardware detection of this run) or an OpenVINO environment (the
-// asr-openvino component, or python_openvino exists).
+// the hardware detection of this run or the remembered one, ext-step1) or
+// an OpenVINO environment (the asr-openvino component, or python_openvino
+// exists).
 func (s *Server) openVINOVisible(det devices.Detection, python string) bool {
 	if pythonExists(python) {
 		return true
@@ -1104,6 +1174,9 @@ func (s *Server) openVINOVisible(det devices.Detection, python string) bool {
 		if d.ID == model.DeviceOVGPU || d.ID == model.DeviceOVNPU {
 			return true
 		}
+	}
+	if h, ok := s.hardwareLast(context.Background()); ok && (h.IntelGPU || h.IntelNPU) {
+		return true
 	}
 	hw, ok := s.cachedHW()
 	return ok && (hw.IntelGPU || hw.IntelNPU)
@@ -1206,15 +1279,24 @@ func (s *Server) mlxModelCheck() SystemCheck {
 
 // ---- handlers ----
 
+// systemView is GET /api/system. ext-step1: nvidia-smi is read (the GPU
+// card) only with an NVIDIA GPU; only Colab (remote) has no device, power
+// or OpenVINO block, and without an NVIDIA GPU the device table leaves out
+// CUDA rows (e.g. one migrated from old settings).
 func (s *Server) systemView(ctx context.Context) System {
+	env := s.diag.environment(ctx)
 	v := System{
 		Checks: WithRoleModelChecks(s.diag.snapshot(), s.roleModelChecks(ctx)),
 		API:    map[string]APIInfo{},
-		Config: s.configView(),
+		Config: s.configViewFor(env),
 	}
 	if s.sc != nil {
-		g := s.sc.GPUStatus(ctx)
-		v.GPU = GPUInfo{TotalMB: g.TotalMB, FreeMB: g.FreeMB, Paused: g.Paused, SlotsUsed: g.SlotsUsed, SlotsMax: g.SlotsMax, EstimatedJobMB: g.EstimatedJobMB}
+		if env.nvidiaRows() {
+			g := s.sc.GPUStatus(ctx)
+			v.GPU = GPUInfo{TotalMB: g.TotalMB, FreeMB: g.FreeMB, Paused: g.Paused, SlotsUsed: g.SlotsUsed, SlotsMax: g.SlotsMax, EstimatedJobMB: g.EstimatedJobMB}
+		} else {
+			v.GPU.Paused = s.sc.GPUPaused()
+		}
 		// Keyed by the display name (unique, A5.1); the pool keys by id.
 		for id, a := range s.sc.APIStatus() {
 			name := a.Name
@@ -1234,9 +1316,12 @@ func (s *Server) systemView(ctx context.Context) System {
 		v.Disk.FreeMB = free >> 20
 	}
 	v.Disk.Courses, v.Disk.DataMB, v.Disk.StreamMB = s.diag.courseSizes(ctx)
-	if s.dev != nil && s.dsc != nil { // SPEC-v2 I10: the devices table, power, OpenVINO
+	if s.dev != nil && s.dsc != nil && !env.remote { // SPEC-v2 I10: the devices table, power, OpenVINO
 		v.Devices, v.Power, v.OpenVINO = s.deviceViews(ctx), s.powerView(), s.openVINOInfo()
-		if v.OpenVINO != nil && !s.openVINOVisible(s.dev.LastDetection(), v.OpenVINO.Python) {
+		if !env.nvidia {
+			v.Devices = slices.DeleteFunc(v.Devices, func(d ASRDeviceView) bool { return model.DeviceKind(d.ID) == model.DeviceKindCUDA })
+		}
+		if v.OpenVINO != nil && (env.mac || !s.openVINOVisible(s.dev.LastDetection(), v.OpenVINO.Python)) {
 			v.OpenVINO = nil // mac-opti M3: no OpenVINO block where the checks are hidden too
 		}
 	}
@@ -1255,7 +1340,7 @@ func (s *Server) systemView(ctx context.Context) System {
 //     has no path. It replaces the python / python_openvino keys, which in
 //     the desktop application named Resources/.venv that never exists.
 //   - nvidia_smi and the VRAM settings (vram_reserve_mb, vram_per_job_mb:
-//     CUDA devices only) only with an NVIDIA GPU (nvidiaChecks: the GPU
+//     CUDA devices only) only with an NVIDIA GPU (hasNVIDIA: the GPU
 //     check is shown; never on a Mac).
 //   - With the device table (SPEC-v2 I6–I8) the global model,
 //     compute_type, device and max_parallel are not in effect (each device
@@ -1263,7 +1348,15 @@ func (s *Server) systemView(ctx context.Context) System {
 //     are the scheduler's fallback when no device exists): asr_devices
 //     lists the devices' backend, model, precision and parallel jobs
 //     instead. Without the registry they are what transcribes and stay.
+//
+// ext-step1: only Colab (remote): no transcription interpreter, no local
+// device, no NVIDIA setting; without an NVIDIA GPU no CUDA device row and
+// a faster-whisper interpreter only when it is really there (fw:cpu).
 func (s *Server) configView() any {
+	return s.configViewFor(s.diag.environment(context.Background()))
+}
+
+func (s *Server) configViewFor(env diagEnv) any {
 	if s.cfg == nil {
 		return map[string]any{}
 	}
@@ -1271,7 +1364,7 @@ func (s *Server) configView() any {
 		return s.legacyConfigView()
 	}
 	a, g := s.set.ASR(), s.set.General()
-	nvidia := s.nvidiaChecks()
+	nvidia := env.nvidiaRows()
 	asr := map[string]any{
 		"language": a.Language,
 		// SPEC-v2 I8 (phase 3b)
@@ -1290,7 +1383,7 @@ func (s *Server) configView() any {
 		asr["fake_result"] = s.cfg.ASR.FakeResult
 	}
 	out := map[string]any{
-		"listen": s.cfg.Listen, "data_dir": s.cfg.DataDir, "python": s.configPython(), "ffmpeg": s.cfg.FFmpeg,
+		"listen": s.cfg.Listen, "data_dir": s.cfg.DataDir, "python": s.configPython(env), "ffmpeg": s.cfg.FFmpeg,
 		"worker_dir": s.cfg.WorkerDir, "log_level": s.cfg.LogLevel,
 		"asr": asr,
 		"general": map[string]any{
@@ -1301,7 +1394,7 @@ func (s *Server) configView() any {
 		out["nvidia_smi"] = s.cfg.NvidiaSMI
 	}
 	if s.dev != nil {
-		out["asr_devices"] = s.configDevices()
+		out["asr_devices"] = s.configDevices(env)
 	}
 	return out
 }
@@ -1323,9 +1416,12 @@ type ConfigPython struct {
 // lists on a platform: macOS MLX and the python component; elsewhere
 // faster-whisper, OpenVINO and the python component — OpenVINO only with
 // the device registry (without it only the legacy faster-whisper path
-// transcribes; SPEC-v2 I10: no OpenVINO fields then).
-func configBackends(goos string, registry bool) []string {
+// transcribes; SPEC-v2 I10: no OpenVINO fields then). ext-step1: only
+// Colab (remote) the python component alone.
+func configBackends(goos string, registry, remote bool) []string {
 	switch {
+	case remote:
+		return []string{config.ComponentBase}
 	case goos == "darwin":
 		return []string{model.BackendMLX, config.ComponentBase}
 	case !registry:
@@ -1334,14 +1430,16 @@ func configBackends(goos string, registry bool) []string {
 	return []string{model.BackendFasterWhisper, model.BackendOpenVINO, config.ComponentBase}
 }
 
-// configPython lists the interpreters of this platform's backends.
-func (s *Server) configPython() []ConfigPython {
+// configPython lists the interpreters of this platform's backends
+// (ext-step1: without an NVIDIA GPU faster-whisper only when its
+// interpreter is there: it runs fw:cpu then).
+func (s *Server) configPython(env diagEnv) []ConfigPython {
 	goos := devices.GOOS
 	if s.diag != nil {
 		goos = s.diag.goos
 	}
 	out := []ConfigPython{}
-	for _, b := range configBackends(goos, s.dev != nil) {
+	for _, b := range configBackends(goos, s.dev != nil, env.remote) {
 		p, src := s.cfg.PythonSource(b)
 		row := ConfigPython{Backend: b, Path: p, Source: src}
 		switch src {
@@ -1350,6 +1448,9 @@ func (s *Server) configPython() []ConfigPython {
 		case config.PythonNotInstalled:
 		default:
 			row.Exists = pythonExists(p)
+		}
+		if b == model.BackendFasterWhisper && s.dev != nil && !env.nvidia && !row.Exists {
+			continue
 		}
 		out = append(out, row)
 	}
@@ -1371,7 +1472,10 @@ type ConfigDevice struct {
 // configDevices lists the devices of the table (Registry.List: none that
 // is hidden on this platform), highest priority first like the devices
 // card.
-func (s *Server) configDevices() []ConfigDevice {
+//
+// ext-step1: only Colab (remote) lists the remote devices alone; without an
+// NVIDIA GPU no CUDA row.
+func (s *Server) configDevices(env diagEnv) []ConfigDevice {
 	rows := s.dev.List()
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Priority > rows[j].Priority })
 	out := make([]ConfigDevice, 0, len(rows))
@@ -1379,6 +1483,9 @@ func (s *Server) configDevices() []ConfigDevice {
 		b := d.Backend
 		if b == "" {
 			b = model.DeviceBackend(d.ID)
+		}
+		if (env.remote && b != model.BackendColab) || (!env.nvidia && model.DeviceKind(d.ID) == model.DeviceKindCUDA) {
+			continue
 		}
 		out = append(out, ConfigDevice{ID: d.ID, Label: d.Label, Backend: b, Model: d.Model, Precision: d.Precision,
 			MaxParallel: d.MaxParallel, Enabled: d.Enabled})
@@ -1429,9 +1536,13 @@ func (s *Server) recheck(w http.ResponseWriter, r *http.Request) {
 	// Not bound to the request: a check that is cut short would cache a
 	// misleading failure. The device detection (SPEC-v2 I6 "诊断页“重新检查”")
 	// runs alongside; the OpenVINO checks read its result.
+	//
+	// ext-step1: only Colab (remote) does not detect the local devices; a
+	// detection that changed the environment (an NVIDIA GPU answered for
+	// the first time) runs the checks of the new one.
 	ctx := context.WithoutCancel(r.Context())
 	var wg sync.WaitGroup
-	if s.dev != nil {
+	if s.dev != nil && s.asrMode(ctx).Mode != ASRModeRemote {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1442,6 +1553,9 @@ func (s *Server) recheck(w http.ResponseWriter, r *http.Request) {
 	}
 	s.diag.run(ctx, true)
 	wg.Wait()
+	if s.diag.stale(ctx) {
+		s.diag.run(ctx, true)
+	}
 	s.diag.invalidateSizes()
 	s.hub.Changed("system", "")
 	writeJSON(w, http.StatusOK, s.systemView(r.Context()))

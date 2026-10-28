@@ -44,9 +44,9 @@ type Hub struct {
 	jobHook   func(model.Job) // set by the server; must not block
 }
 
-// setClientsHook registers fn, called with the number of connected SSE
-// clients after every connect and disconnect (resources.Service.SetClients),
-// and once right away.
+// setClientsHook registers fn, called with the number of visible SSE
+// clients (VisibleClients) after every connect, disconnect and visibility
+// change (resources.Service.SetClients), and once right away.
 func (h *Hub) setClientsHook(fn func(n int)) {
 	h.hookMu.Lock()
 	h.onClients = fn
@@ -54,14 +54,14 @@ func (h *Hub) setClientsHook(fn func(n int)) {
 	h.notifyClients()
 }
 
-// notifyClients reports the current client count to the hook. The count is
-// read under hookMu, so concurrent connects/disconnects cannot report an
-// older count last.
+// notifyClients reports the current visible client count to the hook. The
+// count is read under hookMu, so concurrent connects/disconnects cannot
+// report an older count last.
 func (h *Hub) notifyClients() {
 	h.hookMu.Lock()
 	defer h.hookMu.Unlock()
 	if h.onClients != nil {
-		h.onClients(h.Clients())
+		h.onClients(h.VisibleClients())
 	}
 }
 
@@ -141,6 +141,14 @@ type sseClient struct {
 	res      *resources.Snapshot // latest unsent resources snapshot
 	comps    any                 // latest unsent components payload (hasComps)
 	hasComps bool
+
+	// perf-fix (visibility.go): id is the front end's client id (?client=,
+	// "" = none), visible whether its page is shown (?visible=0 = hidden;
+	// POST /api/events/visibility changes it) and visSeq the sequence
+	// number of the report in effect. Guarded by Hub.mu.
+	id      string
+	visible bool
+	visSeq  int64
 }
 
 type sentInfo struct {
@@ -201,12 +209,17 @@ func (h *Hub) Clients() int {
 	return len(h.clients)
 }
 
-func (h *Hub) add() *sseClient {
+// add registers a client; v is the visibility its request reported
+// (visibility.go).
+func (h *Hub) add(v clientVisibility) *sseClient {
 	c := &sseClient{
 		wake:     make(chan struct{}, 1),
 		jobs:     map[string]JobEvent{},
 		changed:  map[changedKey]bool{},
 		lastSent: map[string]sentInfo{},
+		id:       v.id,
+		visible:  v.visible,
+		visSeq:   v.seq,
 	}
 	h.init()
 	h.mu.Lock()
@@ -284,7 +297,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
-	c := h.add()
+	c := h.add(visibilityOf(r))
 	defer h.remove(c)
 
 	min, ping, wto := h.MinInterval, h.PingInterval, h.WriteTimeout

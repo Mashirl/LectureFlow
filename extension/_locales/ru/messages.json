@@ -1,0 +1,1058 @@
+{
+  "extName": {
+    "message": "Отправить в LectureFlow",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Находит аудио- и видеодорожки записи лекции, которую вы смотрите, и передаёт их в приложение LectureFlow (его нужно установить).",
+    "description": "Store description"
+  },
+  "actionTitle": {
+    "message": "LectureFlow: дорожки на этой странице",
+    "description": "Toolbar button tooltip"
+  },
+  "connChecking": {
+    "message": "Подключение…",
+    "description": "Native messaging state"
+  },
+  "connRecheck": {
+    "message": "Проверить снова",
+    "description": "Button: retry connecting to LectureFlow"
+  },
+  "connConnected": {
+    "message": "LectureFlow подключён"
+  },
+  "connConnectedVersion": {
+    "message": "LectureFlow $P1$",
+    "description": "Connected, with app version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "connUnavailable": {
+    "message": "Не подключено"
+  },
+  "connNotRunning": {
+    "message": "Не удалось запустить LectureFlow. Откройте его и проверьте снова."
+  },
+  "connNotInstalled": {
+    "message": "Установите или откройте LectureFlow и проверьте снова."
+  },
+  "detecting": {
+    "message": "Поиск дорожек…"
+  },
+  "showTracks": {
+    "message": "Показать",
+    "description": "Expand the track list"
+  },
+  "hideTracks": {
+    "message": "Скрыть дорожки",
+    "description": "Closes the full track list"
+  },
+  "emptyHint": {
+    "message": "Откройте запись лекции, начните воспроизведение и нажмите ещё раз.",
+    "description": "Empty state"
+  },
+  "exportReport": {
+    "message": "Экспорт отчёта"
+  },
+  "grantSite": {
+    "message": "Искать автоматически на этом сайте",
+    "description": "Button: grant host permission"
+  },
+  "openOptions": {
+    "message": "Настройки"
+  },
+  "notAPage": {
+    "message": "Эту страницу нельзя проверить."
+  },
+  "noAccess": {
+    "message": "Расширение не может прочитать эту страницу."
+  },
+  "noTracks": {
+    "message": "Дорожки не найдены"
+  },
+  "tracksDetected": {
+    "message": "Найдено дорожек: $P1$",
+    "description": "Header with the track count",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "sourceProfile": {
+    "message": "Профиль: $P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "sourceGeneric": {
+    "message": "Общий поиск"
+  },
+  "unreviewed": {
+    "message": "Не проверен",
+    "description": "Locally imported profile"
+  },
+  "reviewed": {
+    "message": "Проверен"
+  },
+  "downloadDisabled": {
+    "message": "Возможны ограничения",
+    "description": "Chip: the platform’s switch says the recording is restricted"
+  },
+  "protectedCount": {
+    "message": "Защищено (DRM): $P1$",
+    "description": "DRM tracks",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "protected": {
+    "message": "Защищено (DRM)",
+    "description": "DRM track"
+  },
+  "recommended": {
+    "message": "Рекомендуется"
+  },
+  "unreadable": {
+    "message": "Плейлист не читается"
+  },
+  "kind_video": {
+    "message": "Видео"
+  },
+  "kind_audio": {
+    "message": "Аудио"
+  },
+  "kind_unknown": {
+    "message": "Неизвестный тип"
+  },
+  "format_file": {
+    "message": "Файл"
+  },
+  "format_hls": {
+    "message": "HLS"
+  },
+  "format_dash": {
+    "message": "DASH"
+  },
+  "source_element": {
+    "message": "страница",
+    "description": "Detection route"
+  },
+  "source_performance": {
+    "message": "ресурсы страницы",
+    "description": "Detection route"
+  },
+  "source_webrequest": {
+    "message": "сеть",
+    "description": "Detection route"
+  },
+  "sizeUnknown": {
+    "message": "размер неизвестен"
+  },
+  "sizeAbout": {
+    "message": "около $P1$",
+    "description": "Estimated size",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "reportBuilding": {
+    "message": "Подготовка отчёта…"
+  },
+  "reportRefused": {
+    "message": "Отчёт не экспортирован: в нём могут быть личные данные."
+  },
+  "reportFailed": {
+    "message": "Не удалось составить отчёт для этой страницы."
+  },
+  "reportSaved": {
+    "message": "Отчёт сохранён. Прежде чем делиться им, просмотрите его."
+  },
+  "finding_email": {
+    "message": "Что-то похоже на адрес электронной почты."
+  },
+  "finding_identity_field": {
+    "message": "Какое-то поле похоже на имя, логин или номер студенческого билета."
+  },
+  "finding_student_id": {
+    "message": "Какое-то число похоже на номер студенческого билета."
+  },
+  "finding_name": {
+    "message": "Часть адреса похожа на имя человека."
+  },
+  "grantDone": {
+    "message": "Разрешено. Обновите страницу, чтобы расширение видело запросы плеера с самого начала."
+  },
+  "grantFailed": {
+    "message": "Не удалось запросить разрешение."
+  },
+  "optionsTitle": {
+    "message": "Настройки расширения LectureFlow"
+  },
+  "languageHeading": {
+    "message": "Язык интерфейса",
+    "description": "Settings section: the extension’s language"
+  },
+  "languageHint": {
+    "message": "По умолчанию — как в браузере. Здесь можно выбрать другой язык, например кантонский, которого в браузерах нет.",
+    "description": "Settings: under the language heading"
+  },
+  "languageAuto": {
+    "message": "Как в браузере",
+    "description": "Language choice: the browser’s language"
+  },
+  "profilesHeading": {
+    "message": "Профили платформ"
+  },
+  "profilesHint": {
+    "message": "Профили дают дорожкам платформы понятные названия. Импортированные из файла помечены «Не проверен» и используются в первую очередь."
+  },
+  "importProfile": {
+    "message": "Импортировать профиль из файла"
+  },
+  "importNotJson": {
+    "message": "Это не файл JSON."
+  },
+  "importInvalid": {
+    "message": "Профиль не соответствует схеме:"
+  },
+  "importBlocked": {
+    "message": "Этот профиль нельзя импортировать: он охватывает $P1$.",
+    "description": "Settings: a local profile matching a do-not-handle site is refused; $1 = the host it matches. Followed by unsupportedYoutube or unsupportedCourses.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importDone": {
+    "message": "Профиль $P1$ импортирован.",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "remove": {
+    "message": "Убрать"
+  },
+  "sitesHeading": {
+    "message": "Сайты"
+  },
+  "sitesHint": {
+    "message": "На этих сайтах расширение само считает дорожки и видит запросы плеера. На других сайтах оно ищет дорожки, только когда вы нажимаете на его значок."
+  },
+  "addSite": {
+    "message": "Разрешить сайт"
+  },
+  "siteInvalid": {
+    "message": "Введите адрес, начинающийся с https://"
+  },
+  "privacyHeading": {
+    "message": "Конфиденциальность"
+  },
+  "privacyText": {
+    "message": "Расширение обменивается данными только с LectureFlow на этом компьютере. Файлы cookie оно читает, только когда вы отправляете лекцию, и только для сайтов, где находятся дорожки. Ничего не передаётся в интернет.",
+    "description": "Options: privacy"
+  },
+  "versionLine": {
+    "message": "Версия $P1$",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "redetect": {
+    "message": "Искать снова",
+    "description": "Button: run detection again"
+  },
+  "unsupportedTitle": {
+    "message": "LectureFlow не работает с этим сайтом",
+    "description": "Do-not-handle site (YouTube)"
+  },
+  "unsupportedText": {
+    "message": "LectureFlow работает только с записями лекций вашего учебного заведения.",
+    "description": "Do-not-handle site"
+  },
+  "unsupportedYoutube": {
+    "message": "LectureFlow работает только с записями лекций вашего учебного заведения, а не с YouTube.",
+    "description": "Do-not-handle site: YouTube (src/lib/blocklist.js). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "unsupportedCourses": {
+    "message": "LectureFlow работает только с записями лекций вашего учебного заведения, а не с платформами онлайн-курсов (MOOC, платные курсы).",
+    "description": "Do-not-handle site: MOOCs and online / paid course platforms (Udemy, Coursera…). Below unsupportedTitle in the popup; also in settings when adding the site."
+  },
+  "blockedEmbedNote": {
+    "message": "На этой странице пропущено встроенное содержимое YouTube или платформ онлайн-курсов: LectureFlow с ним не работает.",
+    "description": "No tracks found, and the page embeds YouTube or a course platform, which detection skipped"
+  },
+  "disconnectedTitle": {
+    "message": "LectureFlow не подключён",
+    "description": "State: native host unreachable"
+  },
+  "discNotInstalled": {
+    "message": "LectureFlow не найден. Установите его, откройте один раз, затем нажмите «Проверить снова».",
+    "description": "Disconnected: host not registered"
+  },
+  "discNotRunning": {
+    "message": "LectureFlow не запустился. Откройте его сами, затем нажмите «Проверить снова».",
+    "description": "Disconnected: start failed"
+  },
+  "discProtocol": {
+    "message": "Версии LectureFlow и расширения несовместимы. Обновите оба до последней версии.",
+    "description": "Disconnected: protocol mismatch"
+  },
+  "discUnsupportedOs": {
+    "message": "LectureFlow работает только в Windows и на Mac с процессором Apple.",
+    "description": "Linux / ChromeOS note"
+  },
+  "getLectureFlow": {
+    "message": "Скачать LectureFlow",
+    "description": "Button: open the download page"
+  },
+  "titleGenerated": {
+    "message": "Название придумает LectureFlow",
+    "description": "Generic detection reads no title"
+  },
+  "durationMinutes": {
+    "message": "$P1$ мин",
+    "description": "Lecture length",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileChip": {
+    "message": "$P1$ $P2$",
+    "description": "Profile name and version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "downloadDisabledOverridden": {
+    "message": "Возможны ограничения · подтверждено",
+    "description": "Chip after the reminder was confirmed"
+  },
+  "observeNeedsGrant": {
+    "message": "Разрешите автоматический поиск на этом сайте и обновите страницу, чтобы увидеть настройку ограничений платформы и полную запись.",
+    "description": "Profile reads a page response; site not authorized"
+  },
+  "observeNeedsReload": {
+    "message": "Обновите страницу записи, чтобы увидеть настройку ограничений платформы и полную запись.",
+    "description": "Profile reads a page response not seen yet"
+  },
+  "courseLabel": {
+    "message": "Курс",
+    "description": "Course select label"
+  },
+  "courseNone": {
+    "message": "В LectureFlow пока нет курсов. Сначала создайте курс в LectureFlow.",
+    "description": "No courses"
+  },
+  "sendButton": {
+    "message": "Отправить в LectureFlow",
+    "description": "The send button (user’s wording)"
+  },
+  "sending": {
+    "message": "Отправка…",
+    "description": "Primary button while sending"
+  },
+  "dataNote": {
+    "message": "При отправке адреса выбранных дорожек, адрес этой страницы и нужные для них файлы cookie передаются LectureFlow на этом компьютере. В интернет ничего не уходит.",
+    "description": "Data note under the popup’s button"
+  },
+  "selectHint": {
+    "message": "Выберите хотя бы одну дорожку.",
+    "description": "Nothing selected"
+  },
+  "oneEach": {
+    "message": "Не больше одной аудиодорожки и одного видео; в режиме «Две камеры» — двух видео",
+    "description": "Selection rule"
+  },
+  "selectTrack": {
+    "message": "Выбрать: $P1$",
+    "description": "Checkbox label",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "blockedImported": {
+    "message": "Эта лекция уже есть в LectureFlow.",
+    "description": "Cannot send: imported"
+  },
+  "blockedProtected": {
+    "message": "Этот медиапоток защищён системой управления цифровыми правами (DRM). LectureFlow не обрабатывает защищённое содержимое.",
+    "description": "Cannot send: DRM"
+  },
+  "openInApp": {
+    "message": "Открыть в LectureFlow",
+    "description": "Button"
+  },
+  "opened": {
+    "message": "Открыто в LectureFlow.",
+    "description": "After open"
+  },
+  "againFailed": {
+    "message": "В прошлый раз запись получить не удалось. Её можно отправить снова.",
+    "description": "Check: failed task"
+  },
+  "againCancelled": {
+    "message": "Получение записи в прошлый раз было отменено. Её можно отправить снова.",
+    "description": "Check: cancelled task"
+  },
+  "queuedTitle": {
+    "message": "Добавлено в очередь",
+    "description": "Queued state title"
+  },
+  "state_queued": {
+    "message": "В очереди",
+    "description": "Fetch task state"
+  },
+  "state_downloading": {
+    "message": "Получение",
+    "description": "Fetch task state (main app: downloads.state.downloading)"
+  },
+  "state_merging": {
+    "message": "Объединение",
+    "description": "Fetch task state"
+  },
+  "state_importing": {
+    "message": "Создание лекции",
+    "description": "Fetch task state"
+  },
+  "state_done": {
+    "message": "Готово",
+    "description": "Fetch task state"
+  },
+  "state_failed": {
+    "message": "Ошибка получения",
+    "description": "Fetch task state"
+  },
+  "state_needs_refresh": {
+    "message": "Нужен доступ",
+    "description": "Fetch task state"
+  },
+  "state_cancelled": {
+    "message": "Отменено",
+    "description": "Fetch task state"
+  },
+  "state_imported": {
+    "message": "Импортировано",
+    "description": "Check state"
+  },
+  "position": {
+    "message": "место $P1$",
+    "description": "Queue position",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "progress": {
+    "message": "$P1$% · $P2$ / $P3$",
+    "description": "Fetch progress",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "progressUnknown": {
+    "message": "Получено $P1$",
+    "description": "Progress without a total",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "closeHint": {
+    "message": "Это окно можно закрыть: получение записи продолжится в LectureFlow.",
+    "description": "Queued note"
+  },
+  "doneHint": {
+    "message": "Запись получена, лекция создана, дальше — расшифровка.",
+    "description": "Done note"
+  },
+  "failedHint": {
+    "message": "Запись получена не полностью. Причину можно посмотреть в LectureFlow и там же повторить попытку.",
+    "description": "Failed note"
+  },
+  "cancelledHint": {
+    "message": "Получение этой записи отменено.",
+    "description": "Cancelled note"
+  },
+  "refreshText": {
+    "message": "Получение этой записи прервалось: данные входа больше не действуют. Нажмите «Продолжить», чтобы продолжить с новыми данными входа с этой страницы.",
+    "description": "needs_refresh view"
+  },
+  "refreshButton": {
+    "message": "Продолжить",
+    "description": "Primary button of the needs_refresh view"
+  },
+  "refreshing": {
+    "message": "Возобновление…",
+    "description": "Primary button while resuming"
+  },
+  "cancel": {
+    "message": "Отменить",
+    "description": "Button"
+  },
+  "errCourseGone": {
+    "message": "Этого курса больше нет в LectureFlow. Выберите другой.",
+    "description": "Error"
+  },
+  "errStale": {
+    "message": "Страница изменилась. Закройте это окно и снова нажмите на значок расширения.",
+    "description": "Error"
+  },
+  "errProtected": {
+    "message": "Дорожки с защитой DRM отправить нельзя.",
+    "description": "Error"
+  },
+  "errNotRunning": {
+    "message": "LectureFlow не отвечает. Откройте его и попробуйте снова.",
+    "description": "Error"
+  },
+  "errTimeout": {
+    "message": "LectureFlow не ответил вовремя. Попробуйте снова.",
+    "description": "Error"
+  },
+  "errRefreshGone": {
+    "message": "В LectureFlow больше нет этого получения записи. Лекцию можно отправить снова.",
+    "description": "Error"
+  },
+  "errInvalid": {
+    "message": "LectureFlow отклонил запрос ($P1$).",
+    "description": "Error with the field name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errSiteBlocked": {
+    "message": "LectureFlow не стал получать запись с этого сайта: он работает только с записями лекций вашего учебного заведения, а не с YouTube или платформами онлайн-курсов.",
+    "description": "Error: LectureFlow refused the send (downloads.site_blocked): the page or a track is on YouTube or a course platform. Same text as LectureFlow’s errors.downloads.site_blocked."
+  },
+  "errGeneric": {
+    "message": "Не получилось ($P1$). Попробуйте снова.",
+    "description": "Error with its code",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileGrant": {
+    "message": "Разрешить эти сайты",
+    "description": "Options: grant a profile’s hosts"
+  },
+  "profileGranted": {
+    "message": "Сайты разрешены",
+    "description": "Options: profile hosts granted"
+  },
+  "reportsHeading": {
+    "message": "Отчёты о поиске дорожек",
+    "description": "Options section"
+  },
+  "reportsHint": {
+    "message": "Экспортируйте обезличенный отчёт, чтобы написать или улучшить профиль. Страница записи появится здесь, после того как вы нажмёте на ней на значок расширения.",
+    "description": "Options: reports"
+  },
+  "reportsEmpty": {
+    "message": "Пока нечего экспортировать.",
+    "description": "Options: reports"
+  },
+  "reportRow": {
+    "message": "$P1$ · дорожек: $P2$",
+    "description": "Options: one page",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "exportOne": {
+    "message": "Экспортировать",
+    "description": "Options: export a report"
+  },
+  "profileHosts": {
+    "message": "Сайты: $P1$",
+    "description": "Options: profile hosts",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmSend": {
+    "message": "Отправить",
+    "description": "The in-page card’s primary button"
+  },
+  "inpageNote": {
+    "message": "Файлы cookie читаются, только когда вы нажимаете «Отправить», и передаются только LectureFlow на этом компьютере",
+    "description": "Under the in-page card’s button"
+  },
+  "profileSource": {
+    "message": "Профиль $P1$ $P2$",
+    "description": "Lecture card: which profile named it",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "courseLast": {
+    "message": " (в прошлый раз)",
+    "description": "Suffix of the course used last"
+  },
+  "close": {
+    "message": "Закрыть",
+    "description": "Button"
+  },
+  "done": {
+    "message": "Готово",
+    "description": "Button"
+  },
+  "rowDownloading": {
+    "message": "Получение $P1$%",
+    "description": "List row: a lecture being fetched",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedChip": {
+    "message": "Возможны ограничения",
+    "description": "Bulk row: skipped because restricted"
+  },
+  "restrictedNotice": {
+    "message": "Этот медиапоток, возможно, ограничен правилами преподавателя или университета. LectureFlow получает на этот компьютер только медиапотоки, к которым у вас есть доступ, и только для вашего личного безбарьерного обучения (расшифровка/перевод). Пожалуйста, соблюдайте правила вашего учебного заведения. Перед отправкой появится ещё одно напоминание.",
+    "description": "The user’s text, verbatim (it says 您)"
+  },
+  "restrictedTitle": {
+    "message": "Этот медиапоток может быть ограничен",
+    "description": "Reminder dialog title"
+  },
+  "restrictedConfirm": {
+    "message": "LectureFlow получает на этот компьютер только медиапотоки, к которым у вас есть доступ, и только для вашего личного безбарьерного обучения (расшифровка/перевод). Пожалуйста, соблюдайте правила вашего учебного заведения.",
+    "description": "Reminder dialog text"
+  },
+  "bulkRestrictedConfirm": {
+    "message": "Некоторые лекции ($P1$) могут быть ограничены правилами преподавателя или университета. LectureFlow получает на этот компьютер только медиапотоки, к которым у вас есть доступ, и только для вашего личного безбарьерного обучения (расшифровка/перевод). Пожалуйста, соблюдайте правила вашего учебного заведения.",
+    "description": "Bulk reminder dialog text",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedNoticeQuiet": {
+    "message": "Этот медиапоток, возможно, ограничен правилами преподавателя или университета. LectureFlow получает на этот компьютер только медиапотоки, к которым у вас есть доступ, и только для вашего личного безбарьерного обучения (расшифровка/перевод). Пожалуйста, соблюдайте правила вашего учебного заведения.",
+    "description": "The restricted notice (the user’s own text) without its last sentence, shown when the reminder is off for this platform"
+  },
+  "restrictedRemember": {
+    "message": "Больше не напоминать для этой платформы ($P1$)",
+    "description": "Check box in the restricted reminder; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedRememberedNote": {
+    "message": "Вы отключили это напоминание для $P1$. Включить его снова можно в настройках расширения.",
+    "description": "Line under the restricted notice when the reminder is off for this platform; $1 is the platform name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedHeading": {
+    "message": "Напоминания о записях с ограничениями",
+    "description": "Settings: section heading"
+  },
+  "restrictedHint": {
+    "message": "Перед отправкой записи, на которую могут распространяться ограничения, расширение показывает напоминание. Здесь перечислены платформы, для которых вы его отключили; если включить его снова, оно будет появляться перед каждой отправкой.",
+    "description": "Settings: section text"
+  },
+  "restrictedEmpty": {
+    "message": "Таких платформ нет: напоминание появляется каждый раз.",
+    "description": "Settings: no platform listed"
+  },
+  "restrictedSince": {
+    "message": "Напоминание отключено с $P1$",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "restrictedForget": {
+    "message": "Включить напоминание",
+    "description": "Settings: button that undoes “don’t remind me again”"
+  },
+  "sendAnyway": {
+    "message": "Всё равно отправить",
+    "description": "Reminder dialog: confirm"
+  },
+  "contentLabel": {
+    "message": "Что отправить",
+    "description": "Label of the three choices"
+  },
+  "presetMain": {
+    "message": "Основное аудио и видео",
+    "description": "Choice: the full recording, or main audio + first picture"
+  },
+  "presetDual": {
+    "message": "Две камеры",
+    "description": "Choice: main audio + two pictures"
+  },
+  "presetAudio": {
+    "message": "Только аудио",
+    "description": "Choice: main audio"
+  },
+  "presetMainNone": {
+    "message": "Здесь нет дорожек, которые можно отправить",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetDualNone": {
+    "message": "Найдено только одно видео",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "presetAudioNone": {
+    "message": "Нет отдельной аудиодорожки",
+    "description": "Tooltip of an unavailable choice"
+  },
+  "chooseContent": {
+    "message": "Выберите, что отправить",
+    "description": "Nothing chosen yet"
+  },
+  "chooseTracks": {
+    "message": "Выбрать дорожки… ($P1$)",
+    "description": "Opens the full track list",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerEmbedded": {
+    "message": "На эту страницу встроен $P1$. Разрешите доступ к сайтам $P1$ и обновите страницу — тогда отправлять можно будет прямо отсюда.",
+    "description": "Popup: a platform frame not readable yet",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerOpaque": {
+    "message": "На странице есть встроенное содержимое, которое расширение не может прочитать. Если это $P1$ (например, ReCap в Canvas), разрешите доступ к сайтам $P1$ и обновите страницу.",
+    "description": "Popup: unreadable frames",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "offerGrant": {
+    "message": "Разрешить сайты $P1$",
+    "description": "Popup: grant a profile’s sites",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "errInfoFailed": {
+    "message": "Не удалось получить сведения об этой лекции от платформы записей ($P1$).",
+    "description": "Error",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectRow": {
+    "message": "Выбрать: $P1$",
+    "description": "Row check box",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selBar": {
+    "message": "Выбрано: $P1$",
+    "description": "Selection bar",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "selClear": {
+    "message": "Сбросить",
+    "description": "Selection bar"
+  },
+  "selSend": {
+    "message": "Отправить выбранные ($P1$)",
+    "description": "Selection bar button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkButton": {
+    "message": "Обновить курс в LectureFlow",
+    "description": "Folder list button (user’s wording)"
+  },
+  "bulkTitle": {
+    "message": "Обновить курс в LectureFlow",
+    "description": "Bulk card title"
+  },
+  "bulkSummary": {
+    "message": "Лекций: $P1$. Уже импортировано: $P2$ (по сеансу и названию), получается сейчас: $P3$, ",
+    "description": "Bulk card summary, first part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      },
+      "p3": {
+        "content": "$3"
+      }
+    }
+  },
+  "bulkSummaryTo": {
+    "message": "к отправке: $P1$",
+    "description": "Bulk card summary, last part",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkNew": {
+    "message": "Новая",
+    "description": "Bulk row"
+  },
+  "bulkQueued": {
+    "message": "В очереди",
+    "description": "Bulk row"
+  },
+  "bulkFailed": {
+    "message": "Не отправлено",
+    "description": "Bulk row"
+  },
+  "bulkSkipped": {
+    "message": "Пропущено",
+    "description": "Bulk row"
+  },
+  "bulkSend": {
+    "message": "Отправить ($P1$)",
+    "description": "Bulk card button",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkReading": {
+    "message": "Чтение $P1$ из $P2$…",
+    "description": "Bulk card button while reading",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkSending": {
+    "message": "Отправка $P1$ из $P2$…",
+    "description": "Bulk card button while sending",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkQueueNote": {
+    "message": "Лекции встают в очередь по порядку; сколько получать одновременно, задаётся в настройках LectureFlow (по умолчанию 3)",
+    "description": "Bulk card note"
+  },
+  "bulkPageOnly": {
+    "message": "Только лекции с этой страницы списка; если страниц несколько, перейдите на следующую и нажмите ещё раз.",
+    "description": "Bulk card note"
+  },
+  "bulkSkipDisabled": {
+    "message": "Пропустить их ($P1$)",
+    "description": "Bulk reminder: skip",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "bulkDone": {
+    "message": "Отправлено: $P1$; не отправлено: $P2$.",
+    "description": "Bulk card result",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "bulkNoTrack": {
+    "message": "Нет дорожек для выбранного варианта",
+    "description": "Bulk row error"
+  },
+  "grantCookieHosts": {
+    "message": "Эти дорожки находятся на других сайтах. Если для их получения нужны cookie этих сайтов, разрешите доступ и к ним (необязательно):",
+    "description": "Popup: above check boxes, one per other host whose cookies a send would read"
+  },
+  "grantAllow": {
+    "message": "Разрешить",
+    "description": "Popup: button that asks the browser for the page’s site and the ticked hosts"
+  },
+  "trustedHeading": {
+    "message": "Доверенные сайты со встроенными страницами",
+    "description": "Settings: section heading (sites the platform’s pages may be embedded in, with in-page confirmation)"
+  },
+  "trustedHint": {
+    "message": "Если страница платформы записей встроена в один из этих сайтов (например, в Canvas вашего вуза), отправку можно подтвердить прямо на странице. Если она встроена в любой другой сайт, кнопка откроет окно подтверждения LectureFlow, чтобы чужой сайт не мог обманом заставить вас нажать её.",
+    "description": "Settings: section text"
+  },
+  "trustedEmpty": {
+    "message": "Доверенных сайтов пока нет: кнопка, встроенная в другой сайт, всегда открывает окно подтверждения.",
+    "description": "Settings: no site listed"
+  },
+  "trustedSince": {
+    "message": "В доверенных с $P1$",
+    "description": "Settings: row detail; $1 is a date (YYYY-MM-DD)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "importReplaceConfirm": {
+    "message": "У этого файла тот же id, что у встроенного профиля «$P1$ $P2$». После импорта он заменит встроенную версию, а на карточке будет пометка «Не проверен». Заменить?",
+    "description": "Settings: an imported file has the id of a built-in profile; $1 its name, $2 its version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      },
+      "p2": {
+        "content": "$2"
+      }
+    }
+  },
+  "importReplace": {
+    "message": "Заменить встроенную версию",
+    "description": "Settings: button, import the file in place of the built-in profile"
+  },
+  "profileReplaces": {
+    "message": "Заменяет встроенную версию $P1$",
+    "description": "Settings: under a local profile that replaces a built-in one; $1 is the built-in version",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "profileInactive": {
+    "message": "Не используется: тот же id, что у встроенного профиля. Импортируйте файл снова и подтвердите замену.",
+    "description": "Settings: chip on a local profile with a built-in profile’s id that was never confirmed"
+  },
+  "embedWhy": {
+    "message": "Эта страница записи встроена в страницу сайта $P1$. Чтобы другой сайт не мог обманом заставить вас нажать кнопку, подтвердите отправку в этом окне.",
+    "description": "Confirmation window: why it opened; $1 is the site the recording page is embedded in (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedWhyUnknown": {
+    "message": "Эта страница записи встроена в страницу другого сайта, и браузер не сообщил расширению, какого именно. Чтобы другой сайт не мог обманом заставить вас нажать кнопку, подтвердите отправку в этом окне.",
+    "description": "Confirmation window: why it opened, when the browser does not tell the site"
+  },
+  "embedFrom": {
+    "message": "Страница записи: $P1$",
+    "description": "Confirmation window: the recording page’s host; $1 is a host name",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "embedTrust": {
+    "message": "В дальнейшем подтверждать прямо на странице в $P1$",
+    "description": "Confirmation window: check box; $1 is the site (an origin)",
+    "placeholders": {
+      "p1": {
+        "content": "$1"
+      }
+    }
+  },
+  "confirmGone": {
+    "message": "Это окно подтверждения больше не действует: страница записи закрыта или перезагружена. Вернитесь на страницу и нажмите кнопку ещё раз.",
+    "description": "Confirmation window: the page it belonged to is gone"
+  },
+  "errConfirmWindow": {
+    "message": "Отправьте запись из окна подтверждения LectureFlow.",
+    "description": "Error: this frame must confirm in the extension’s window"
+  }
+}

@@ -69,6 +69,16 @@ const (
 	CodeSnapshotInvalid         = "snapshot.unusable.invalid"          //
 	CodeSnapshotProviderDeleted = "snapshot.unusable.provider_deleted" // provider
 	CodeSnapshotNoAPIKey        = "snapshot.unusable.no_api_key"       // provider
+	// cred-enc (keys.go): the stored key cannot be decrypted with this
+	// installation's key (another computer or account) and has to be
+	// entered again; provider is the display name.
+	CodeSnapshotKeyUnreadable = "snapshot.unusable.api_key_unreadable" // provider
+	CodeProviderKeyUnreadable = "settings.provider_key_unreadable"     // provider
+	// sec3 L2 (keys.go): there is no data key now, so a key entered now is
+	// stored in the clear (error: the reason, in English); a provider's key
+	// is stored in the clear.
+	CodeCredentialsUnavailable = "settings.credentials_unavailable"  // error
+	CodeProviderKeyUnprotected = "settings.provider_key_unprotected" // provider
 )
 
 // ErrorCodes lists the codes this package defines (CodeProviderNotFound and
@@ -85,4 +95,6 @@ var ErrorCodes = []string{
 	CodeManualDevicesEmpty, CodeManualDevicesCPU, CodeManualDevicesUnknown,
 	CodeLocaleUnsupported, CodeZhDisplayInvalid,
 	CodeSnapshotNotRecorded, CodeSnapshotInvalid, CodeSnapshotProviderDeleted, CodeSnapshotNoAPIKey,
+	CodeSnapshotKeyUnreadable, CodeProviderKeyUnreadable,
+	CodeCredentialsUnavailable, CodeProviderKeyUnprotected,
 }

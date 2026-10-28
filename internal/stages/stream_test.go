@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	lfmedia "lectureflow/internal/media"
 	"lectureflow/internal/model"
 	"lectureflow/internal/sched"
 	"lectureflow/internal/state"
@@ -250,15 +251,17 @@ func TestBrowserReady(t *testing.T) {
 
 // TestStreamArgs: P8.1 remux (-c copy -movflags +faststart) and transcode
 // (H.264 with the chosen encoder of SPEC-v3 V7 + AAC), mapping the probed
-// streams.
+// streams; the input read with the whitelists of media.InputArgs (security
+// review 2, M3) right before its -i.
 func TestStreamArgs(t *testing.T) {
 	info := mediaInfo{Video: &mediaStream{Index: 2, Codec: "h264"}, Audio: &mediaStream{Index: 0, Codec: "aac"}}
+	wl := "-format_whitelist " + lfmedia.FormatWhitelist + " -protocol_whitelist file"
 	remux := strings.Join(streamArgs(info, `C:\in.mp4`, `C:\out.tmp`, ""), " ")
-	if remux != `-hide_banner -nostdin -nostats -progress pipe:1 -y -threads 2 -i C:\in.mp4 -map 0:2 -map 0:0 -c copy -movflags +faststart -f mp4 C:\out.tmp` {
+	if remux != `-hide_banner -nostdin -nostats -progress pipe:1 -y -threads 2 `+wl+` -i C:\in.mp4 -map 0:2 -map 0:0 -c copy -movflags +faststart -f mp4 C:\out.tmp` {
 		t.Errorf("remux args: %s", remux)
 	}
 	tr := strings.Join(streamArgs(info, `C:\in.mkv`, `C:\out.tmp`, encNVENC), " ")
-	if tr != `-hide_banner -nostdin -nostats -progress pipe:1 -y -threads 2 -i C:\in.mkv -map 0:2 -map 0:0 -c:v h264_nvenc -preset p4 -tune hq -rc vbr -cq 23 -b:v 0 -profile:v high -pix_fmt yuv420p -vf scale=trunc(iw/2)*2:trunc(ih/2)*2 -c:a aac -b:a 128k -threads 2 -movflags +faststart -f mp4 C:\out.tmp` {
+	if tr != `-hide_banner -nostdin -nostats -progress pipe:1 -y -threads 2 `+wl+` -i C:\in.mkv -map 0:2 -map 0:0 -c:v h264_nvenc -preset p4 -tune hq -rc vbr -cq 23 -b:v 0 -profile:v high -pix_fmt yuv420p -vf scale=trunc(iw/2)*2:trunc(ih/2)*2 -c:a aac -b:a 128k -threads 2 -movflags +faststart -f mp4 C:\out.tmp` {
 		t.Errorf("transcode args: %s", tr)
 	}
 }
@@ -362,14 +365,18 @@ func TestPrepRemux(t *testing.T) {
 }
 
 // TestPrepTranscode: incompatible codecs → H.264 + AAC, recorded as
-// transcoded; the transcode takes most of prep's progress.
+// transcoded. stream-parallel: prep only writes audio.wav (all of its
+// progress) and queues the stream task, which transcodes after prep.
 func TestPrepTranscode(t *testing.T) {
 	e := newEnv(t)
 	l, _ := e.mediaLecture("L")
 	fm := &fakeMedia{probe: probeHEVC}
-	r := e.run(&prepStage{d: e.deps(nil), media: fm}, l.ID)
-	if r.err != nil {
-		t.Fatal(r.err)
+	p, r := e.prepThenStream(fm, l.ID)
+	if vals := p.progress.vals; !monotone(vals) || !slices.Contains(vals, 0.5) || p.progress.last() != 1 || len(fm.ffmpegCalls()) != 2 {
+		t.Errorf("prep progress %v (audio.wav is all of prep)", vals)
+	}
+	if r.err != nil || r.job.Status != model.StatusDone {
+		t.Fatalf("stream task %v %s", r.err, r.job.Status)
 	}
 	sc := fm.streamCalls()
 	if len(sc) != 1 || !argsContain(sc[0], "-c:v", encNVENC) || slices.Contains(sc[0], "libx264") || !argsContain(sc[0], "-c:a", "aac") ||
@@ -379,9 +386,8 @@ func TestPrepTranscode(t *testing.T) {
 	if st := e.streamState(l.ID); st.Status != StreamReady || !st.Transcoded {
 		t.Errorf("stream state %+v", st)
 	}
-	a := audioShareTranscode
-	if vals := r.progress.vals; !monotone(vals) || !slices.Contains(vals, a) || !slices.Contains(vals, a+0.5*(1-a)) {
-		t.Errorf("progress %v", vals)
+	if vals := r.progress.vals; !monotone(vals) || !slices.Contains(vals, 0.5) || r.progress.last() != 1 {
+		t.Errorf("stream task progress %v", vals)
 	}
 }
 
@@ -442,7 +448,9 @@ func TestPrepNoSpace(t *testing.T) {
 
 // TestPrepStreamFailureKeepsPrepDone: the playback file is optional — a
 // failed remux/transcode or probe is recorded with its D6 code and the raw
-// output, and prep still succeeds (the transcript does not wait for it).
+// output, and prep still succeeds (the transcript does not wait for it). A
+// transcode fails in the stream task that prep queued (stream-parallel):
+// the task fails, prep is done.
 func TestPrepStreamFailureKeepsPrepDone(t *testing.T) {
 	e := newEnv(t)
 	cases := []struct {
@@ -469,7 +477,17 @@ func TestPrepStreamFailureKeepsPrepDone(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			l, dir := e.mediaLecture(c.name)
-			r := e.run(&prepStage{d: e.deps(nil), media: c.fm}, l.ID)
+			var r runResult
+			if c.fm.probe == probeHEVC {
+				var task runResult
+				r, task = e.prepThenStream(c.fm, l.ID)
+				var ce *model.CodedError
+				if task.job.Status != model.StatusFailed || !errors.As(task.err, &ce) || ce.Info.Code != c.code {
+					t.Errorf("stream task %v %s, want %s", task.err, task.job.Status, c.code)
+				}
+			} else {
+				r = e.run(&prepStage{d: e.deps(nil), media: c.fm}, l.ID)
+			}
 			if r.err != nil || r.job.Status != model.StatusDone {
 				t.Fatalf("prep %v %s", r.err, r.job.Status)
 			}
@@ -526,6 +544,18 @@ func TestPrepKeepOriginalFalseKeepsStream(t *testing.T) {
 			r := e.run(&prepStage{d: e.deps(nil), media: c.fm}, l.ID)
 			if r.err != nil || r.job.Status != model.StatusDone {
 				t.Fatalf("prep %v %s", r.err, r.job.Status)
+			}
+			if c.fm.probe == probeHEVC {
+				// stream-parallel: a transcode is the stream task's; prep keeps
+				// the original for it without a note, and the task's own
+				// outcome decides (here: it fails, so the original stays and
+				// the task's job carries the note)
+				if _, err := os.Stat(filepath.Join(dir, "m.mp4")); err != nil || r.job.Stats.NoteInfo != nil {
+					t.Fatalf("after prep: original %v, prep note %+v", err, r.job.Stats.NoteInfo)
+				}
+				if r = e.run(&streamStage{d: e.deps(nil), media: c.fm}, l.ID); r.job.Status != model.StatusFailed {
+					t.Fatalf("stream task %v %s", r.err, r.job.Status)
+				}
 			}
 			if st := e.streamState(l.ID); st.Status != c.status {
 				t.Fatalf("stream state %+v, want %s", st, c.status)
@@ -811,8 +841,9 @@ func realH264OrSkip(t *testing.T, e *env, ff string) string {
 }
 
 // TestPrepRealStream runs prep with the real ffmpeg/ffprobe on a 2-second
-// H.264/AAC MP4 (remux) and an MPEG-4/MP3 AVI (transcode). With less than
-// 10 GB free on the temp volume the state must be no_space instead.
+// H.264/AAC MP4 (remux) and an MPEG-4/MP3 AVI (transcode; prep queues the
+// stream task, which is run next: stream-parallel). With less than 10 GB
+// free on the temp volume the state must be no_space instead.
 func TestPrepRealStream(t *testing.T) {
 	e := newEnv(t)
 	ff := realMediaOrSkip(t, e)
@@ -845,6 +876,24 @@ func TestPrepRealStream(t *testing.T) {
 			r := e.run(e.stage(e.deps(nil), model.StagePrep), l.ID)
 			if r.err != nil {
 				t.Fatal(r.err)
+			}
+			if c.transcoded {
+				// stream-parallel: prep wrote audio.wav and queued the stream
+				// task; the transcode is that task's
+				if _, ok, _ := StreamStateOf(e.ctx, e.st, l.ID); ok {
+					t.Error("prep recorded a playback file state for a transcode")
+				}
+				if _, err := os.Stat(filepath.Join(dir, model.StreamFile)); !os.IsNotExist(err) {
+					t.Errorf("prep made stream.mp4 itself: %v", err)
+				}
+				if j := e.job(model.ScopeLecture, l.ID, model.StageStream); j.Status != model.StatusPending {
+					t.Fatalf("stream task %s, want pending (queued by prep)", j.Status)
+				}
+				if r := e.run(e.stage(e.deps(nil), model.StageStream), l.ID); r.err != nil {
+					t.Fatal(r.err)
+				}
+			} else if e.hasCurrentJob(l.ID, model.StageStream) {
+				t.Error("prep queued the stream task for a remux")
 			}
 			st := e.streamState(l.ID)
 			if ferr == nil && free < StreamMinFreeBytes {

@@ -65,6 +65,13 @@ const (
 	CodeLoginRunning      = "colab.login_running"       // a sign-in is already waiting for the browser
 	CodeLoginTimeout      = "colab.login_timeout"       // minutes: the sign-in did not finish in time; gcloud was stopped
 	CodeLoginFailed       = "colab.login_failed"        // exit_code: gcloud ended with an error (detail: its last ERROR line)
+
+	// The account (colab-obs-core, account.go): Status.Account.ReadError
+	// when ccu-info could not be read (a credential problem keeps its own
+	// colab.auth_* code). reason: unavailable (network, Colab's 5xx),
+	// api_changed (the answer does not look like ccu-info), other. Never a
+	// lecture's error: nothing is handed back for it.
+	CodeAccountUnavailable = "colab.account_unavailable" // reason
 )
 
 // ErrorCodes lists the codes this package defines (for cmd's
@@ -79,6 +86,7 @@ var ErrorCodes = []string{
 	CodeRemoteFailed, CodeHashMismatch, CodeAudioMissing, CodeSettingsInvalid, CodeWorkerMissing, CodeCancelled,
 	CodeUploadFailed, CodeDownloadFailed, CodeLocalWrite, CodeWorkerExited,
 	CodeGcloudMissing, CodeGcloudStartFailed, CodeLoginRunning, CodeLoginTimeout, CodeLoginFailed,
+	CodeAccountUnavailable,
 }
 
 // ErrorParams lists each code's params (for the lead's
@@ -98,5 +106,5 @@ var ErrorParams = map[string][]string{
 	CodeCancelled: {}, CodeUploadFailed: {"file"}, CodeDownloadFailed: {"file"}, CodeLocalWrite: {"file"},
 	CodeWorkerExited:  {},
 	CodeGcloudMissing: {}, CodeGcloudStartFailed: {}, CodeLoginRunning: {}, CodeLoginTimeout: {"minutes"},
-	CodeLoginFailed: {"exit_code"},
+	CodeLoginFailed: {"exit_code"}, CodeAccountUnavailable: {"reason"},
 }

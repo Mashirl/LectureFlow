@@ -225,11 +225,12 @@ func TestSystemEndpoints(t *testing.T) {
 		byName[c.Name] = c
 		names = append(names, c.Name)
 	}
-	want := []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cuda", "api_key:deepseek", "api:deepseek", "disk"}
+	// ext-step1: cudnn (asr.py --check-cudnn) after gpu
+	want := []string{"data_dir", "ffmpeg", "aria2c", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "cuda", "browser_ext", "api_key:deepseek", "api:deepseek", "disk"}
 	if !eqStrings(names, want) {
 		t.Fatalf("checks %v, want %v", names, want)
 	}
-	for _, n := range []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "disk"} {
+	for _, n := range []string{"data_dir", "ffmpeg", "python", "faster-whisper", "pypdf", "gpu", "cudnn", "disk"} {
 		if byName[n].Status != "ok" {
 			t.Errorf("%s: %+v", n, byName[n])
 		}
@@ -243,7 +244,7 @@ func TestSystemEndpoints(t *testing.T) {
 	if sys.GPU.TotalMB != 12000 || sys.GPU.FreeMB != 9000 || sys.GPU.SlotsMax != 1 || sys.GPU.EstimatedJobMB < 5000 {
 		t.Errorf("gpu %+v", sys.GPU)
 	}
-	if a, ok := sys.API["deepseek"]; !ok || a.Max != 8 || a.RPMLimit != 300 {
+	if a, ok := sys.API["deepseek"]; !ok || a.Max != 64 || a.RPMLimit != 0 { // perf-llm: 64, no per-minute limit
 		t.Errorf("api %+v", sys.API)
 	}
 	cfg, _ := sys.Config.(map[string]any)

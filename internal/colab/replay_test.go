@@ -35,7 +35,7 @@ type testEnv struct {
 func newEnv(t *testing.T, sample string, mods ...func(*Options)) *testEnv {
 	t.Helper()
 	rs := newReplay(t, sample)
-	kv := NewMemKV()
+	kv := newDiskKV()
 	clk := newFakeClock()
 	lg, lb := newTestLogger()
 	o := Options{KV: kv, ColabURL: rs.colabURL(), TokenURL: rs.tokenURL(), RevokeURL: rs.revokeURL(),
@@ -218,6 +218,7 @@ func TestReplayIdleRelease(t *testing.T) {
 	if _, err := e.b.Transcribe(ctx, e.job(t), nil); err != nil {
 		t.Fatal(err)
 	}
+	e.b.removalsSettled() // the job directory goes in the background, before the clock moves
 	e.clk.Advance(4 * time.Minute)
 	e.b.Tick(ctx)
 	if e.b.Status(ctx).State != StateRunning {
@@ -243,6 +244,10 @@ func TestReplayWindowRelease(t *testing.T) {
 	if _, err := e.b.Transcribe(ctx, e.job(t), nil); err != nil {
 		t.Fatal(err)
 	}
+	// The job directory goes in the background (3.2.0), before the clock
+	// moves: 50 minutes later the access token would have to be refreshed
+	// first, which the recording does not expect (flake-hunt #1).
+	e.b.removalsSettled()
 	// Lectures keep coming (the idle limit never triggers); only the window
 	// can release the runtime: at 4 h minus the overhead of one lecture.
 	for i := 0; i < 5; i++ {
@@ -281,6 +286,7 @@ func TestReplayAuthEndingRelease(t *testing.T) {
 	if _, err := e.b.Transcribe(ctx, e.job(t), nil); err != nil {
 		t.Fatal(err)
 	}
+	e.b.removalsSettled() // the job directory goes in the background, before the clock moves
 	set := e.b.Settings()
 	set.IdleReleaseMin = 60
 	_ = e.b.SetSettings(ctx, set)
@@ -366,8 +372,9 @@ func TestReplayQueueThenAssigned(t *testing.T) {
 	if s.rec.State != StateRunning || s.rec.Endpoint != "gpu-t4-s-replay1" {
 		t.Errorf("session %+v", s.rec)
 	}
-	// Exponential back-off: 30 s, then 60 s; boot answered at once.
-	if !slices.Equal(e.clk.sleeps, []time.Duration{30 * time.Second, 60 * time.Second}) {
+	// Exponential back-off: 5 s, then 10 s (colab-prof R3: the first retry
+	// soon, still doubling); boot answered at once.
+	if !slices.Equal(e.clk.sleeps, []time.Duration{5 * time.Second, 10 * time.Second}) {
 		t.Errorf("sleeps %v", e.clk.sleeps)
 	}
 	waits := 0
@@ -383,7 +390,7 @@ func TestReplayQueueThenAssigned(t *testing.T) {
 		t.Errorf("%d waiting events", waits)
 	}
 	// The window counts the queue wait (V14.3 step 4).
-	if st := e.b.Status(ctx); st.WindowUsedSec != 90 || st.State != StateRunning {
+	if st := e.b.Status(ctx); st.WindowUsedSec != 15 || st.State != StateRunning {
 		t.Errorf("status %+v", st)
 	}
 	var rec sessionRecord
@@ -652,12 +659,13 @@ func TestReplayLowBalance(t *testing.T) {
 	if ok, w := e.b.CanDispatch(ctx, 3000); ok || w != model.WaitRemoteBalance {
 		t.Fatalf("CanDispatch = %v %q", ok, w)
 	}
-	// The free tier does not check the balance.
-	set := e.b.Settings()
+	// colab-obs-core: the tier follows the account (0.1 CU paid: paid);
+	// a tier in the settings is ignored.
+	set := e.b.UserSettings()
 	set.Tier = TierFree
 	_ = e.b.SetSettings(ctx, set)
-	if ok, w := e.b.CanDispatch(ctx, 3000); !ok || w != "" {
-		t.Errorf("free tier CanDispatch = %v %q", ok, w)
+	if ok, w := e.b.CanDispatch(ctx, 3000); ok || w != model.WaitRemoteBalance || e.b.Settings().Tier != TierPaid {
+		t.Errorf("tier setting not ignored: CanDispatch = %v %q", ok, w)
 	}
 	e.rs.finish()
 	e.checkClean(t)
@@ -728,6 +736,9 @@ func TestReplayCleanupFailureReleases(t *testing.T) {
 	if got, _ := os.ReadFile(path); string(got) != e.rs.vars["result_json"] {
 		t.Fatal("result.json differs from the download")
 	}
+	// 3.2.0: the lecture is done; its files go in the background (the
+	// removal cell cannot confirm, the deletions one by one are retried).
+	e.b.removalsSettled()
 	st := e.b.Status(ctx)
 	if st.State != StateReleased || st.LastRelease == nil || st.LastRelease.Reason != ReleaseCleanupFailed ||
 		st.LastRelease.File != "result.json" {

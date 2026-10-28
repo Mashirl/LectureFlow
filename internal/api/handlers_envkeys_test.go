@@ -212,8 +212,8 @@ func TestUseEnvKeyUsesPresetLimits(t *testing.T) {
 			preset = p
 		}
 	}
-	if preset.MaxConcurrency != 8 || preset.RPM != 300 {
-		t.Fatalf("shipped DeepSeek preset: %d / %d, want 8 / 300", preset.MaxConcurrency, preset.RPM)
+	if preset.MaxConcurrency != 64 || preset.RPM != 0 { // perf-llm
+		t.Fatalf("shipped DeepSeek preset: %d / %d, want 64 / 0", preset.MaxConcurrency, preset.RPM)
 	}
 	for name, comps := range map[string]*components.Manager{"manifest": m, "fallback": nil} {
 		e := newEnv(t, func(s *Server) {
@@ -223,7 +223,7 @@ func TestUseEnvKeyUsesPresetLimits(t *testing.T) {
 		renameDeepSeekFixture(t, e.set)
 		var pv ProviderView
 		e.call("POST", "/api/onboarding/use-env-key", map[string]string{"provider_type": "deepseek"}, http.StatusCreated, &pv)
-		if pv.MaxConcurrency != 8 || pv.RPM != 300 || pv.BalanceAPI != "deepseek" {
+		if pv.MaxConcurrency != 64 || pv.RPM != 0 || pv.BalanceAPI != "deepseek" {
 			t.Errorf("%s: created %+v", name, pv)
 		}
 		// an existing provider keeps its own limits; only the key changes

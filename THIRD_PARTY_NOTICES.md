@@ -20,6 +20,7 @@ Modules linked into `lectureflow` for Windows, macOS and Linux (`go list -deps`)
 | github.com/ncruces/go-strftime | v1.1.0 | MIT | https://pkg.go.dev/github.com/ncruces/go-strftime |  |
 | github.com/oklog/ulid/v2 | v2.1.2 | Apache-2.0 | https://pkg.go.dev/github.com/oklog/ulid/v2 |  |
 | github.com/remyoudompheng/bigfft | v0.0.0-20230129092748-24d4a6f8daec | BSD-3-Clause | https://pkg.go.dev/github.com/remyoudompheng/bigfft |  |
+| golang.org/x/crypto | v0.58.0 | BSD-3-Clause | https://pkg.go.dev/golang.org/x/crypto |  |
 | golang.org/x/sys | v0.49.0 | BSD-3-Clause | https://pkg.go.dev/golang.org/x/sys |  |
 | modernc.org/libc | v1.79.0 | BSD-3-Clause AND MIT | https://pkg.go.dev/modernc.org/libc |  |
 | modernc.org/mathutil | v1.7.1 | BSD-3-Clause | https://pkg.go.dev/modernc.org/mathutil |  |
@@ -53,7 +54,7 @@ Runtime npm packages of `desktop/` (`desktop/package-lock.json`); build-only dev
 | lodash.escaperegexp | 4.1.2 | MIT | https://registry.npmjs.org/lodash.escaperegexp/-/lodash.escaperegexp-4.1.2.tgz |  |
 | lodash.isequal | 4.5.0 | MIT | https://registry.npmjs.org/lodash.isequal/-/lodash.isequal-4.5.0.tgz |  |
 | ms | 2.1.3 | MIT | https://registry.npmjs.org/ms/-/ms-2.1.3.tgz |  |
-| sax | 1.6.1 | BlueOak-1.0.0 | https://registry.npmjs.org/sax/-/sax-1.6.1.tgz | Accepted by allowlist: Shipped with the desktop app through electron-updater. BlueOak-1.0.0 is an OSI-approved permissive license whose only condition is keeping the license notice (reproduced in Appendix A); it has no term that conflicts with AGPL-3.0. Not on the FSF license list; accepted by the copyright holder (the user) on 2026-10-25. Lead ruling 2026-10-24; BlueOak-1.0.0 deliberately not added to the general compatible table. |
+| sax | 1.6.1 | BlueOak-1.0.0 | https://registry.npmjs.org/sax/-/sax-1.6.1.tgz | Accepted by allowlist: Shipped with the desktop app through electron-updater. BlueOak-1.0.0 is an OSI-approved permissive license whose only condition is keeping the license notice (reproduced in Appendix A); it has no term that conflicts with AGPL-3.0. Not on the FSF license list; accepted by the copyright holder (the user) on 2026-10-25, and confirmed by the user on 2026-10-27 as compatible with AGPL-3.0. Lead ruling 2026-10-24; BlueOak-1.0.0 deliberately not added to the general compatible table. |
 | semver | 7.7.4 | ISC | https://registry.npmjs.org/semver/-/semver-7.7.4.tgz |  |
 | tiny-typed-emitter | 2.1.0 | MIT | https://registry.npmjs.org/tiny-typed-emitter/-/tiny-typed-emitter-2.1.0.tgz |  |
 | universalify | 2.0.1 | MIT | https://registry.npmjs.org/universalify/-/universalify-2.0.1.tgz |  |
@@ -149,14 +150,59 @@ Programs shipped next to the server. Their license texts ship alongside the bina
 
 | Name | Version | License | Component / platforms | Source | Note |
 |---|---|---|---|---|---|
-| ffmpeg / ffprobe (macOS build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz in CI) | LGPL-2.1-or-later | core darwin | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables; the one third-party library inside is dav1d (bundled), linked statically. zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically; the build checks that nothing else is. Corresponding source: the pinned ffmpeg-9.0.2.tar.xz, dav1d-1.5.4.tar.xz and that build script. |
-| ffmpeg / ffprobe (Windows build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz with mingw-w64) | LGPL-2.1-or-later | core windows | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264, libvpl and dav1d in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer. |
+| aria2c (macOS build) | 1.37.0 (built from aria2-1.37.0.tar.xz in CI) | GPL-2.0-or-later | core darwin | https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz | Download tool of the browser extension's download queue (SPEC-ext), started by LectureFlow in RPC mode only. aria2 is under the GNU GPL version 2 or later with an additional permission to link with OpenSSL (COPYING, LICENSE.OpenSSL and the source file headers). Neither bundled build links OpenSSL: Windows uses WinTLS (SChannel), macOS AppleTLS (Security.framework). A separate program that LectureFlow starts and talks to over JSON-RPC; it is not linked into LectureFlow. Built by packaging/aria2c/build-aria2c-macos.sh with exactly the configure line above, for macOS 13.0 or later (the app's minimum). AppleTLS (Security.framework; certificates are checked against the system trust store); OpenSSL, GnuTLS, nettle, GMP, libgcrypt, libxml2, Expat, SQLite, libssh2, c-ares, BitTorrent and Metalink are off. Linked dynamically only to macOS system libraries (libz, libc++, libiconv, libSystem, CoreFoundation, Security); the build checks otool -L, the minimum macOS version and aria2c --version. The one third-party library inside is wslay (WebSocket, MIT), part of the aria2 source. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-aria2c-darwin-arm64.tar (the pinned aria2-1.37.0.tar.xz, unchanged, with that build script and its pins); resources/licenses/aria2/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. COPYING, LICENSE.OpenSSL, AUTHORS, BUILDINFO.txt, SOURCE.txt and wslay's COPYING ship in resources/licenses/aria2. |
+| aria2c (Windows build) | 1.37.0 (official build aria2-1.37.0-win-64bit-build1) | GPL-2.0-or-later | core windows | https://github.com/aria2/aria2/releases/tag/release-1.37.0 | Download tool of the browser extension's download queue (SPEC-ext), started by LectureFlow in RPC mode only. aria2 is under the GNU GPL version 2 or later with an additional permission to link with OpenSSL (COPYING, LICENSE.OpenSSL and the source file headers). Neither bundled build links OpenSSL: Windows uses WinTLS (SChannel), macOS AppleTLS (Security.framework). A separate program that LectureFlow starts and talks to over JSON-RPC; it is not linked into LectureFlow. The binary is upstream's own Windows build, used unchanged and pinned by the SHA-256 of the zip and of aria2c.exe (desktop/packaging/third-party.json); upstream's build scripts are Dockerfile.mingw and mingw-config in the 1.37.0 source tarball. Statically linked (README.mingw): GMP, Expat, SQLite, zlib, c-ares, libssh2, the WebSocket library wslay from the aria2 source, and the static parts of the GCC and MinGW-w64 runtimes; it imports only Windows system DLLs. Enabled features: Async DNS, BitTorrent, Firefox3 Cookie, GZip, HTTPS (WinTLS; TLS 1.3 does not work, README.mingw), Message Digest, Metalink, XML-RPC, SFTP. LectureFlow uses only HTTP(S) downloads over JSON-RPC. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-aria2c-windows-x64.tar (the aria2 1.37.0 source with upstream's Dockerfile.mingw and mingw-config, and the pinned GMP, Expat, SQLite, zlib, c-ares and libssh2 tarballs, unchanged); resources/licenses/aria2/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. The GCC and MinGW-w64 runtime sources are not attached: the GCC Runtime Library Exception 3.1 and the ZPL-2.1 ask for none; their Ubuntu source packages are listed. COPYING, LICENSE.OpenSSL, AUTHORS, README.mingw, SOURCE.txt and the libraries' license texts ship in resources/licenses/aria2. |
+| ffmpeg / ffprobe (macOS build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz in CI) | LGPL-2.1-or-later | core darwin | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-macos.sh with exactly the configure line above. Static executables; the one third-party library inside is dav1d (bundled), linked statically. zlib, VideoToolbox and AudioToolbox are system libraries of macOS, linked dynamically; the build checks that nothing else is. Built for macOS 13.0 or later (the app's minimum). Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-ffmpeg-darwin-arm64.tar (the pinned ffmpeg-9.0.2.tar.xz and dav1d-1.5.4.tar.xz, unchanged, with that build script and its pins); resources/licenses/ffmpeg/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. |
+| ffmpeg / ffprobe (Windows build) | 9.0.2 (built from ffmpeg-9.0.2.tar.xz with mingw-w64) | LGPL-2.1-or-later | core windows | https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz | Built by desktop/scripts/build-ffmpeg-windows.sh (Linux, mingw-w64 GCC win32 thread model; Docker image and toolchain versions pinned in desktop/packaging/third-party.json) with exactly the configure line above: no GPL, no non-free, no version3, no autodetected libraries. Shared DLLs (avcodec, avformat, avfilter, avdevice, avutil, swscale, swresample) next to ffmpeg.exe and ffprobe.exe, so they can be replaced; the build checks that they import only Windows system DLLs and each other. External code inside: listed under bundled (OpenH264, libvpl and dav1d in avcodec, zlib, NVENC headers; GCC and MinGW-w64 runtime parts linked statically). Licence texts ship in resources/licenses/ffmpeg (with BUILDINFO.txt). NVENC needs an NVIDIA driver 531.61 or newer. Corresponding source: attached to every LectureFlow release on GitHub, next to the installers, as LectureFlow-<version>-source-ffmpeg-windows-x64.tar (the pinned FFmpeg, zlib, nv-codec-headers, OpenH264, libvpl and dav1d tarballs, unchanged, with desktop/scripts/build-ffmpeg-windows.sh and its pins); resources/licenses/ffmpeg/SOURCE.txt names the attachment of that version. The other addresses in its corresponding-source list are upstream's, for reference. The GCC and MinGW-w64 runtime sources are not attached: the GCC Runtime Library Exception 3.1 and the ZPL-2.1 ask for none; their Ubuntu source packages are listed. |
 | uv | 0.13.1 | MIT OR Apache-2.0 | core windows darwin | https://github.com/astral-sh/uv/releases/tag/0.13.1 | Creates the component virtual environments (SPEC-v3 V3.1). LICENSE-MIT and LICENSE-APACHE of the 0.13.1 tag ship in resources/licenses/uv. |
+
+### aria2c (macOS build)
+
+Corresponding source code / 对应源码:
+
+- https://github.com/ShouldBeQuincy/LectureFlow/releases
+- https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz
+
+Statically linked libraries / 静态链入的库:
+
+| Library | Version | License | Source | Note |
+|---|---|---|---|---|
+| wslay | 1.1.1 (deps/wslay of the aria2 1.37.0 source) | MIT | https://github.com/aria2/aria2/tree/release-1.37.0/deps/wslay | WebSocket library of aria2's RPC interface, compiled in from the aria2 source; its COPYING ships in resources/licenses/aria2/thirdparty. |
+
+### aria2c (Windows build)
+
+Corresponding source code / 对应源码:
+
+- https://github.com/ShouldBeQuincy/LectureFlow/releases
+- https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz
+- https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
+- https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2
+- https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz
+- https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz
+- https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz
+- https://libssh2.org/download/libssh2-1.11.0.tar.bz2
+- https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1
+- https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3
+
+Statically linked libraries / 静态链入的库:
+
+| Library | Version | License | Source | Note |
+|---|---|---|---|---|
+| GMP | 6.3.0 | LGPL-3.0-or-later OR GPL-2.0-or-later | https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz | Multi-precision arithmetic (BitTorrent key exchange). Statically linked by upstream's build. |
+| Expat | 2.5.0 | MIT | https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2 | XML parser (Metalink, XML-RPC). Statically linked by upstream's build. |
+| SQLite | 3.43.1 | blessing | https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz | Reads Firefox 3 / Chromium cookie files (--load-cookies); public-domain dedication, no license text required. Statically linked by upstream's build. |
+| zlib | 1.3 | Zlib | https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz | gzip content encoding. Statically linked by upstream's build. |
+| c-ares | 1.19.1 | MIT | https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz | Asynchronous DNS. Statically linked by upstream's build. |
+| libssh2 | 1.11.0 | BSD-3-Clause | https://libssh2.org/download/libssh2-1.11.0.tar.bz2 | SFTP downloads. Statically linked by upstream's build. |
+| wslay | 1.1.1 (deps/wslay of the aria2 1.37.0 source) | MIT | https://github.com/aria2/aria2/tree/release-1.37.0/deps/wslay | WebSocket library of aria2's RPC interface, compiled in from the aria2 source; its COPYING ships in resources/licenses/aria2/thirdparty. |
+| GCC runtime libraries (libgcc, libstdc++) | 10.3.0 (Ubuntu 22.04 gcc-mingw-w64 24.3, "10-win32 20220113") | GPL-3.0-or-later WITH GCC-exception-3.1 | https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3 | Linked statically by upstream's build. The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL-3.0 terms of these libraries (COPYING.RUNTIME ships in resources/licenses/aria2/thirdparty). |
+| MinGW-w64 runtime (static CRT parts) | 8.0.0 (Ubuntu 22.04 mingw-w64 8.0.0-1) | ZPL-2.1 | https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1 | Startup code and libmingwex helpers linked statically by upstream's build; some files are public domain. The C runtime itself is msvcrt.dll from Windows. COPYING.MinGW-w64-runtime.txt ships in resources/licenses/aria2/thirdparty. |
 
 ### ffmpeg / ffprobe (macOS build)
 
 Corresponding source code / 对应源码:
 
+- https://github.com/ShouldBeQuincy/LectureFlow/releases
 - https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
 - https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz
 
@@ -170,6 +216,7 @@ Statically linked libraries / 静态链入的库:
 
 Corresponding source code / 对应源码:
 
+- https://github.com/ShouldBeQuincy/LectureFlow/releases
 - https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz
 - https://github.com/madler/zlib/archive/refs/tags/v1.3.1.tar.gz
 - https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n12.1.14.0.tar.gz
@@ -177,7 +224,7 @@ Corresponding source code / 对应源码:
 - https://github.com/intel/libvpl/archive/refs/tags/v2.16.0.tar.gz
 - https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz
 - https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1
-- https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1
+- https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1
 
 Statically linked libraries / 静态链入的库:
 
@@ -188,7 +235,7 @@ Statically linked libraries / 静态链入的库:
 | dav1d | 1.5.4 (commit 54706fc6bc0c) | BSD-2-Clause | https://code.videolan.org/videolan/dav1d/-/tree/54706fc6bc0cdecab7e9593974a4039cc038fca7 | AV1 software decoder (libdav1d) linked statically into avcodec, built from the pinned 1.5.4 release tarball with meson. COPYING and the AOMedia Patent License 1.0 (doc/PATENTS) ship in resources/licenses/ffmpeg. |
 | zlib | 1.3.1 (commit 51b7f2abdade) | Zlib | https://github.com/madler/zlib/tree/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf | Compression (PNG, compressed MP4 headers). |
 | nv-codec-headers | 12.1.14.0 (commit 1889e62e2d35) | MIT | https://github.com/FFmpeg/nv-codec-headers/tree/1889e62e2d35ff7aa9baca2bceb14f053785e6f1 | Headers only (NVENC, h264_nvenc); the NVIDIA driver is loaded at run time. |
-| GCC runtime libraries (libgcc, libstdc++) | 13.2.0 (Ubuntu 13.2.0-6ubuntu1+26.1) | GPL-3.0-or-later WITH GCC-exception-3.1 | https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1 | Linked statically (-static-libgcc; libstdc++ for OpenH264 and libvpl). The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL: no GPL obligations attach to ffmpeg. |
+| GCC runtime libraries (libgcc, libstdc++) | 13.2.0 (Ubuntu 13.2.0-6ubuntu1+26.1) | GPL-3.0-or-later WITH GCC-exception-3.1 | https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1 | Linked statically (-static-libgcc; libstdc++ for OpenH264 and libvpl). The GCC Runtime Library Exception 3.1 exempts the compiled program from the GPL: no GPL obligations attach to ffmpeg. |
 | MinGW-w64 runtime (static CRT parts) | 11.0.1 (Ubuntu 11.0.1-3build1) | ZPL-2.1 | https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1 | Startup code and libmingwex helpers linked statically; some files are public domain. The C runtime itself is msvcrt.dll from Windows. |
 
 ## 7. Downloaded on your computer by the component manager, not distributed with LectureFlow / 由组件管理器在你的电脑上下载、不随本程序分发的组件
@@ -199,12 +246,12 @@ These Python packages are not part of the LectureFlow installer or of any Lectur
 
 | Name | Version | License | Components | Source | Note |
 |---|---|---|---|---|---|
-| av | 15.1.0 | BSD-3-Clause AND GPL-2.0-or-later AND OpenSSL | asr-cuda | https://pypi.org/project/av/ | PyAV itself is BSD-3-Clause, but the Windows wheel (av.libs) bundles an FFmpeg built with GPL parts (libx264, libx265: GPL-2.0-or-later) and OpenSSL 1.1 libcrypto (OpenSSL/SSLeay license, GPL-incompatible). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: the Windows wheel bundles OpenSSL 1.1 libcrypto (OpenSSL/SSLeay license, GPL-incompatible) next to an FFmpeg built with GPL parts (libx264, libx265). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
-| ctranslate2 | 4.8.3 | MIT AND LicenseRef-NVIDIA-Proprietary AND LicenseRef-Intel-libiomp5 | asr-cuda | https://pypi.org/project/ctranslate2/ | CTranslate2 is MIT, but the Windows wheel bundles cudnn64_9.dll (NVIDIA cuDNN, proprietary) and libiomp5md.dll (Intel OpenMP runtime, license not stated in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: the wheel bundles cudnn64_9.dll (NVIDIA cuDNN, proprietary) and libiomp5md.dll (Intel OpenMP runtime, license not stated in the wheel). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
-| nvidia-cublas-cu12 | 12.9.2.10 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cublas-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA cuBLAS, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
-| nvidia-cuda-nvrtc-cu12 | 12.9.86 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cuda-nvrtc-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA NVRTC, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
-| nvidia-cudnn-cu12 | 9.27.0.42 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cudnn-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA cuDNN, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
-| regex | 2026.9.29 | Apache-2.0 AND CNRI-Python | asr-mlx | https://pypi.org/project/regex/ | Locked in asr-mlx (via tiktoken / mlx-whisper); also in the OpenVINO dev venv via transformers. CNRI-Python alone is not GPL-compatible per FSF. User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: Apache-2.0 AND CNRI-Python; the CNRI-Python part alone is not GPL-compatible per FSF. Component: asr-mlx. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| av | 15.1.0 | BSD-3-Clause AND GPL-2.0-or-later AND OpenSSL | asr-cuda | https://pypi.org/project/av/ | PyAV itself is BSD-3-Clause, but the Windows wheel (av.libs) bundles an FFmpeg built with GPL parts (libx264, libx265: GPL-2.0-or-later) and OpenSSL 1.1 libcrypto (OpenSSL/SSLeay license, GPL-incompatible). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: the Windows wheel bundles OpenSSL 1.1 libcrypto (OpenSSL/SSLeay license, GPL-incompatible) next to an FFmpeg built with GPL parts (libx264, libx265). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| ctranslate2 | 4.8.3 | MIT AND LicenseRef-NVIDIA-Proprietary AND LicenseRef-Intel-libiomp5 | asr-cuda | https://pypi.org/project/ctranslate2/ | CTranslate2 is MIT, but the Windows wheel bundles cudnn64_9.dll (NVIDIA cuDNN, proprietary) and libiomp5md.dll (Intel OpenMP runtime, license not stated in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: the wheel bundles cudnn64_9.dll (NVIDIA cuDNN, proprietary) and libiomp5md.dll (Intel OpenMP runtime, license not stated in the wheel). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| nvidia-cublas-cu12 | 12.9.2.10 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cublas-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA cuBLAS, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| nvidia-cuda-nvrtc-cu12 | 12.9.86 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cuda-nvrtc-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA NVRTC, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| nvidia-cudnn-cu12 | 9.27.0.42 | LicenseRef-NVIDIA-Proprietary | asr-cuda | https://pypi.org/project/nvidia-cudnn-cu12/ | NVIDIA proprietary CUDA library (License.txt in the wheel). User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: NVIDIA cuDNN, proprietary license (LicenseRef-NVIDIA-Proprietary). Component: asr-cuda. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
+| regex | 2026.9.29 | Apache-2.0 AND CNRI-Python | asr-mlx | https://pypi.org/project/regex/ | Locked in asr-mlx (via tiktoken / mlx-whisper); also in the OpenVINO dev venv via transformers. CNRI-Python alone is not GPL-compatible per FSF. User-fetched, not distributed (allowlist.json, lead ruling 2026-10-24). Not distributed by LectureFlow: Not distributed with LectureFlow: not in the installer or any LectureFlow download; the component manager downloads it on the user's computer from PyPI (or the mirror the user chose), pinned by the component lock file, into the component's own Python environment that runs in a separate process. The project must not publish offline component archives that contain this package. Incompatibility: Apache-2.0 AND CNRI-Python; the CNRI-Python part alone is not GPL-compatible per FSF. Component: asr-mlx. Lead ruling 2026-10-24. LectureFlow's combination with this package is covered by the additional permission under AGPL-3.0 section 7 in LICENSE-EXCEPTION.md (user decision 2026-10-25, confirmed 2026-10-27), which names it; that permission does not change this package's own license and does not change the rule above: LectureFlow still does not distribute it. |
 
 ## 8. Bundled media / 随包分发的媒体文件
 
@@ -257,6 +304,17 @@ When you install one of these components, the component manager downloads the ve
 | Name | Version | License | Platforms | Source | Note |
 |---|---|---|---|---|---|
 | gcloud | 590.0.1 | Apache-2.0 | darwin-arm64 windows-x64 | https://docs.cloud.google.com/sdk/docs/downloads-versioned-archives | Google Cloud CLI 590.0.1 (Windows: with its bundled Python 3.14; macOS: runs on the python component). Downloaded from Google (dl.google.com) on the user's computer by the component manager and run as a separate program; not part of the LectureFlow installer and never put into an offline archive. The Google Cloud CLI is Apache-2.0 unless an alternate license file says otherwise; the Python bundled in the Windows archive (PSF-2.0, with the Microsoft C runtime DLLs) and the third-party libraries under lib/third_party and platform/ keep their own licenses (license files inside the installed tool). On Windows the component leaves out six directories of API clients and test data that LectureFlow never uses and whose paths are too long for Windows (packaging/components/README.md, Tools). |
+
+## 11. Browser extension / 浏览器扩展
+
+Third-party files inside the browser extension's packages (Chrome, Edge, Firefox): copied unchanged from npm into `extension/src/vendor`, registered in `packaging/licenses/extension.json`, and shipped with `vendor/NOTICE` and their license texts (Appendix A). The extension's own code is under the AGPL like the rest of LectureFlow. Its platform profiles and detection fixtures (`extension/profiles`, `extension/fixtures`) are dedicated to the public domain under CC0-1.0 (`extension/profiles/LICENSE`). Its development tools (Playwright, for the end-to-end tests) are not shipped and not listed.
+
+浏览器扩展安装包（Chrome、Edge、Firefox）中的第三方文件：从 npm 原样复制到 `extension/src/vendor`，登记在 `packaging/licenses/extension.json`，与 `vendor/NOTICE` 及各自的许可证全文一起分发（附录 A）。扩展自身的代码与 LectureFlow 其他部分一样以 AGPL 发布；平台对策文件与探测报告样例（`extension/profiles`、`extension/fixtures`）以 CC0-1.0 贡献到公有领域（`extension/profiles/LICENSE`）。开发工具（端到端测试用的 Playwright）不随扩展分发，不在此列出。
+
+| Name | Version | License | Shipped as | Source | Note |
+|---|---|---|---|---|---|
+| @tabler/icons | 3.49.0 | MIT | ui/icons.js (path data of the outline icons, with the MIT notice) and vendor/tabler/LICENSE | https://registry.npmjs.org/@tabler/icons/-/icons-3.49.0.tgz | icons/outline/*.svg of the npm package, unchanged in the repository; the build turns the path data into ui/icons.js. Upstream: https://github.com/tabler/tabler-icons. |
+| webextension-polyfill | 0.12.0 | MPL-2.0 | vendor/browser-polyfill.js, unchanged | https://registry.npmjs.org/webextension-polyfill/-/webextension-polyfill-0.12.0.tgz | dist/browser-polyfill.js of the npm package, copied unchanged; it keeps its MPL-2.0 header (Exhibit A). MPL-2.0 is a file-level copyleft: the file is its own source form, and the package carries the license text (MPL-2.0 sections 3.1, 3.3: the extension as a larger work may be under the AGPL). Upstream: https://github.com/mozilla/webextension-polyfill. |
 
 ## Appendix A: License texts and notices
 
@@ -638,7 +696,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ### A.8
 
-Used by: golang.org/x/sys v0.49.0 (LICENSE)
+Used by: golang.org/x/crypto v0.58.0 (LICENSE); golang.org/x/sys v0.49.0 (LICENSE)
 
 ````text
 Copyright 2009 The Go Authors.
@@ -3936,6 +3994,414 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ````
 
+### A.40
+
+Used by: @tabler/icons 3.49.0 (vendor/tabler/LICENSE)
+
+````text
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
+
+### A.41
+
+Used by: webextension-polyfill 0.12.0 (vendor/LICENSE.webextension-polyfill)
+
+````text
+Mozilla Public License Version 2.0
+==================================
+
+1. Definitions
+--------------
+
+1.1. "Contributor"
+    means each individual or legal entity that creates, contributes to
+    the creation of, or owns Covered Software.
+
+1.2. "Contributor Version"
+    means the combination of the Contributions of others (if any) used
+    by a Contributor and that particular Contributor's Contribution.
+
+1.3. "Contribution"
+    means Covered Software of a particular Contributor.
+
+1.4. "Covered Software"
+    means Source Code Form to which the initial Contributor has attached
+    the notice in Exhibit A, the Executable Form of such Source Code
+    Form, and Modifications of such Source Code Form, in each case
+    including portions thereof.
+
+1.5. "Incompatible With Secondary Licenses"
+    means
+
+    (a) that the initial Contributor has attached the notice described
+        in Exhibit B to the Covered Software; or
+
+    (b) that the Covered Software was made available under the terms of
+        version 1.1 or earlier of the License, but not also under the
+        terms of a Secondary License.
+
+1.6. "Executable Form"
+    means any form of the work other than Source Code Form.
+
+1.7. "Larger Work"
+    means a work that combines Covered Software with other material, in
+    a separate file or files, that is not Covered Software.
+
+1.8. "License"
+    means this document.
+
+1.9. "Licensable"
+    means having the right to grant, to the maximum extent possible,
+    whether at the time of the initial grant or subsequently, any and
+    all of the rights conveyed by this License.
+
+1.10. "Modifications"
+    means any of the following:
+
+    (a) any file in Source Code Form that results from an addition to,
+        deletion from, or modification of the contents of Covered
+        Software; or
+
+    (b) any new file in Source Code Form that contains any Covered
+        Software.
+
+1.11. "Patent Claims" of a Contributor
+    means any patent claim(s), including without limitation, method,
+    process, and apparatus claims, in any patent Licensable by such
+    Contributor that would be infringed, but for the grant of the
+    License, by the making, using, selling, offering for sale, having
+    made, import, or transfer of either its Contributions or its
+    Contributor Version.
+
+1.12. "Secondary License"
+    means either the GNU General Public License, Version 2.0, the GNU
+    Lesser General Public License, Version 2.1, the GNU Affero General
+    Public License, Version 3.0, or any later versions of those
+    licenses.
+
+1.13. "Source Code Form"
+    means the form of the work preferred for making modifications.
+
+1.14. "You" (or "Your")
+    means an individual or a legal entity exercising rights under this
+    License. For legal entities, "You" includes any entity that
+    controls, is controlled by, or is under common control with You. For
+    purposes of this definition, "control" means (a) the power, direct
+    or indirect, to cause the direction or management of such entity,
+    whether by contract or otherwise, or (b) ownership of more than
+    fifty percent (50%) of the outstanding shares or beneficial
+    ownership of such entity.
+
+2. License Grants and Conditions
+--------------------------------
+
+2.1. Grants
+
+Each Contributor hereby grants You a world-wide, royalty-free,
+non-exclusive license:
+
+(a) under intellectual property rights (other than patent or trademark)
+    Licensable by such Contributor to use, reproduce, make available,
+    modify, display, perform, distribute, and otherwise exploit its
+    Contributions, either on an unmodified basis, with Modifications, or
+    as part of a Larger Work; and
+
+(b) under Patent Claims of such Contributor to make, use, sell, offer
+    for sale, have made, import, and otherwise transfer either its
+    Contributions or its Contributor Version.
+
+2.2. Effective Date
+
+The licenses granted in Section 2.1 with respect to any Contribution
+become effective for each Contribution on the date the Contributor first
+distributes such Contribution.
+
+2.3. Limitations on Grant Scope
+
+The licenses granted in this Section 2 are the only rights granted under
+this License. No additional rights or licenses will be implied from the
+distribution or licensing of Covered Software under this License.
+Notwithstanding Section 2.1(b) above, no patent license is granted by a
+Contributor:
+
+(a) for any code that a Contributor has removed from Covered Software;
+    or
+
+(b) for infringements caused by: (i) Your and any other third party's
+    modifications of Covered Software, or (ii) the combination of its
+    Contributions with other software (except as part of its Contributor
+    Version); or
+
+(c) under Patent Claims infringed by Covered Software in the absence of
+    its Contributions.
+
+This License does not grant any rights in the trademarks, service marks,
+or logos of any Contributor (except as may be necessary to comply with
+the notice requirements in Section 3.4).
+
+2.4. Subsequent Licenses
+
+No Contributor makes additional grants as a result of Your choice to
+distribute the Covered Software under a subsequent version of this
+License (see Section 10.2) or under the terms of a Secondary License (if
+permitted under the terms of Section 3.3).
+
+2.5. Representation
+
+Each Contributor represents that the Contributor believes its
+Contributions are its original creation(s) or it has sufficient rights
+to grant the rights to its Contributions conveyed by this License.
+
+2.6. Fair Use
+
+This License is not intended to limit any rights You have under
+applicable copyright doctrines of fair use, fair dealing, or other
+equivalents.
+
+2.7. Conditions
+
+Sections 3.1, 3.2, 3.3, and 3.4 are conditions of the licenses granted
+in Section 2.1.
+
+3. Responsibilities
+-------------------
+
+3.1. Distribution of Source Form
+
+All distribution of Covered Software in Source Code Form, including any
+Modifications that You create or to which You contribute, must be under
+the terms of this License. You must inform recipients that the Source
+Code Form of the Covered Software is governed by the terms of this
+License, and how they can obtain a copy of this License. You may not
+attempt to alter or restrict the recipients' rights in the Source Code
+Form.
+
+3.2. Distribution of Executable Form
+
+If You distribute Covered Software in Executable Form then:
+
+(a) such Covered Software must also be made available in Source Code
+    Form, as described in Section 3.1, and You must inform recipients of
+    the Executable Form how they can obtain a copy of such Source Code
+    Form by reasonable means in a timely manner, at a charge no more
+    than the cost of distribution to the recipient; and
+
+(b) You may distribute such Executable Form under the terms of this
+    License, or sublicense it under different terms, provided that the
+    license for the Executable Form does not attempt to limit or alter
+    the recipients' rights in the Source Code Form under this License.
+
+3.3. Distribution of a Larger Work
+
+You may create and distribute a Larger Work under terms of Your choice,
+provided that You also comply with the requirements of this License for
+the Covered Software. If the Larger Work is a combination of Covered
+Software with a work governed by one or more Secondary Licenses, and the
+Covered Software is not Incompatible With Secondary Licenses, this
+License permits You to additionally distribute such Covered Software
+under the terms of such Secondary License(s), so that the recipient of
+the Larger Work may, at their option, further distribute the Covered
+Software under the terms of either this License or such Secondary
+License(s).
+
+3.4. Notices
+
+You may not remove or alter the substance of any license notices
+(including copyright notices, patent notices, disclaimers of warranty,
+or limitations of liability) contained within the Source Code Form of
+the Covered Software, except that You may alter any license notices to
+the extent required to remedy known factual inaccuracies.
+
+3.5. Application of Additional Terms
+
+You may choose to offer, and to charge a fee for, warranty, support,
+indemnity or liability obligations to one or more recipients of Covered
+Software. However, You may do so only on Your own behalf, and not on
+behalf of any Contributor. You must make it absolutely clear that any
+such warranty, support, indemnity, or liability obligation is offered by
+You alone, and You hereby agree to indemnify every Contributor for any
+liability incurred by such Contributor as a result of warranty, support,
+indemnity or liability terms You offer. You may include additional
+disclaimers of warranty and limitations of liability specific to any
+jurisdiction.
+
+4. Inability to Comply Due to Statute or Regulation
+---------------------------------------------------
+
+If it is impossible for You to comply with any of the terms of this
+License with respect to some or all of the Covered Software due to
+statute, judicial order, or regulation then You must: (a) comply with
+the terms of this License to the maximum extent possible; and (b)
+describe the limitations and the code they affect. Such description must
+be placed in a text file included with all distributions of the Covered
+Software under this License. Except to the extent prohibited by statute
+or regulation, such description must be sufficiently detailed for a
+recipient of ordinary skill to be able to understand it.
+
+5. Termination
+--------------
+
+5.1. The rights granted under this License will terminate automatically
+if You fail to comply with any of its terms. However, if You become
+compliant, then the rights granted under this License from a particular
+Contributor are reinstated (a) provisionally, unless and until such
+Contributor explicitly and finally terminates Your grants, and (b) on an
+ongoing basis, if such Contributor fails to notify You of the
+non-compliance by some reasonable means prior to 60 days after You have
+come back into compliance. Moreover, Your grants from a particular
+Contributor are reinstated on an ongoing basis if such Contributor
+notifies You of the non-compliance by some reasonable means, this is the
+first time You have received notice of non-compliance with this License
+from such Contributor, and You become compliant prior to 30 days after
+Your receipt of the notice.
+
+5.2. If You initiate litigation against any entity by asserting a patent
+infringement claim (excluding declaratory judgment actions,
+counter-claims, and cross-claims) alleging that a Contributor Version
+directly or indirectly infringes any patent, then the rights granted to
+You by any and all Contributors for the Covered Software under Section
+2.1 of this License shall terminate.
+
+5.3. In the event of termination under Sections 5.1 or 5.2 above, all
+end user license agreements (excluding distributors and resellers) which
+have been validly granted by You or Your distributors under this License
+prior to termination shall survive termination.
+
+************************************************************************
+*                                                                      *
+*  6. Disclaimer of Warranty                                           *
+*  -------------------------                                           *
+*                                                                      *
+*  Covered Software is provided under this License on an "as is"       *
+*  basis, without warranty of any kind, either expressed, implied, or  *
+*  statutory, including, without limitation, warranties that the       *
+*  Covered Software is free of defects, merchantable, fit for a        *
+*  particular purpose or non-infringing. The entire risk as to the     *
+*  quality and performance of the Covered Software is with You.        *
+*  Should any Covered Software prove defective in any respect, You     *
+*  (not any Contributor) assume the cost of any necessary servicing,   *
+*  repair, or correction. This disclaimer of warranty constitutes an   *
+*  essential part of this License. No use of any Covered Software is   *
+*  authorized under this License except under this disclaimer.         *
+*                                                                      *
+************************************************************************
+
+************************************************************************
+*                                                                      *
+*  7. Limitation of Liability                                          *
+*  --------------------------                                          *
+*                                                                      *
+*  Under no circumstances and under no legal theory, whether tort      *
+*  (including negligence), contract, or otherwise, shall any           *
+*  Contributor, or anyone who distributes Covered Software as          *
+*  permitted above, be liable to You for any direct, indirect,         *
+*  special, incidental, or consequential damages of any character      *
+*  including, without limitation, damages for lost profits, loss of    *
+*  goodwill, work stoppage, computer failure or malfunction, or any    *
+*  and all other commercial damages or losses, even if such party      *
+*  shall have been informed of the possibility of such damages. This   *
+*  limitation of liability shall not apply to liability for death or   *
+*  personal injury resulting from such party's negligence to the       *
+*  extent applicable law prohibits such limitation. Some               *
+*  jurisdictions do not allow the exclusion or limitation of           *
+*  incidental or consequential damages, so this exclusion and          *
+*  limitation may not apply to You.                                    *
+*                                                                      *
+************************************************************************
+
+8. Litigation
+-------------
+
+Any litigation relating to this License may be brought only in the
+courts of a jurisdiction where the defendant maintains its principal
+place of business and such litigation shall be governed by laws of that
+jurisdiction, without reference to its conflict-of-law provisions.
+Nothing in this Section shall prevent a party's ability to bring
+cross-claims or counter-claims.
+
+9. Miscellaneous
+----------------
+
+This License represents the complete agreement concerning the subject
+matter hereof. If any provision of this License is held to be
+unenforceable, such provision shall be reformed only to the extent
+necessary to make it enforceable. Any law or regulation which provides
+that the language of a contract shall be construed against the drafter
+shall not be used to construe this License against a Contributor.
+
+10. Versions of the License
+---------------------------
+
+10.1. New Versions
+
+Mozilla Foundation is the license steward. Except as provided in Section
+10.3, no one other than the license steward has the right to modify or
+publish new versions of this License. Each version will be given a
+distinguishing version number.
+
+10.2. Effect of New Versions
+
+You may distribute the Covered Software under the terms of the version
+of the License under which You originally received the Covered Software,
+or under the terms of any subsequent version published by the license
+steward.
+
+10.3. Modified Versions
+
+If you create software not governed by this License, and you want to
+create a new license for such software, you may create and use a
+modified version of this License if you rename the license and remove
+any references to the name of the license steward (except to note that
+such modified license differs from this License).
+
+10.4. Distributing Source Code Form that is Incompatible With Secondary
+Licenses
+
+If You choose to distribute Source Code Form that is Incompatible With
+Secondary Licenses under the terms of this version of the License, the
+notice described in Exhibit B of this License must be attached.
+
+Exhibit A - Source Code Form License Notice
+-------------------------------------------
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+If it is not possible or desirable to put the notice in a particular
+file, then You may include the notice in a location (such as a LICENSE
+file in a relevant directory) where a recipient would be likely to look
+for such a notice.
+
+You may add additional accurate notices of copyright ownership.
+
+Exhibit B - "Incompatible With Secondary Licenses" Notice
+---------------------------------------------------------
+
+  This Source Code Form is "Incompatible With Secondary Licenses", as
+  defined by the Mozilla Public License, v. 2.0.
+````
+
 ## Appendix B: Where the other license texts are
 
 - Python packages: `*.dist-info/licenses/` (or `*.dist-info/LICENSE*`) inside each installed component; upstream at the source links above.
@@ -3945,3 +4411,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - Programs downloaded from their vendor (section 10): the license files inside the installed tool (`components/{id}/{version}/tool/`; for the Google Cloud CLI its `LICENSE` and the license files of the parts it bundles).
 - Bundled binaries: the license files shipped next to each binary (section 6).
 - Electron: `LICENSE` and `LICENSES.chromium.html` in the application directory.
+- Browser extension (section 11): `vendor/NOTICE` and the license file of each package next to it, inside the extension package (`extension/src/vendor/` in the repository); the Tabler Icons notice is also at the top of `ui/icons.js`.

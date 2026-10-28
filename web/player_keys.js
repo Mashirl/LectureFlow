@@ -11,7 +11,8 @@ import { h, openDialog, isTypingTarget } from './dom.js';
 import { t } from './i18n.js';
 
 // [keys shown, i18n key of the action]; also the help table (P6.3 "?").
-export function shortcutRows() {
+// opts.angles: the lecture has a second camera angle (ext web3: V swaps).
+export function shortcutRows(opts = {}) {
   const space = t('player.key.space');
   return [
     [[space, 'K'], 'player.help.play'],
@@ -23,13 +24,14 @@ export function shortcutRows() {
     [['C'], 'player.help.display'],
     [['T'], 'player.help.theater'],
     [['F'], 'player.help.fullscreen'],
+    opts.angles ? [['V'], 'player.angle.help'] : null,
     [['Y'], 'player.help.cite'],
     [['/'], 'player.help.search'],
     [['?'], 'player.help.help'],
-  ];
+  ].filter(Boolean);
 }
 
-export function openHelp() {
+export function openHelp(opts = {}) {
   return openDialog(
     t('player.help.title'),
     (close) =>
@@ -42,7 +44,7 @@ export function openHelp() {
           h(
             'tbody',
             null,
-            shortcutRows().map(([keys, label]) =>
+            shortcutRows(opts).map(([keys, label]) =>
               h(
                 'tr',
                 null,
@@ -70,7 +72,8 @@ export function ownsArrowKeys(el) {
 }
 
 // bindKeys(handlers) → unbind. handlers: {toggle, seekBy(ms), prev, next,
-// loop, rate(dir), display, theater, fullscreen, cite, search, help}.
+// loop, rate(dir), display, theater, fullscreen, cite, search, help,
+// angle → false when there is no second angle}.
 export function bindKeys(root, hd) {
   let swallowSpaceUp = false;
   function onKey(e) {
@@ -127,6 +130,9 @@ export function bindKeys(root, hd) {
         break;
       case 'y':
         hd.cite();
+        break;
+      case 'v':
+        done = !!(hd.angle && hd.angle());
         break;
       case '/':
         hd.search();

@@ -177,6 +177,14 @@ func rerun(ctx context.Context, st db.Store, dataDir, scope, scopeID, stage stri
 		// (EnqueueAux), never rerun with downstream cleanup.
 		return fmt.Errorf("%w: %s is an auxiliary task and has no rerun", ErrConflict, stage)
 	}
+	if o.TextRepair {
+		if scope != model.ScopeLecture || stage != model.StageASR {
+			return fmt.Errorf("%w: text_only is a rerun of a lecture's asr stage, not of %s", ErrBadInput, stage)
+		}
+		if _, ok := o.NewSnapshots[model.StageASR]; ok {
+			return fmt.Errorf("%w: text_only keeps the asr snapshot", ErrBadInput)
+		}
+	}
 	// The stage and its downstream stages. glossary_review is outside the
 	// course chain (v2 lead ruling 2): it has none, and a glossary_seed
 	// rerun does not replace it.
@@ -219,7 +227,14 @@ func rerun(ctx context.Context, st db.Store, dataDir, scope, scopeID, stage stri
 			if stage == model.StagePrep && !MediaExists(dataDir, lec) {
 				return ErrMediaMissing
 			}
-			if err := cleanupLecture(ctx, tx, scopeID, stage); err != nil {
+			clean := stage
+			if o.TextRepair {
+				// "修复断句": the sentences stay for the asr job to repair;
+				// everything after asr is cleaned up as by a rerun of the
+				// stage after it (textrepair-int).
+				clean = Downstream(stage)[0]
+			}
+			if err := cleanupLecture(ctx, tx, scopeID, clean); err != nil {
 				return err
 			}
 		}
@@ -232,7 +247,11 @@ func rerun(ctx context.Context, st db.Store, dataDir, scope, scopeID, stage stri
 				// keeps (v2 G5.5, lead Gate 1): record that version.
 				snap = withPromptVersion(s, snapshotOf(cur[s]), model.PromptVersionOf(s))
 			}
-			if err := newPending(ctx, tx, scope, scopeID, s, cur[s], snap, model.JobStats{}); err != nil {
+			var stats model.JobStats
+			if o.TextRepair && s == model.StageASR {
+				stats = textRepairStats(self.Stats)
+			}
+			if err := newPending(ctx, tx, scope, scopeID, s, cur[s], snap, stats); err != nil {
 				return err
 			}
 		}

@@ -2,7 +2,8 @@
 // Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
 
 // The main process's own calls to the service (/api/app/activity,
-// /api/app/settings, /api/settings/ui), with the access token. No Electron imports.
+// /api/app/settings, /api/settings/ui, the update relay, /api/selfupdate),
+// with the access token. No Electron imports.
 'use strict';
 
 const { TOKEN_HEADER } = require('./lib/security');
@@ -42,6 +43,7 @@ function createApiClient({ getServer, fetchImpl = fetch }) {
     patchSettings: (patch, opts) => request('PATCH', '/api/app/settings', { ...opts, body: patch }),
     getUpdate: (opts) => request('GET', '/api/app/update', opts),
     postUpdateState: (body, opts) => request('POST', '/api/app/update/state', { ...opts, body }),
+    selfUpdate: (opts) => request('GET', '/api/selfupdate', opts),
   };
 }
 

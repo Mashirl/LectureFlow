@@ -16,6 +16,9 @@ const { ServerProcess, StartError } = require('../../src/main/server');
 const { buildServerArgs } = require('../../src/main/lib/serverutil');
 
 const FAKE = path.join(__dirname, '..', 'fixtures', 'fake-server.js');
+// the long-start tests put setTimeout on a fake clock
+const realSetTimeout = setTimeout;
+const realClearTimeout = clearTimeout;
 const dirs = [];
 
 function tmpDir() {
@@ -120,6 +123,137 @@ test('no answer within the start timeout: the process is ended', async () => {
   assert.ok(Date.now() - t0 < 8000);
   const pid = fakeState(dir).pids[0];
   assert.equal(await waitFor(() => !alive(pid)), true);
+});
+
+// The long-start tests run the start timeouts on a fake clock (node:test's
+// mock timers: setTimeout and Date of this process). The fake service is a
+// real process; how long it takes to start (seconds on a loaded machine,
+// flake-hunt #11) takes no fake time. Its "LECTUREFLOW_STARTING" lines and
+// its ready line come when the test asks for them (FAKE_STEPS=stdin), and
+// only the test's tick() moves the clock between them.
+
+/**
+ * within(promise, what): the promise, or a failure if it has not settled
+ * after a minute of real time (the fake clock would never end the wait).
+ */
+function within(promise, what, ms = 60_000) {
+  let timer;
+  const limit = new Promise((resolve, reject) => {
+    timer = realSetTimeout(() => reject(new Error(`${what}: still pending after ${ms / 1000} s`)), ms);
+  });
+  return Promise.race([promise, limit]).finally(() => realClearTimeout(timer));
+}
+
+/** stepped(t, opts): a fake service steered line by line, on a fake clock; start() is running. */
+async function stepped(t, opts) {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  const dir = tmpDir();
+  const srv = makeServer(dir, { FAKE_STEPS: 'stdin' }, opts);
+  t.after(async () => {
+    t.mock.timers.reset();
+    await srv.stop({ timeoutMs: 5000 }).catch(() => {}); // also when an assertion failed
+  });
+  const steps = [];
+  srv.on('starting', (s) => steps.push(s));
+  const started = srv.start();
+  started.catch(() => {}); // awaited by the test
+  await within((async () => {
+    while (!srv._child) await new Promise((r) => setImmediate(r)); // spawned after the port is picked
+  })(), 'spawning the fake service');
+  const child = srv._child;
+  const exited = once(child, 'exit').then(([code]) => {
+    throw new Error(`the fake service exited (${code}) before the test was done with it`);
+  });
+  exited.catch(() => {});
+  return {
+    srv,
+    dir,
+    steps,
+    t0: Date.now(),
+    /** the service prints one LECTUREFLOW_STARTING line; resolves once the shell has read it */
+    async starting() {
+      const seen = once(srv, 'starting');
+      child.stdin.write('starting\n');
+      await within(Promise.race([seen, exited]), 'the LECTUREFLOW_STARTING line');
+    },
+    /** the service listens and prints its ready line; resolves when start() has */
+    ready() {
+      child.stdin.write('ready\n');
+      return within(started, 'the start after the ready line');
+    },
+    /** start() ends with a timeout */
+    timedOut() {
+      return assert.rejects(within(started, 'the start timeout'), isTimeout);
+    },
+    tick: (ms) => t.mock.timers.tick(ms),
+  };
+}
+
+const isTimeout = (err) => err instanceof StartError && err.kind === 'timeout';
+
+test('a long start that keeps saying LECTUREFLOW_STARTING is waited for past the start timeout (test-upgrade F3)', async (t) => {
+  const s = await stepped(t, { startTimeoutMs: 800 });
+  // a line every 799 ms (just under the start timeout), five times
+  for (let i = 0; i < 5; i++) {
+    await s.starting();
+    s.tick(799);
+  }
+  assert.equal(Date.now() - s.t0, 5 * 799, 'well past the start timeout');
+  await s.ready();
+  assert.equal(s.srv.ready, true);
+  assert.deepEqual(s.steps, Array(5).fill('upgrade-backup'));
+  assert.equal(fakeState(s.dir).attempts, 1);
+});
+
+test('the starting lines extend the wait only up to startMaxMs; silence ends it after the start timeout', async (t) => {
+  // startMaxMs 2000: lines at 0, 700 and 1400 ms; the start timeout from the
+  // last one would end at 2200, startMaxMs ends it at 2000.
+  const capped = async (t2, endAt) => {
+    const s = await stepped(t2, { startTimeoutMs: 800, startMaxMs: 2000 });
+    for (const at of [0, 700, 1400]) {
+      s.tick(at - (Date.now() - s.t0));
+      await s.starting();
+    }
+    s.tick(endAt - (Date.now() - s.t0));
+    return s;
+  };
+  await t.test('still waiting at 1999 ms', async (t2) => {
+    const s = await capped(t2, 1999);
+    await s.ready(); // no timeout yet: the service's ready line still counts
+  });
+  await t.test('ended at 2000 ms', async (t2) => {
+    const s = await capped(t2, 2000);
+    await s.timedOut();
+  });
+
+  // No startMaxMs: each line gives the start timeout (800 ms) again, from
+  // that line; silence for that long ends the start.
+  const quiet = async (t2, endAt) => {
+    const s = await stepped(t2, { startTimeoutMs: 800 });
+    await s.starting();
+    s.tick(500);
+    await s.starting();
+    s.tick(endAt - (Date.now() - s.t0));
+    return s;
+  };
+  await t.test('a line at 500 ms: still waiting at 1299 ms', async (t2) => {
+    const s = await quiet(t2, 1299);
+    await s.ready();
+  });
+  await t.test('a line at 500 ms: ended at 1300 ms, 800 ms after it', async (t2) => {
+    const s = await quiet(t2, 1300);
+    await s.timedOut();
+  });
+});
+
+test('a coded failure carries its code and parameters besides the ERROR reason', async () => {
+  const dir = tmpDir();
+  const failure = { code: 'startup.data_dir_in_use', params: { data_dir: dir, pid: 4242 } };
+  const srv = makeServer(dir, { FAKE_FAILURE: JSON.stringify(failure) });
+  await assert.rejects(srv.start(), (err) => err instanceof StartError && err.kind === 'exited' && err.code === 1 &&
+    err.reason === 'a coded failure for the test' && JSON.stringify(err.failure) === JSON.stringify(failure));
+  const plain = makeServer(tmpDir(), { FAKE_START_FAIL_TIMES: '1' });
+  await assert.rejects(plain.start(), (err) => err instanceof StartError && err.failure === null);
 });
 
 test('a service not in desktop mode is refused', async () => {

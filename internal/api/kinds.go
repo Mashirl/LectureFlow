@@ -332,10 +332,15 @@ func (s *Server) setLectureKind(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	// course-ux: a kind that contradicts the week override ends it
+	dropOverride := dropOverrideForKind(l, kind, src, kinds)
 	after := make([]model.Lecture, len(lecs))
 	for i, o := range lecs {
 		if o.ID == l.ID {
 			o.Kind, o.KindSource = kind, src
+			if dropOverride {
+				o.WeekOverride = nil
+			}
 		}
 		after[i] = o
 	}
@@ -349,7 +354,15 @@ func (s *Server) setLectureKind(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return state.WriteLectureKind(ctx, tx, cur, kind, src)
+		if err := state.WriteLectureKind(ctx, tx, cur, kind, src); err != nil {
+			return err
+		}
+		if dropOverride {
+			if err := tx.DeleteWeekOverride(ctx, l.ID); err != nil && !errors.Is(err, db.ErrNotFound) {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		s.fail(w, r, notFoundAs(err, "lecture.not_found"))
 		return

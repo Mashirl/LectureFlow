@@ -49,6 +49,11 @@ type StageModel struct {
 // batch operations that may need a model choice.
 type ModelChoiceRequest struct {
 	ModelChoice string `json:"model_choice,omitempty"` // "" | snapshot | current
+	// TextOnly (textrepair-int, an optional field the lead approved): the asr
+	// rerun "修复断句" — the stored transcript is repaired, not transcribed
+	// again (offered as model.ActionRerunTextOnly). Only with stage asr and
+	// action rerun; model_choice then concerns the stages after asr.
+	TextOnly bool `json:"text_only,omitempty"`
 }
 
 // SnapshotView describes one side of a model diff.
@@ -156,6 +161,15 @@ type ProviderView struct {
 	// (settings.SupportsThinking: DeepSeek and Anthropic; other
 	// OpenAI-compatible providers only "off").
 	SupportsThinking bool `json:"supports_thinking"`
+	// cred-enc: the stored key cannot be decrypted with this installation's
+	// key (the data directory came from another computer or account); it
+	// has to be entered again. key_hint is then "", key_error_info is
+	// settings.provider_key_unreadable {provider}.
+	KeyUnreadable bool             `json:"key_unreadable,omitempty"`
+	KeyErrorInfo  *model.ErrorInfo `json:"key_error_info,omitempty"`
+	// sec3 L2: the key is stored in the clear (saved while there was no data
+	// key); key_error_info is then settings.provider_key_unprotected.
+	KeyUnprotected bool `json:"key_unprotected,omitempty"`
 }
 
 // ProviderInput is the body of POST /api/providers and PATCH /api/providers/{id}.
@@ -230,6 +244,17 @@ type Settings struct {
 	// I6, phase 3b freeze; = GET /api/asr/devices). Omitted when there are
 	// none (and by builds before 3b).
 	Devices []ASRDeviceView `json:"devices,omitempty"`
+	// ASRRedecode is the switch "修复退化的转写窗口" of the 转写 section
+	// (redecode, 2026-10-27, optional field added with the lead's leave):
+	// kv model.KVASRRedecode, on unless the user switched it off. The
+	// server always sends it; a client reads a missing value as on. PUT
+	// /api/settings/asr takes it as "redecode" (true | false) next to the
+	// ASRSettings fields; absent leaves it unchanged.
+	ASRRedecode *bool `json:"asr_redecode,omitempty"`
+	// CredentialsErrorInfo (sec3 L2): settings.credentials_unavailable
+	// {error} while there is no data key: a key entered now is stored in
+	// the clear. Omitted normally.
+	CredentialsErrorInfo *model.ErrorInfo `json:"credentials_error_info,omitempty"`
 }
 
 // ProviderTest is the response of POST /api/providers/{id}/test.

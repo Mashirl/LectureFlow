@@ -34,7 +34,28 @@ const (
 	WaitRemoteWindow  = "remote_window"  // this borrowing session's fair-use window is used up
 	WaitRemoteAuth    = "remote_auth"    // credential expired or missing: authorise again
 	WaitRemoteBalance = "remote_balance" // not enough compute units
+	// WaitRemoteBusy (colabfix): the job waits for Colab, which runs another
+	// lecture (or is being started or released), and no local device could
+	// take it either (the local reason would name a missing or paused
+	// device, e.g. power_no_device when only Colab transcribes).
+	WaitRemoteBusy = "remote_busy"
+	// WaitRemoteFallback (colabfix): Colab handed the lecture back
+	// (stats.remote_fallback: it is never sent there automatically again)
+	// and no local device can take it; the asr stage offers
+	// ActionUseColab ("改用 Colab 处理").
+	WaitRemoteFallback = "remote_fallback"
+	// WaitRemoteHeld (colabfix2): the job could go to Colab, but the
+	// automatic dispatch is held after "处理完当前这节后关机" / "立即关机"
+	// (until no such lecture waits), and no local device can take it either
+	// (or it may run on Colab only: a fixed colab:remote snapshot). The asr
+	// stage offers ActionUseColab, which ends the hold.
+	WaitRemoteHeld = "remote_held"
 )
+
+// ActionUseColab (colabfix) is offered in an asr stage's allowed_actions
+// while the job waits with WaitRemoteFallback or WaitRemoteHeld: "改用 Colab
+// 处理" (POST /api/lectures/{id}/use-colab, not the stage action endpoint).
+const ActionUseColab = "use_colab"
 
 // kv keys of the desktop app settings (SPEC-v3 V1.1, V11; .claude/v3-brief.md §2).
 const (

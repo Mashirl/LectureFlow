@@ -66,6 +66,9 @@ type asrJob struct {
 	// Checkpoint (power management, power-brief §4): pipeline runs only;
 	// nil for the self-test, so its job.json is unchanged.
 	Checkpoint *devices.CheckpointJob `json:"checkpoint,omitempty"`
+	// Redecode is the switch "修复退化的转写窗口" (kv asr.redecode,
+	// Deps.redecodeOn): whether asr.py decodes degenerate windows again.
+	Redecode bool `json:"redecode"`
 }
 
 // ovJob is job.json of worker/asr_openvino.py (SPEC-v2 I7; brief section
@@ -134,6 +137,64 @@ type workerTiming struct {
 	AudioS           float64 `json:"audio_s"`
 	FirstCompile     bool    `json:"first_compile"`
 	PeakWorkingSetMB float64 `json:"peak_working_set_mb"`
+	// Postprocess (redecode, 2026-10-27): the counters of the worker's steps
+	// after decoding; absent when it ran none.
+	Postprocess *workerPostprocess `json:"postprocess"`
+}
+
+// workerPostprocess is timing.postprocess of result.json.
+type workerPostprocess struct {
+	// Redecode: worker/asr.py RedecodeStats (counts and seconds; skipped
+	// when job.redecode was false).
+	Redecode *struct {
+		Skipped      bool    `json:"skipped"`
+		Windows      int     `json:"windows"`
+		Unpunctuated int     `json:"unpunctuated"`
+		Uppercase    int     `json:"uppercase"`
+		Redecoded    int     `json:"redecoded"`
+		Accepted     int     `json:"accepted"`
+		RedecodeS    float64 `json:"redecode_s"`
+	} `json:"redecode"`
+	// TextRepair (textrepair-int): the statistical repair before the
+	// sentence split (worker/textrepair.py repair_transcript; every worker).
+	TextRepair *workerTextRepair `json:"textrepair"`
+	// Split: "极速模式" cut the lecture at silences (colab_remote.py; Colab only).
+	Split *model.ASRSplit `json:"split"`
+}
+
+// workerTextRepair is the stats of worker/textrepair.py: timing.postprocess.
+// textrepair of a transcription, result.json "textrepair" of a "修复断句" run.
+type workerTextRepair struct {
+	Skipped              string `json:"skipped"`
+	Version              int    `json:"version"`
+	Words                int    `json:"words"`
+	Segments             int    `json:"segments"`
+	UnpunctuatedSegments int    `json:"unpunctuated_segments"`
+	CapsSegments         int    `json:"caps_segments"`
+	SentenceEndsAdded    int    `json:"sentence_ends_added"`
+	CommasAdded          int    `json:"commas_added"`
+	WordsRecased         int    `json:"words_recased"`
+	TrainSentences       int    `json:"train_sentences"`
+	KeptSentences        int    `json:"kept_sentences"`
+	SentencesIn          int    `json:"sentences_in"`
+	SentencesOut         int    `json:"sentences_out"`
+	MS                   int64  `json:"ms"`
+}
+
+// stats is the repair's counters as job.stats (negative values from a broken
+// worker count as 0); nil for nil.
+func (r *workerTextRepair) stats() *model.ASRTextRepair {
+	if r == nil {
+		return nil
+	}
+	return &model.ASRTextRepair{
+		Skipped: r.Skipped, Version: max(r.Version, 0), Words: max(r.Words, 0), Segments: max(r.Segments, 0),
+		UnpunctuatedSegments: max(r.UnpunctuatedSegments, 0), CapsSegments: max(r.CapsSegments, 0),
+		SentenceEndsAdded: max(r.SentenceEndsAdded, 0), CommasAdded: max(r.CommasAdded, 0),
+		WordsRecased: max(r.WordsRecased, 0), TrainSentences: max(r.TrainSentences, 0),
+		KeptSentences: max(r.KeptSentences, 0), SentencesIn: max(r.SentencesIn, 0), SentencesOut: max(r.SentencesOut, 0),
+		MS: max(r.MS, 0),
+	}
 }
 
 // stats is the timing as job.stats.asr_timing (ms and MB); nil for nil.
@@ -142,8 +203,18 @@ func (t *workerTiming) stats() *model.ASRTiming {
 		return nil
 	}
 	ms := func(s float64) int64 { return int64(math.Round(max(s, 0) * 1000)) }
-	return &model.ASRTiming{LoadMS: ms(t.LoadS), TranscribeMS: ms(t.TranscribeS), AudioMS: ms(t.AudioS),
+	out := &model.ASRTiming{LoadMS: ms(t.LoadS), TranscribeMS: ms(t.TranscribeS), AudioMS: ms(t.AudioS),
 		FirstCompile: t.FirstCompile, PeakMemMB: int(math.Round(max(t.PeakWorkingSetMB, 0)))}
+	if p := t.Postprocess; p != nil && (p.Redecode != nil || p.TextRepair != nil || p.Split != nil) {
+		out.Postprocess = &model.ASRPostprocess{TextRepair: p.TextRepair.stats(), Split: p.Split.Checked()}
+		if r := p.Redecode; r != nil {
+			out.Postprocess.Redecode = &model.ASRRedecode{
+				Skipped: r.Skipped, Windows: max(r.Windows, 0), Unpunctuated: max(r.Unpunctuated, 0), Uppercase: max(r.Uppercase, 0),
+				Redecoded: max(r.Redecoded, 0), Accepted: max(r.Accepted, 0), RedecodeMS: ms(r.RedecodeS),
+			}
+		}
+	}
+	return out
 }
 
 // ASRHashVersion is stats.hash_version of new asr runs: input_hash = wav +
@@ -275,6 +346,11 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 	if err != nil {
 		return err
 	}
+	if model.IsTextRepairJob(job) {
+		// "修复断句": the stored transcript is repaired, nothing is
+		// transcribed (asr_textrepair.go; the scheduler runs it on the CPU).
+		return s.textRepairRun(ctx, job, lectureID, progress)
+	}
 	snap, ok := model.ParseASRSnapshot(job.ConfigSnapshot)
 	if !ok {
 		return sched.Permanent(model.Errorf(CodeSnapshotMissing, nil, errors.New(MissingSnapshot)))
@@ -285,7 +361,8 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 	run := model.NormalizeASRSnapshot(snap)
 	// SPEC-v3 V14: a colab snapshot runs on the remote backend (asr_colab.go).
 	remote := run.Backend == model.BackendColab && run.DeviceID == model.DeviceColab
-	if !remote {
+	ssh := model.IsSSHDevice(run.DeviceID) // ssh-mvp: an SSH inference server (asr_remote.go)
+	if !remote && !ssh {
 		if err := d.checkASRDevice(ctx, run); err != nil {
 			return err
 		}
@@ -303,39 +380,10 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 		return sched.Permanent(model.Errorf(CodeASRAudioMissing, map[string]any{"file": model.AudioFile},
 			fmt.Errorf("找不到 %s（prep 的产物），请重跑 prep 阶段", audio)))
 	}
-	// The prompt still comes from the glossary of the moment (A1); terms and
-	// glossary version are read together. The order of the prompt depends on
-	// the text of the materials bound to this lecture (SPEC-v2 G4) and, since
-	// lecture kinds, to its teaching week (lead ruling for K2: the lecture's
-	// material set without the course-wide part). The prompt is not part of
-	// the input hash, so this never makes asr stale.
-	var (
-		terms           []model.Term
-		mats            []model.Material
-		week            int
-		glossaryVersion int
-	)
-	err = d.Store.Tx(ctx, func(tx db.Store) error {
-		c, err := tx.GetCourse(ctx, l.CourseID)
-		if err != nil {
-			return err
-		}
-		glossaryVersion = c.GlossaryVersion
-		cur, err := tx.GetLecture(ctx, lectureID) // recorded_at as of now
-		if err != nil {
-			return err
-		}
-		week = state.LectureWeek(c, cur)
-		if terms, err = tx.ListTerms(ctx, l.CourseID); err != nil {
-			return err
-		}
-		mats, err = tx.ListMaterials(ctx, l.CourseID)
-		return err
-	})
+	prompt, glossaryVersion, err := s.asrPrompt(ctx, l)
 	if err != nil {
 		return err
 	}
-	prompt := ctxbuild.BuildASRPrompt(terms, ctxbuild.BoundMaterialTextWeek(mats, lectureID, week))
 
 	sched.UpdateStats(ctx, func(st *model.JobStats) { st.ASRTiming = nil }) // set again when this attempt succeeds
 	var raw []byte
@@ -348,6 +396,8 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 		// Colab (V14.3): the same result.json as the local faster-whisper
 		// worker; the local checkpoint is not continued remotely.
 		raw, err = s.remoteRun(ctx, job, run, dir, audio, prompt, progress)
+	} else if ssh {
+		raw, err = s.sshRun(ctx, job, run, dir, audio, prompt, progress)
 	} else if fake := d.Cfg.ASR.FakeResult; fake != "" {
 		if run.Backend == model.BackendOpenVINO && d.Cfg.ASR.FakeResultOpenVINO != "" {
 			fake = d.Cfg.ASR.FakeResultOpenVINO
@@ -427,7 +477,7 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 	// The transcription is stored: its checkpoint has served (power-brief
 	// §4: only a successful run removes it; cancels and power interrupts
 	// keep it for the next run of the same job).
-	if fromWorker || remote {
+	if fromWorker || remote || ssh {
 		removeCheckpoint(dir)
 	}
 
@@ -475,6 +525,45 @@ func (s *asrStage) run(ctx context.Context, lectureID string, progress func(floa
 	}
 	progress(1)
 	return nil
+}
+
+// asrPrompt is the initial_prompt of lecture l's transcription (the course's
+// terms, ", " joined in priority order) and the course's glossary version.
+// The prompt still comes from the glossary of the moment (A1); terms and
+// glossary version are read together. The order of the prompt depends on
+// the text of the materials bound to this lecture (SPEC-v2 G4) and, since
+// lecture kinds, to its teaching week (lead ruling for K2: the lecture's
+// material set without the course-wide part). The prompt is not part of
+// the input hash, so this never makes asr stale. A "修复断句" run takes its
+// glossary from it too (textrepair-int).
+func (s *asrStage) asrPrompt(ctx context.Context, l model.Lecture) (string, int, error) {
+	var (
+		terms           []model.Term
+		mats            []model.Material
+		week            int
+		glossaryVersion int
+	)
+	err := s.d.Store.Tx(ctx, func(tx db.Store) error {
+		c, err := tx.GetCourse(ctx, l.CourseID)
+		if err != nil {
+			return err
+		}
+		glossaryVersion = c.GlossaryVersion
+		cur, err := tx.GetLecture(ctx, l.ID) // recorded_at as of now
+		if err != nil {
+			return err
+		}
+		week = state.LectureWeek(c, cur)
+		if terms, err = tx.ListTerms(ctx, l.CourseID); err != nil {
+			return err
+		}
+		mats, err = tx.ListMaterials(ctx, l.CourseID)
+		return err
+	})
+	if err != nil {
+		return "", 0, err
+	}
+	return ctxbuild.BuildASRPrompt(terms, ctxbuild.BoundMaterialTextWeek(mats, l.ID, week)), glossaryVersion, nil
 }
 
 // fakeRun copies asr.fake_result through result.json.tmp → result.json (SPEC §14).
@@ -887,12 +976,30 @@ func (d Deps) asrCallAt(ctx context.Context, a model.ASRSnapshot, dir, audio, pr
 		Audio: audio, Model: modelDir(devices.FWModel(d.Cfg, a.Model, a.Precision)),
 		ComputeType: config.ResolveComputeType(a.Precision, dev, total),
 		Language:    a.Language, InitialPrompt: prompt, Device: dev, Timing: true, Checkpoint: ckpt,
+		Redecode: d.redecodeOn(ctx),
 	}
 	if dev == "cuda" {
 		job.CPUThreads = 4 // SPEC §17.3; cpu mode: the worker uses physical cores - 1
 	}
 	return workerCall{name: "asr", label: "转写进程（asr.py）", code: workerASR, dir: dir, job: job, out: "result.json",
 		python: python, pythonKey: key}, nil
+}
+
+// redecodeOn reads the switch "修复退化的转写窗口" (model.KVASRRedecode:
+// on unless the user switched it off). It is read for every faster-whisper
+// run (pipeline, self-test, Colab), so a change applies to the next
+// transcription; it is no part of the input hash. A kv that cannot be read
+// keeps the default.
+func (d Deps) redecodeOn(ctx context.Context) bool {
+	if d.Store == nil {
+		return true
+	}
+	v, ok, err := d.Store.GetKV(context.WithoutCancel(ctx), model.KVASRRedecode)
+	if err != nil {
+		slog.Warn("asr: reading the redecode switch; it stays on", "err", err)
+		return true
+	}
+	return model.RedecodeEnabled(v, ok)
 }
 
 // mlxErrorCode maps the MLX worker's ERROR_CODE names (NOTES "决定（v3

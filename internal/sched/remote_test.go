@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"lectureflow/internal/colab"
+	"lectureflow/internal/devices"
 	"lectureflow/internal/model"
 	"lectureflow/internal/state"
 )
@@ -38,17 +39,38 @@ type fakeRemote struct {
 	// nowCh is closed by ShutdownNow (the running remote lecture returns
 	// NewRequeueError, see remoteHook).
 	nowCh chan struct{}
+
+	// colabfix: strict makes the fake keep the real backend's books — job
+	// is the lecture whose Transcribe runs (remoteEnv.hook registers it),
+	// stopping is set while QueueDrained releases the runtime (it takes
+	// releaseFor). CanDispatch says busy and a lecture that registers
+	// meanwhile gets NewBusyError, as colab.Backend does. drainSig gets a
+	// value when a release starts; drainedWhile counts the QueueDrained
+	// calls made while the scheduler had a run on colab:remote (the accept2
+	// race: that run's Transcribe may not have registered yet).
+	strict       bool
+	job          string
+	stopping     bool
+	releaseFor   time.Duration
+	released     int
+	drainSig     chan struct{}
+	drainedWhile int
+	remoteRun    func() bool // the scheduler has a run on colab:remote (set before start)
 }
 
 func newFakeRemote() *fakeRemote {
 	set := colab.DefaultSettings()
-	return &fakeRemote{cred: true, can: true, set: set, nowCh: make(chan struct{})}
+	return &fakeRemote{cred: true, can: true, set: set, nowCh: make(chan struct{}), drainSig: make(chan struct{}, 16),
+		releaseFor: 30 * time.Millisecond}
 }
 
 func (f *fakeRemote) CanDispatch(ctx context.Context, sec float64) (bool, string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.asks++
+	if f.strict && (f.job != "" || f.stopping) {
+		return false, "" // busy, as colab.Backend
+	}
 	return f.can, f.wf
 }
 
@@ -59,10 +81,62 @@ func (f *fakeRemote) SetQueue(q []float64) {
 }
 
 func (f *fakeRemote) QueueDrained(ctx context.Context) error {
+	busy := f.remoteRun != nil && f.remoteRun() // outside f.mu (it takes the scheduler's lock)
 	f.mu.Lock()
 	f.drained++
+	if busy {
+		f.drainedWhile++
+	}
+	if !f.strict || f.job != "" {
+		f.mu.Unlock()
+		return nil // released after the running lecture (not modelled)
+	}
+	// As colab.Backend: nothing registered, so the runtime is released now.
+	f.stopping = true
+	d := f.releaseFor
+	f.mu.Unlock()
+	select {
+	case f.drainSig <- struct{}{}:
+	default:
+	}
+	time.Sleep(d)
+	f.mu.Lock()
+	f.stopping = false
+	f.released++
 	f.mu.Unlock()
 	return nil
+}
+
+// register is the start of Transcribe in strict mode: busy while the
+// runtime is being released or another lecture is registered.
+func (f *fakeRemote) register(id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.stopping || f.job != "" {
+		return colab.NewBusyError()
+	}
+	f.job = id
+	return nil
+}
+
+func (f *fakeRemote) unregister(id string) {
+	f.mu.Lock()
+	if f.job == id {
+		f.job = ""
+	}
+	f.mu.Unlock()
+}
+
+func (f *fakeRemote) registered() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.job
+}
+
+func (f *fakeRemote) strictCounts() (drainedWhile, released int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.drainedWhile, f.released
 }
 
 func (f *fakeRemote) ShutdownAfterCurrent(ctx context.Context) error {
@@ -143,6 +217,7 @@ func newRemoteEnv(t *testing.T, rows []model.ASRDevice, prefs RemotePrefs) *remo
 	var de *devEnv
 	de = newDevEnv(t, rows, func(o *Options) {
 		o.Remote = re.fr
+		o.RemoteBusyPause = 30 * time.Millisecond
 		o.OnRemote = func(ctx context.Context, present bool, row model.ASRDevice) {
 			if present {
 				if _, ok := de.devs.Get(row.ID); !ok {
@@ -162,8 +237,25 @@ func newRemoteEnv(t *testing.T, rows []model.ASRDevice, prefs RemotePrefs) *remo
 	return re
 }
 
+// strictBackend makes the fake behave like colab.Backend around a release
+// (fakeRemote.strict). Call before start.
+func (re *remoteEnv) strictBackend() {
+	re.fr.mu.Lock()
+	re.fr.strict = true
+	re.fr.remoteRun = re.s.remoteRunning
+	re.fr.mu.Unlock()
+}
+
+// registerWait is how long a run on colab:remote takes in strict mode
+// before its Transcribe registers with the backend (the asr stage reads the
+// audio, asks for the status, refreshes the credential): it registers at
+// once when a release starts meanwhile, the accept2 interleaving.
+const registerWait = 50 * time.Millisecond
+
 // hook: a run on colab:remote waits for release, then returns remoteErr
 // (or NewRequeueError after ShutdownNow); a local run behaves as devStage.
+// In strict mode the run first registers with the fake backend (busy:
+// NewBusyError, as Transcribe).
 func (re *remoteEnv) hook(ctx context.Context, id, dev string) error {
 	d := re.asr
 	d.mu.Lock()
@@ -181,8 +273,20 @@ func (re *remoteEnv) hook(ctx context.Context, id, dev string) error {
 		}
 	}
 	re.fr.mu.Lock()
-	now := re.fr.nowCh
+	now, strict, sig := re.fr.nowCh, re.fr.strict, re.fr.drainSig
 	re.fr.mu.Unlock()
+	if strict {
+		select {
+		case <-sig: // a release started before this lecture registered
+		case <-time.After(registerWait):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if err := re.fr.register(id); err != nil {
+			return err
+		}
+		defer re.fr.unregister(id)
+	}
 	if !pass {
 		select {
 		case <-ch:
@@ -520,9 +624,17 @@ func TestUseRemote(t *testing.T) {
 		t.Fatalf("UseRemote while Colab cannot = %v", err)
 	}
 
-	// A queued job: it starts over on Colab, pinned.
+	// A queued job: it starts over on Colab, pinned. Once Colab can take a
+	// lecture, any scan would also send l2 there on its own (overflow, not
+	// pinned), and UseRemote on a lecture already running on Colab does
+	// nothing (by design); a scan between setCan and UseRemote made this
+	// test flaky under CPU load. Dispatch is paused (with its barrier) before
+	// Colab says yes and resumed after UseRemote, so the pin is what runs.
+	resume := re.s.PauseDispatch()
 	re.fr.setCan(true, "")
-	if err := re.s.UseRemote(re.ctx, l2.ID); err != nil {
+	err = re.s.UseRemote(re.ctx, l2.ID)
+	resume()
+	if err != nil {
 		t.Fatal(err)
 	}
 	re.waitRunningOn(l2, model.DeviceColab)
@@ -537,7 +649,7 @@ func TestUseRemote(t *testing.T) {
 	if err := re.s.UseRemote(re.ctx, l1.ID); err != nil {
 		t.Fatal(err)
 	}
-	re.waitReason(l1, model.WaitGPUSlot) // pinned, Colab busy with l2
+	re.waitReason(l1, model.WaitRemoteBusy) // pinned, Colab busy with l2 (colabfix: says Colab)
 	re.asr.release(l2.ID)
 	re.waitStatus(l2.ID, model.StageASR, model.StatusDone)
 	re.waitRunningOn(l1, model.DeviceColab)
@@ -592,5 +704,224 @@ func TestRemoteStepsMatchColab(t *testing.T) {
 	want := []string{colab.StepWaitAccelerator, colab.StepUploadAudio, colab.StepRemoteTranscribe, colab.StepDownloadResult, colab.StepVerify}
 	if !slices.Equal(model.RemoteSteps, want) {
 		t.Fatalf("model.RemoteSteps = %v, colab = %v", model.RemoteSteps, want)
+	}
+}
+
+// ---- colabfix (accept2) ----
+
+// onlyColab is a laptop on AC whose one local device is switched off: only
+// Colab transcribes (the accept2 setup; the local reason is power_no_device).
+func onlyColab(t *testing.T) (*remoteEnv, model.ASRDevice) {
+	t.Helper()
+	cuda := devRow(model.DeviceCUDA0, 300, 1)
+	cuda.Enabled = false
+	re := newRemoteEnv(t, []model.ASRDevice{cuda}, colabOn)
+	re.power.set(onACLaptop)
+	return re, cuda
+}
+
+// One lecture runs on Colab, the next waits for it; the first one ends and
+// the scan that sends the second to Colab must not tell the backend the
+// queue is drained: the backend would release the runtime before the second
+// lecture's Transcribe registered, and that lecture would find the runtime
+// stopping (accept2: colab.busy, handed back for good, then stuck with
+// power_no_device). The fake backend keeps the real one's books (strict);
+// QueueDrained comes once the last lecture has ended.
+func TestRemoteHandoverToTheNextLectureKeepsTheRuntime(t *testing.T) {
+	re, cuda := onlyColab(t)
+	re.strictBackend()
+	l1 := re.lectureOn(autoOn(cuda))
+	re.prepDone(l1)
+	re.start()
+	re.waitRunningOn(l1, model.DeviceColab)
+	re.waitFor("l1 registered with the backend", 5*time.Second, func() bool { return re.fr.registered() == l1.ID })
+	l2 := re.lectureOn(autoOn(cuda))
+	re.prepDone(l2)
+	// colabfix item 2: it waits for Colab, not for a local device.
+	re.stillQueued(l2, model.WaitRemoteBusy)
+	re.waitFor("planned queue of one lecture", 5*time.Second, func() bool {
+		q, ok := re.fr.lastQueue()
+		return ok && len(q) == 1
+	})
+
+	re.asr.release(l1.ID)
+	re.waitStatus(l1.ID, model.StageASR, model.StatusDone)
+	re.waitFor("l2 registered with the backend", 5*time.Second, func() bool { return re.fr.registered() == l2.ID })
+	if d, _, _, _ := re.fr.counts(); d != 0 {
+		t.Fatalf("QueueDrained called %d times while l2 was on its way to Colab", d)
+	}
+	re.asr.release(l2.ID)
+	re.waitStatus(l2.ID, model.StageASR, model.StatusDone)
+	// Nothing left: the runtime is released once, after the last lecture.
+	re.waitFor("runtime released after the last lecture", 5*time.Second, func() bool {
+		_, released := re.fr.strictCounts()
+		return released == 1
+	})
+	if while, _ := re.fr.strictCounts(); while != 0 {
+		t.Fatalf("QueueDrained called %d times while a run on colab:remote existed", while)
+	}
+	for _, l := range []model.Lecture{l1, l2} {
+		if devs := re.asr.startsOf(l.ID); len(devs) != 1 || devs[0] != model.DeviceColab {
+			t.Fatalf("%s ran on %v, want Colab once", l.ID, devs)
+		}
+		if st := re.lj(l.ID, model.StageASR).Stats; st.RemoteFallback != nil || st.RemoteRequeues != 0 {
+			t.Fatalf("stats of %s = %+v", l.ID, st)
+		}
+	}
+}
+
+// Colab answers busy (the runtime was being released or started, e.g. an
+// idle release racing a dispatch): the lecture goes back to the queue
+// without a hand-back — no remote_fallback, the "改用 Colab 处理" pin
+// stays, no retry used up — and Colab takes it again after a short pause.
+func TestRemoteBusyIsNoHandBack(t *testing.T) {
+	re, cuda := onlyColab(t)
+	l1 := re.lectureOn(autoOn(cuda))
+	re.prepDone(l1)
+	re.asr.release(l1.ID)
+	re.failRemoteNext(colab.NewBusyError())
+	re.start()
+	j := re.waitStatus(l1.ID, model.StageASR, model.StatusDone)
+	if devs := re.asr.startsOf(l1.ID); len(devs) != 2 || devs[0] != model.DeviceColab || devs[1] != model.DeviceColab {
+		t.Fatalf("l1 ran on %v, want Colab twice", devs)
+	}
+	if j.Stats.RemoteFallback != nil || j.Stats.RemoteRequeues != 1 || model.CountedAttempts(j) != 0 {
+		t.Fatalf("l1 after the busy answer: attempt %d stats %+v", j.Attempt, j.Stats)
+	}
+
+	// Pinned with "改用 Colab 处理": the pin survives the busy answer.
+	re.fr.setCan(false, "") // nothing goes to Colab on its own meanwhile
+	l2 := re.lectureOn(autoOn(cuda))
+	re.prepDone(l2)
+	re.waitReason(l2, model.WaitRemoteBusy)
+	if err := re.s.UseRemote(re.ctx, l2.ID); err != nil {
+		t.Fatal(err)
+	}
+	re.asr.release(l2.ID)
+	re.failRemoteNext(colab.NewBusyError())
+	re.fr.setCan(true, "")
+	j = re.waitStatus(l2.ID, model.StageASR, model.StatusDone)
+	if devs := re.asr.startsOf(l2.ID); len(devs) != 2 || devs[1] != model.DeviceColab {
+		t.Fatalf("l2 ran on %v, want Colab twice", devs)
+	}
+	if !j.Stats.RemotePin || j.Stats.RemoteFallback != nil || j.Stats.RemoteRequeues != 1 {
+		t.Fatalf("l2 after the busy answer: %+v", j.Stats)
+	}
+}
+
+// Only Colab transcribes (no local device can take a lecture): a lecture
+// waiting for the busy Colab says remote_busy, on a laptop on AC
+// (power_no_device locally) and on a desktop (no_asr_device). One Colab
+// hands back waits with remote_fallback — it is never sent to Colab on its
+// own again — until "改用 Colab 处理".
+func TestRemoteOnlyColabWaitingFor(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		power devices.Power
+	}{{"laptop on AC", onACLaptop}, {"desktop", onAC}} {
+		t.Run(tc.name, func(t *testing.T) {
+			re, cuda := onlyColab(t)
+			re.power.set(tc.power)
+			l1, l2 := re.lectureOn(autoOn(cuda)), re.lectureOn(autoOn(cuda))
+			re.prepDone(l1, l2)
+			re.start()
+			re.waitRunningOn(l1, model.DeviceColab)
+			re.stillQueued(l2, model.WaitRemoteBusy)
+
+			re.failRemoteNext(colab.NewFallbackError(colab.CodeSessionReclaimed, nil))
+			re.asr.release(l1.ID)
+			re.waitRunningOn(l2, model.DeviceColab)
+			re.stillQueued(l1, model.WaitRemoteFallback)
+			if st := re.lj(l1.ID, model.StageASR).Stats; st.RemoteFallback == nil || st.RemoteFallback.Code != colab.CodeSessionReclaimed {
+				t.Fatalf("l1 after the hand-back: %+v", st)
+			}
+			if err := re.s.UseRemote(re.ctx, l1.ID); err != nil {
+				t.Fatal(err)
+			}
+			re.waitReason(l1, model.WaitRemoteBusy) // pinned now; Colab busy with l2
+			re.asr.release(l2.ID)
+			re.waitStatus(l1.ID, model.StageASR, model.StatusDone)
+			if devs := re.asr.startsOf(l1.ID); len(devs) != 2 || devs[1] != model.DeviceColab {
+				t.Fatalf("l1 ran on %v", devs)
+			}
+		})
+	}
+}
+
+// With a local device that is only busy the reason stays the local one
+// (whichever frees first takes the lecture); a handed-back lecture waits
+// for that device, not with remote_fallback.
+func TestRemoteBusyReasonKeepsLocalWait(t *testing.T) {
+	for _, local := range []string{model.WaitGPUSlot, model.WaitMemory, model.WaitPowerQueue(model.DeviceCUDA0), model.WaitGPUPaused} {
+		if got := remoteBusyReason(local); got != local {
+			t.Errorf("remoteBusyReason(%q) = %q", local, got)
+		}
+	}
+	for _, local := range []string{model.WaitNoASRDevice, model.WaitPowerNoDevice, model.WaitPowerNoSaverDevice, model.WaitDevicePaused(model.DeviceCUDA0)} {
+		if got := remoteBusyReason(local); got != model.WaitRemoteBusy {
+			t.Errorf("remoteBusyReason(%q) = %q", local, got)
+		}
+		if got := remoteHeldReason(local); got != model.WaitRemoteHeld { // colabfix2
+			t.Errorf("remoteHeldReason(%q) = %q", local, got)
+		}
+	}
+	for _, local := range []string{model.WaitGPUSlot, model.WaitMemory, model.WaitPowerQueue(model.DeviceCUDA0)} {
+		if got := remoteHeldReason(local); got != local {
+			t.Errorf("remoteHeldReason(%q) = %q", local, got)
+		}
+	}
+	cuda := devRow(model.DeviceCUDA0, 300, 1)
+	re := newRemoteEnv(t, []model.ASRDevice{cuda}, colabOn)
+	l1, l2 := re.lectureOn(autoOn(cuda)), re.lectureOn(autoOn(cuda))
+	re.prepDone(l1, l2)
+	re.failRemoteNext(colab.NewFallbackError(colab.CodeSessionReclaimed, nil))
+	re.start()
+	re.waitRunningOn(l1, model.DeviceCUDA0)
+	re.waitRunningOn(l2, model.DeviceColab)
+	re.asr.release(l2.ID)
+	re.stillQueued(l2, model.WaitGPUSlot)
+	re.asr.release(l1.ID)
+	re.waitStatus(l2.ID, model.StageASR, model.StatusDone)
+}
+
+// colabfix2: only Colab transcribes and "处理完当前这节后关机" holds the
+// automatic dispatch: a waiting lecture no local device can take says
+// remote_held (also one fixed to colab:remote, which runs nowhere else),
+// and the hold stays while it waits. "改用 Colab 处理" ends the hold (the
+// user asked for Colab explicitly): the lecture runs on Colab and finishes.
+func TestRemoteHeldWithoutLocalDevice(t *testing.T) {
+	re, cuda := onlyColab(t)
+	l1, l2 := re.lectureOn(autoOn(cuda)), re.lectureOn(autoOn(cuda))
+	re.prepDone(l1, l2)
+	re.start()
+	re.waitRunningOn(l1, model.DeviceColab)
+	re.stillQueued(l2, model.WaitRemoteBusy)
+	if err := re.s.ShutdownRemote(re.ctx, false); err != nil {
+		t.Fatal(err)
+	}
+	re.stillQueued(l2, model.WaitRemoteHeld)
+	re.asr.release(l1.ID) // the current lecture finishes; l2 stays held
+	re.waitStatus(l1.ID, model.StageASR, model.StatusDone)
+	re.stillQueued(l2, model.WaitRemoteHeld)
+	if !re.s.RemoteHeld() {
+		t.Fatal("the hold ended while a lecture waits for Colab")
+	}
+	l3 := re.lectureOn(fixedOn(RemoteRow(re.fr.Settings())))
+	re.prepDone(l3)
+	re.stillQueued(l3, model.WaitRemoteHeld)
+
+	re.asr.release(l2.ID)
+	re.asr.release(l3.ID)
+	if err := re.s.UseRemote(re.ctx, l2.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range []model.Lecture{l2, l3} {
+		re.waitStatus(l.ID, model.StageASR, model.StatusDone)
+		if !re.asr.ran(l.ID, model.DeviceColab) {
+			t.Fatalf("%s ran on %v", l.ID, re.asr.startsOf(l.ID))
+		}
+	}
+	if re.s.RemoteHeld() {
+		t.Fatal("still held after 改用 Colab 处理")
 	}
 }

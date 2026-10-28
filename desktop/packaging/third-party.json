@@ -1,5 +1,18 @@
 {
   "_doc": "Third-party programs bundled into resources/bin by scripts/stage.js (SPEC-v3 V7, V10). Every download is pinned by URL and SHA-256 and verified before use; the cache is desktop/.cache (git-ignored). Keep packaging/licenses/binaries.json in step with this file.",
+  "macos": {
+    "_doc": "The minimum macOS of the app: electron-builder's mac.minimumSystemVersion (LSMinimumSystemVersion) and the deployment target (MACOSX_DEPLOYMENT_TARGET) of the binaries built here (ffmpeg, aria2c). It is the highest minimum of the parts: Electron 44 (Electron Framework LC_BUILD_VERSION minos 13.0, LSMinimumSystemVersion 13.0) and Go 1.27 (the linker's default, cmd/link/internal/ld/macho.go: 13.0); uv 0.13.1 needs 11.0. stage.js fails when a Mach-O file in resources/ needs a newer macOS. checked_with: the Electron major and Go minor version this was checked for (build.test.js fails when either changes, so the value is re-checked).",
+    "minimum_system_version": "13.0",
+    "checked_with": {
+      "electron": "44",
+      "go": "1.27"
+    }
+  },
+  "release_sources": {
+    "_doc": "The corresponding source of the GPL / LGPL programs in resources/bin (ffmpeg, aria2c) is attached to every GitHub release next to the installers (GPLv2 section 3, LGPL-2.1 section 4: equivalent access to the source from the same place). scripts/sources.js builds one tar per program and platform: the pinned upstream tarballs that build uses (the program's own source and its deps, verified by SHA-256), its build_scripts, README.txt and SHA256SUMS. A source_code entry is the release attachment itself (release_asset), a pinned tarball in the bundle, or says why it is not attached (not_attached).",
+    "repository": "ShouldBeQuincy/LectureFlow",
+    "asset": "LectureFlow-{version}-source-{bundle}.tar"
+  },
   "ffmpeg": {
     "version": "9.0.2",
     "license": "LGPL-2.1-or-later",
@@ -10,6 +23,11 @@
       "size": 12040788,
       "root": "ffmpeg-9.0.2",
       "source_code": [
+        {
+          "what": "LectureFlow release attachment LectureFlow-<version>-source-ffmpeg-windows-x64.tar: every tarball below that this build uses, the build script and these pins",
+          "url": "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+          "release_asset": true
+        },
         {
           "what": "FFmpeg 9.0.2 release tarball (build script: desktop/scripts/build-ffmpeg-windows.sh)",
           "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
@@ -36,12 +54,18 @@
         },
         {
           "what": "MinGW-w64 runtime 11.0.1 as packaged by Ubuntu 24.04 (static CRT parts)",
-          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1"
+          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/11.0.1-3build1",
+          "not_attached": "The MinGW-w64 runtime is under the ZPL-2.1 and partly in the public domain; neither asks for the source to be distributed. Its source is the Ubuntu source package at this address."
         },
         {
           "what": "GCC 13.2.0 for MinGW-w64 as packaged by Ubuntu 24.04 (static libgcc, libstdc++)",
-          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/13.2.0-6ubuntu1+26.1"
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/26.1",
+          "not_attached": "Only GCC's runtime library helpers are linked in; the GCC Runtime Library Exception 3.1 lets the compiled program be distributed under its own terms, without GCC's source. GCC's source is the Ubuntu source package at this address (and gcc.gnu.org)."
         }
+      ],
+      "build_scripts": [
+        "desktop/scripts/build-ffmpeg-windows.sh",
+        "desktop/packaging/third-party.json"
       ],
       "docker_image": "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
       "apt_packages": [
@@ -198,6 +222,11 @@
       "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
       "source_code": [
         {
+          "what": "LectureFlow release attachment LectureFlow-<version>-source-ffmpeg-darwin-arm64.tar: every tarball below that this build uses, the build script and these pins",
+          "url": "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+          "release_asset": true
+        },
+        {
           "what": "FFmpeg 9.0.2 release tarball (this URL; the build script is desktop/scripts/build-ffmpeg-macos.sh)",
           "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
         },
@@ -205,6 +234,10 @@
           "what": "dav1d 1.5.4 (commit 54706fc6bc0c)",
           "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
         }
+      ],
+      "build_scripts": [
+        "desktop/scripts/build-ffmpeg-macos.sh",
+        "desktop/packaging/third-party.json"
       ],
       "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
       "size": 12040788,
@@ -238,7 +271,7 @@
         "LICENSE.md",
         "thirdparty/*"
       ],
-      "note": "Static executables (no dylib paths to fix). --disable-autodetect keeps optional libraries that a CI image may happen to have (some of them GPL) out of the build; only zlib, pthreads and the macOS frameworks named here are enabled, plus dav1d (AV1 software decoder, BSD-2-Clause), built from the pinned tarball with meson and linked statically. build_tools (meson, ninja, pkgconf) are PyPI wheels pinned by SHA-256, used only to build and not shipped.",
+      "note": "Static executables (no dylib paths to fix). --disable-autodetect keeps optional libraries that a CI image may happen to have (some of them GPL) out of the build; only zlib, pthreads and the macOS frameworks named here are enabled, plus dav1d (AV1 software decoder, BSD-2-Clause), built from the pinned tarball with meson and linked statically. build_tools (meson, ninja, pkgconf) are PyPI wheels pinned by SHA-256, used only to build and not shipped. Everything is compiled for macos.minimum_system_version (MACOSX_DEPLOYMENT_TARGET); the build checks the minimum macOS of ffmpeg, ffprobe and every object in libdav1d.a.",
       "deps": [
         {
           "name": "dav1d",
@@ -316,5 +349,245 @@
         "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
       }
     ]
+  },
+  "aria2c": {
+    "version": "1.37.0",
+    "license": "GPL-2.0-or-later",
+    "license_note": "aria2 is under the GNU GPL version 2 or later with an additional permission to link with OpenSSL (COPYING, LICENSE.OpenSSL and the source file headers). Neither bundled build links OpenSSL: Windows uses WinTLS (SChannel), macOS AppleTLS (Security.framework). A separate program that LectureFlow starts and talks to over JSON-RPC; it is not linked into LectureFlow.",
+    "source": {
+      "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz",
+      "sha256": "60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b",
+      "size": 1705256,
+      "root": "aria2-1.37.0"
+    },
+    "windows-x64": {
+      "build": "upstream's official Windows build aria2-1.37.0-win-64bit-build1 (mingw-w64 cross build by Dockerfile.mingw and mingw-config of the 1.37.0 source, HOST=x86_64-w64-mingw32, statically linked), used unchanged",
+      "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0-win-64bit-build1.zip",
+      "sha256": "67d015301eef0b612191212d564c5bb0a14b5b9c4796b76454276a4d28d9b288",
+      "size": 2475379,
+      "root": "aria2-1.37.0-win-64bit-build1",
+      "bin": "aria2c.exe",
+      "bin_sha256": "be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2",
+      "bin_size": 5649408,
+      "licenses": [
+        "COPYING",
+        "LICENSE.OpenSSL",
+        "AUTHORS",
+        "README.mingw"
+      ],
+      "source_code": [
+        {
+          "what": "LectureFlow release attachment LectureFlow-<version>-source-aria2c-windows-x64.tar: every tarball below that this build uses and these pins",
+          "url": "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+          "release_asset": true
+        },
+        {
+          "what": "aria2 1.37.0 release tarball (its Dockerfile.mingw and mingw-config are the build scripts of this binary; wslay is in deps/)",
+          "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz"
+        },
+        {
+          "what": "GMP 6.3.0",
+          "url": "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz"
+        },
+        {
+          "what": "Expat 2.5.0",
+          "url": "https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2"
+        },
+        {
+          "what": "SQLite 3.43.1",
+          "url": "https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz"
+        },
+        {
+          "what": "zlib 1.3",
+          "url": "https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz"
+        },
+        {
+          "what": "c-ares 1.19.1",
+          "url": "https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz"
+        },
+        {
+          "what": "libssh2 1.11.0",
+          "url": "https://libssh2.org/download/libssh2-1.11.0.tar.bz2"
+        },
+        {
+          "what": "MinGW-w64 runtime 8.0.0 as packaged by Ubuntu 22.04 (static CRT parts)",
+          "url": "https://launchpad.net/ubuntu/+source/mingw-w64/8.0.0-1",
+          "not_attached": "The MinGW-w64 runtime is under the ZPL-2.1 and partly in the public domain; neither asks for the source to be distributed. Its source is the Ubuntu source package at this address."
+        },
+        {
+          "what": "GCC 10.3.0 for MinGW-w64 as packaged by Ubuntu 22.04 (source package gcc-mingw-w64 24.3; static libgcc, libstdc++)",
+          "url": "https://launchpad.net/ubuntu/+source/gcc-mingw-w64/24.3",
+          "not_attached": "Only GCC's runtime library helpers are linked in; the GCC Runtime Library Exception 3.1 lets the compiled program be distributed under its own terms, without GCC's source. GCC's source is the Ubuntu source package at this address (and gcc.gnu.org)."
+        }
+      ],
+      "build_scripts": [
+        "desktop/packaging/third-party.json"
+      ],
+      "deps": [
+        {
+          "name": "GMP",
+          "version": "6.3.0",
+          "license": "LGPL-3.0-or-later OR GPL-2.0-or-later",
+          "url": "https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz",
+          "sha256": "a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898",
+          "root": "gmp-6.3.0",
+          "licenses": [
+            "COPYING.LESSERv3",
+            "COPYINGv2",
+            "COPYINGv3"
+          ]
+        },
+        {
+          "name": "Expat",
+          "version": "2.5.0",
+          "license": "MIT",
+          "url": "https://github.com/libexpat/libexpat/releases/download/R_2_5_0/expat-2.5.0.tar.bz2",
+          "sha256": "6f0e6e01f7b30025fa05c85fdad1e5d0ec7fd35d9f61b22f34998de11969ff67",
+          "root": "expat-2.5.0",
+          "licenses": [
+            "COPYING"
+          ]
+        },
+        {
+          "name": "SQLite",
+          "version": "3.43.1",
+          "license": "blessing",
+          "url": "https://www.sqlite.org/2023/sqlite-autoconf-3430100.tar.gz",
+          "sha256": "39116c94e76630f22d54cd82c3cea308565f1715f716d1b2527f1c9c969ba4d9",
+          "root": "sqlite-autoconf-3430100",
+          "licenses": []
+        },
+        {
+          "name": "zlib",
+          "version": "1.3",
+          "license": "Zlib",
+          "url": "https://github.com/madler/zlib/releases/download/v1.3/zlib-1.3.tar.gz",
+          "sha256": "ff0ba4c292013dbc27530b3a81e1f9a813cd39de01ca5e0f8bf355702efa593e",
+          "root": "zlib-1.3",
+          "licenses": [
+            "LICENSE"
+          ]
+        },
+        {
+          "name": "c-ares",
+          "version": "1.19.1",
+          "license": "MIT",
+          "url": "https://github.com/c-ares/c-ares/releases/download/cares-1_19_1/c-ares-1.19.1.tar.gz",
+          "sha256": "321700399b72ed0e037d0074c629e7741f6b2ec2dda92956abe3e9671d3e268e",
+          "root": "c-ares-1.19.1",
+          "licenses": [
+            "LICENSE.md"
+          ]
+        },
+        {
+          "name": "libssh2",
+          "version": "1.11.0",
+          "license": "BSD-3-Clause",
+          "url": "https://libssh2.org/download/libssh2-1.11.0.tar.bz2",
+          "sha256": "e56d81f01f090d3c6eaf5f56c645610fd1a90d92819541d0079ae363d1eed11e",
+          "root": "libssh2-1.11.0",
+          "licenses": [
+            "COPYING"
+          ]
+        },
+        {
+          "name": "wslay",
+          "version": "1.1.1 (deps/wslay of the aria2 1.37.0 source)",
+          "license": "MIT",
+          "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz",
+          "sha256": "60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b",
+          "root": "aria2-1.37.0/deps/wslay",
+          "licenses": [
+            "COPYING"
+          ]
+        }
+      ],
+      "license_texts": [
+        {
+          "name": "mingw-w64-runtime-COPYING.txt",
+          "url": "https://raw.githubusercontent.com/mingw-w64/mingw-w64/v8.0.0/COPYING.MinGW-w64-runtime/COPYING.MinGW-w64-runtime.txt",
+          "sha256": "e9b2dc02451ea29092a1f25fa0f3c07207ed421f1807dffb0c4e6dce69dee7bd"
+        },
+        {
+          "name": "gcc-COPYING.RUNTIME.txt",
+          "url": "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-10.3.0/COPYING.RUNTIME",
+          "sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74"
+        }
+      ],
+      "toolchain": {
+        "gcc-mingw-w64": "10.3.0 (Ubuntu 22.04 gcc-mingw-w64 24.3, \"10-win32 20220113\")",
+        "mingw-w64": "8.0.0 (Ubuntu 22.04 mingw-w64 8.0.0-1)"
+      },
+      "note": "Statically linked (README.mingw): GMP, Expat, SQLite, zlib, c-ares, libssh2, the WebSocket library wslay from the aria2 source, and the static parts of the GCC and MinGW-w64 runtimes; it imports only Windows system DLLs. Enabled features: Async DNS, BitTorrent, Firefox3 Cookie, GZip, HTTPS (WinTLS; TLS 1.3 does not work, README.mingw), Message Digest, Metalink, XML-RPC, SFTP. LectureFlow uses only HTTP(S) downloads over JSON-RPC."
+    },
+    "darwin-arm64": {
+      "build": "built from source by packaging/aria2c/build-aria2c-macos.sh (CI: macos-14); aria2 publishes no macOS binary of 1.37.0",
+      "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz",
+      "sha256": "60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b",
+      "size": 1705256,
+      "root": "aria2-1.37.0",
+      "bin": "bin/aria2c",
+      "licenses": [
+        "COPYING",
+        "LICENSE.OpenSSL",
+        "AUTHORS",
+        "BUILDINFO.txt",
+        "thirdparty/*"
+      ],
+      "source_code": [
+        {
+          "what": "LectureFlow release attachment LectureFlow-<version>-source-aria2c-darwin-arm64.tar: the tarball below, the build script and these pins",
+          "url": "https://github.com/ShouldBeQuincy/LectureFlow/releases",
+          "release_asset": true
+        },
+        {
+          "what": "aria2 1.37.0 release tarball (this URL; the build script is packaging/aria2c/build-aria2c-macos.sh, the configure line is below and in BUILDINFO.txt; wslay is in deps/)",
+          "url": "https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz"
+        }
+      ],
+      "build_scripts": [
+        "packaging/aria2c/build-aria2c-macos.sh",
+        "desktop/packaging/third-party.json"
+      ],
+      "configure": [
+        "--with-appletls",
+        "--without-openssl",
+        "--without-gnutls",
+        "--without-libnettle",
+        "--without-libgmp",
+        "--without-libgcrypt",
+        "--without-libxml2",
+        "--without-libexpat",
+        "--without-sqlite3",
+        "--without-libssh2",
+        "--without-libcares",
+        "--without-libuv",
+        "--without-tcmalloc",
+        "--without-jemalloc",
+        "--with-libz",
+        "--disable-bittorrent",
+        "--disable-metalink",
+        "--disable-nls",
+        "--without-libintl-prefix",
+        "--without-libiconv-prefix",
+        "ARIA2_STATIC=no"
+      ],
+      "forbidden_configure": [
+        "--with-openssl",
+        "--with-gnutls",
+        "--with-libnettle",
+        "--with-libgmp",
+        "--with-libgcrypt",
+        "--with-libxml2",
+        "--with-libexpat",
+        "--with-sqlite3",
+        "--with-libssh2",
+        "--with-libcares",
+        "--enable-bittorrent",
+        "--enable-metalink",
+        "ARIA2_STATIC=yes"
+      ],
+      "note": "AppleTLS (Security.framework; certificates are checked against the system trust store); OpenSSL, GnuTLS, nettle, GMP, libgcrypt, libxml2, Expat, SQLite, libssh2, c-ares, BitTorrent and Metalink are off. Linked dynamically only to macOS system libraries (libz, libc++, libiconv, libSystem, CoreFoundation, Security); the build checks otool -L, the minimum macOS version and aria2c --version. The one third-party library inside is wslay (WebSocket, MIT), part of the aria2 source."
+    }
   }
 }

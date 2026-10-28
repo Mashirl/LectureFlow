@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +37,8 @@ type replayServer struct {
 	mu       sync.Mutex
 	steps    []ReplayStep
 	pos      int
+	used     []bool          // steps of a group served out of order
+	served   map[string]bool // names of the steps served
 	vars     map[string]string
 	finished bool
 	failures []string
@@ -66,13 +69,13 @@ func loadReplayPath(t *testing.T, path string) (ReplayFile, []ReplayStep, map[st
 		t.Fatalf("%s: _source and upstream (version, files) are required", name)
 	}
 	vars := map[string]string{}
-	var steps []ReplayStep
+	var steps, rest []ReplayStep
 	if f.Extends != "" {
 		_, parent, pv := loadReplayPath(t, filepath.Join(filepath.Dir(path), f.Extends))
 		for k, v := range pv {
 			vars[k] = v
 		}
-		found := false
+		found := f.Until == ""
 		for _, s := range parent {
 			if s.Name == f.Until {
 				found = true
@@ -83,11 +86,21 @@ func loadReplayPath(t *testing.T, path string) (ReplayFile, []ReplayStep, map[st
 		if !found {
 			t.Fatalf("%s: step %q not found in %s", name, f.Until, f.Extends)
 		}
+		if f.Resume != "" {
+			i := slices.IndexFunc(parent, func(s ReplayStep) bool { return s.Name == f.Resume })
+			if i < 0 {
+				t.Fatalf("%s: resume step %q not found in %s", name, f.Resume, f.Extends)
+			}
+			rest = parent[i:]
+		}
+	} else if f.Until != "" || f.Resume != "" {
+		t.Fatalf("%s: until and resume need extends", name)
 	}
 	for k, v := range f.Vars {
 		vars[k] = v
 	}
-	return f, append(steps, f.Steps...), vars
+	steps = append(steps, f.Steps...)
+	return f, append(steps, rest...), vars
 }
 
 func newReplay(t *testing.T, name string) *replayServer {
@@ -99,7 +112,7 @@ func newReplayPath(t *testing.T, path string) *replayServer {
 	t.Helper()
 	_, steps, vars := loadReplayPath(t, path)
 	name := filepath.Base(path)
-	rs := &replayServer{t: t, name: name, steps: steps, vars: vars}
+	rs := &replayServer{t: t, name: name, steps: steps, vars: vars, used: make([]bool, len(steps)), served: map[string]bool{}}
 	rs.srv = httptest.NewServer(http.HandlerFunc(rs.serve))
 	t.Cleanup(func() {
 		rs.srv.CloseClientConnections()
@@ -125,8 +138,10 @@ func (rs *replayServer) finish() {
 	}
 	if rs.pos < len(rs.steps) {
 		var left []string
-		for _, s := range rs.steps[rs.pos:] {
-			left = append(left, s.Name)
+		for i, s := range rs.steps[rs.pos:] {
+			if !rs.used[rs.pos+i] {
+				left = append(left, s.Name)
+			}
 		}
 		rs.t.Errorf("%s: %d steps not used: %s", rs.name, len(left), strings.Join(left, "; "))
 	}
@@ -257,6 +272,8 @@ func (rs *replayServer) serve(w http.ResponseWriter, r *http.Request) {
 			rs.fail(w, "%s: %s", where, msg)
 			return
 		}
+		rs.used[rs.pos] = true
+		rs.served[st.Name] = true
 		rs.pos++
 		rs.wsDone.Add(1)
 		rs.mu.Unlock()
@@ -264,40 +281,38 @@ func (rs *replayServer) serve(w http.ResponseWriter, r *http.Request) {
 		rs.runWS(w, r, ws, where)
 		return
 	}
-	req := st.Request
-	if req == nil {
-		rs.fail(w, "%s: neither request nor websocket", where)
-		return
-	}
-	if req.Method != r.Method || req.Host != host || !rs.matchStr(req.Path, path) {
-		rs.fail(w, "%s: expected %s %s %s, got %s %s %s", where, req.Method, req.Host, req.Path, r.Method, host, path)
-		return
-	}
-	if msg := rs.checkQueryHeaders(req.Query, req.Headers, r); msg != "" {
+	idx := rs.pos
+	if st.Group != "" {
+		// Any unused step of the group that matches.
+		idx = -1
+		var first string
+		for i := rs.pos; i < len(rs.steps) && rs.steps[i].Group == st.Group; i++ {
+			if rs.used[i] {
+				continue
+			}
+			msg := rs.matchRequest(rs.steps[i], host, path, body, r)
+			if msg == "" {
+				idx = i
+				break
+			}
+			if first == "" {
+				first = fmt.Sprintf("step %d %q: %s", i+1, rs.steps[i].Name, msg)
+			}
+		}
+		if idx < 0 {
+			rs.fail(w, "group %q: no step matches %s %s %s (first: %s)", st.Group, r.Method, host, path, first)
+			return
+		}
+		st = rs.steps[idx]
+	} else if msg := rs.matchRequest(st, host, path, body, r); msg != "" {
 		rs.fail(w, "%s: %s", where, msg)
 		return
 	}
-	if req.Form != nil {
-		form, err := url.ParseQuery(string(body))
-		if err != nil {
-			rs.fail(w, "%s: body is not a form", where)
-			return
-		}
-		for k, v := range req.Form {
-			if !rs.matchStr(v, form.Get(k)) {
-				rs.fail(w, "%s: form field %s does not match", where, k)
-				return
-			}
-		}
+	rs.used[idx] = true
+	rs.served[st.Name] = true
+	for rs.pos < len(rs.steps) && rs.used[rs.pos] {
+		rs.pos++
 	}
-	if req.JSON != nil {
-		var got any
-		if json.Unmarshal(body, &got) != nil || !rs.matchJSON(map[string]any(req.JSON), got) {
-			rs.fail(w, "%s: JSON body does not match", where)
-			return
-		}
-	}
-	rs.pos++
 	resp := st.Response
 	if resp == nil {
 		resp = &ReplayResponse{Status: 200}
@@ -317,6 +332,39 @@ func (rs *replayServer) serve(w http.ResponseWriter, r *http.Request) {
 	rs.mu.Unlock()
 	w.WriteHeader(resp.Status)
 	_, _ = io.WriteString(w, out)
+}
+
+// matchRequest is "" when the request matches the step, else why not.
+// Called with rs.mu held.
+func (rs *replayServer) matchRequest(st ReplayStep, host, path string, body []byte, r *http.Request) string {
+	req := st.Request
+	if req == nil {
+		return "neither request nor websocket"
+	}
+	if req.Method != r.Method || req.Host != host || !rs.matchStr(req.Path, path) {
+		return fmt.Sprintf("expected %s %s %s, got %s %s %s", req.Method, req.Host, req.Path, r.Method, host, path)
+	}
+	if msg := rs.checkQueryHeaders(req.Query, req.Headers, r); msg != "" {
+		return msg
+	}
+	if req.Form != nil {
+		form, err := url.ParseQuery(string(body))
+		if err != nil {
+			return "body is not a form"
+		}
+		for k, v := range req.Form {
+			if !rs.matchStr(v, form.Get(k)) {
+				return "form field " + k + " does not match"
+			}
+		}
+	}
+	if req.JSON != nil {
+		var got any
+		if json.Unmarshal(body, &got) != nil || !rs.matchJSON(map[string]any(req.JSON), got) {
+			return "JSON body does not match"
+		}
+	}
+	return ""
 }
 
 // checkQueryHeaders: query keys must be exactly the expected ones; headers
@@ -385,6 +433,21 @@ func (rs *replayServer) runWS(w http.ResponseWriter, r *http.Request, ws *Replay
 	}
 	for i, a := range ws.Script {
 		switch {
+		case a.After != "":
+			for {
+				rs.mu.Lock()
+				ok := rs.served[a.After]
+				rs.mu.Unlock()
+				if ok {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					rs.addFailure("%s action %d: step %q was never served", where, i+1, a.After)
+					return
+				case <-time.After(5 * time.Millisecond):
+				}
+			}
 		case a.Expect != nil:
 			_, data, err := c.ReadMessage(ctx)
 			if err != nil {
@@ -399,7 +462,7 @@ func (rs *replayServer) runWS(w http.ResponseWriter, r *http.Request, ws *Replay
 			var content map[string]any
 			_ = json.Unmarshal(m.Content, &content)
 			for k, sub := range a.Expect.ContentContains {
-				if s, _ := content[k].(string); !strings.Contains(s, sub) {
+				if s, _ := content[k].(string); !strings.Contains(s, rs.sub(sub)) {
 					rs.addFailure("%s action %d: content.%s does not contain %q", where, i+1, k, sub)
 				}
 			}

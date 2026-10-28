@@ -15,10 +15,12 @@ import (
 	"lectureflow/internal/colab"
 	"lectureflow/internal/components"
 	"lectureflow/internal/devices"
+	"lectureflow/internal/fetch"
 	"lectureflow/internal/glossary"
 	"lectureflow/internal/llm"
 	"lectureflow/internal/resources"
 	"lectureflow/internal/sched"
+	"lectureflow/internal/selfupdate"
 	"lectureflow/internal/settings"
 	"lectureflow/internal/stages"
 	"lectureflow/internal/state"
@@ -62,7 +64,8 @@ func TestBackendErrorCodesCatalog(t *testing.T) {
 
 	var defined []string
 	for _, list := range [][]string{settings.ErrorCodes, llm.ErrorCodes, stages.ErrorCodes, glossary.ErrorCodes,
-		sched.ErrorCodes, resources.ErrorCodes, state.ErrorCodes, devices.ErrorCodes, colab.ErrorCodes, components.ErrorCodes} {
+		sched.ErrorCodes, resources.ErrorCodes, state.ErrorCodes, devices.ErrorCodes, colab.ErrorCodes, components.ErrorCodes,
+		fetch.ErrorCodes, selfupdate.ErrorCodes} {
 		defined = append(defined, list...)
 	}
 	seen := map[string]bool{}

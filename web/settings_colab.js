@@ -16,14 +16,27 @@
 //   user's own gcloud, also every 3.0.0 import), 断开连接 (which also signs
 //   gcloud's application-default login out — only for the source gcloud,
 //   whose refresh token gcloud shares), and the settings:
-//   enabled, accelerator, model and precision, paid / free tier, the
-//   longest wait for a GPU, "电池模式下优先使用 Colab". Every change is
+//   enabled, accelerator (colab-batch: measured speed and cost per lecture
+//   of each, the paid tier's default L4 until one is picked), model and
+//   precision, memory mode, "极速模式" (off by default; the larger GPUs
+//   only), the longest wait for a GPU, "电池模式下优先使用
+//   Colab". Every change is
 //   sent at once; what is shown is the last GET /api/colab or the answer
 //   of the change (nothing optimistic).
 // - The lecture menu's "改用 Colab 处理" (POST /api/lectures/{id}/use-colab).
 // - Shared helpers of the resource panel, the pipeline card and the
 //   workbench line: the last resource snapshot's "remote" (Colab status;
 //   null = switched off), durations, the state names.
+// - colab-obs (user decisions 2026-10-27 07:00 and 14:50): the account
+//   (status.account: level paid | free, the paid balance, the free quota,
+//   eligibility_known false = not read, only the T4 then), the
+//   accelerators it unlocks (selectable_accelerators, effective_accelerator,
+//   locked_reason: a locked choice is kept, the T4 is used meanwhile), the
+//   resource card of the snapshot's remotes[] (internal/remote.Card:
+//   machine, usage, jobs) and the memory bar's segments. The settings page
+//   shows the account ("重新查询"), the accelerators as a radio list with
+//   what each measured, and no paid / free switch any more (the tier
+//   follows the account).
 
 import { h, btn, skeleton, errorBlock, toast, confirmDialog, copyText } from './dom.js';
 import { icon } from './icons.js';
@@ -128,6 +141,237 @@ export function stageOnColab(st) {
   return !!(a && a.device_id === 'colab:remote');
 }
 
+/**
+ * "极速模式" of a lecture's last transcription (colab-obs): the number of
+ * parts Colab cut it into (asr_timing.postprocess.split), 0 when it was
+ * transcribed whole.
+ */
+export function splitParts(lec) {
+  const asr = ((lec && lec.stages) || []).find((s) => s.stage === 'asr');
+  const sp = asr && asr.asr_timing && asr.asr_timing.postprocess && asr.asr_timing.postprocess.split;
+  const n = sp ? Number(sp.parts) : 0;
+  return Number.isInteger(n) && n > 1 ? n : 0;
+}
+
+// ---- colab-obs: the account and the accelerators it unlocks ----
+
+// What each accelerator measured on Colab (colab-setup-time.md §5.1 and
+// §9.1; a 55-minute lecture with large-v3, about 30 s of setup included):
+// the runtime's GPU memory and memory in GB, minutes per lecture, the
+// session's compute units per hour. The H100 was never lent to the test
+// account: its GPU memory only.
+export const SPECS = {
+  T4: { vram: 15, ram: 13, min: 3.8, cuh: 1.07 },
+  L4: { vram: 24, ram: 54, min: 3, cuh: 1.54 },
+  A100: { vram: 40, ram: 85, min: 2.3, cuh: 5.3 },
+  G4: { vram: 96, ram: 181, min: 1.9, cuh: 8.9 },
+  H100: { vram: 80, ram: null, min: null, cuh: null },
+};
+
+/** Compute units one lecture costs on accelerator x (null: not measured). */
+export function cuPerLecture(x) {
+  const s = SPECS[x];
+  return s && s.min && s.cuh ? (s.min * s.cuh) / 60 : null;
+}
+
+/** "约 N 节": hundreds from 1,000 on, tens from 100 on, else whole lectures. */
+export function approxCount(n) {
+  if (n == null || !isFinite(n) || n < 0) return null;
+  if (n >= 1000) return Math.round(n / 100) * 100;
+  if (n >= 100) return Math.round(n / 10) * 10;
+  return Math.floor(n);
+}
+
+/** The account of a Colab status (null: a back end without it). */
+export function accountOf(st) {
+  return (st && st.account && typeof st.account === 'object' && st.account) || null;
+}
+
+/** The account said which GPUs it may borrow (false: only the T4). */
+export function accountKnown(a) {
+  return !!(a && a.eligibility_known);
+}
+
+/** Why the last query of the account failed ({code, params}; null: it did not). */
+export function accountError(a) {
+  return a && a.read_ok === false && a.read_error && a.read_error.code ? a.read_error : null;
+}
+
+/**
+ * The failed query in words: the authorization's own texts (they say what
+ * to do); any other code is the dispatch's wording ("这节讲座已转回本机…"),
+ * so a plain "the query failed" with the code's text as the hover detail.
+ * {text, detail}; null when the last query did not fail.
+ */
+export function accountErrorText(a) {
+  const err = accountError(a);
+  if (!err) return null;
+  const detail = infoText(err);
+  if (err.code.startsWith('colab.auth_')) return { text: detail, detail: '' };
+  return { text: t('resources.remote.check_failed'), detail };
+}
+
+/** "重新查询" is offered: the last query failed, or only the T4 is open. */
+export function accountNeedsCheck(a) {
+  return !!a && (a.read_ok === false || !accountKnown(a));
+}
+
+/** The paid balance of the reading shown (null: never read). */
+export function paidBalance(a) {
+  return a && typeof a.paid_balance_cu === 'number' && isFinite(a.paid_balance_cu) ? a.paid_balance_cu : null;
+}
+
+const freeQuota = (a) => (a && typeof a.free_quota_cu === 'number' && a.free_quota_cu > 0 ? a.free_quota_cu : 0);
+
+/**
+ * About how many lectures the account pays for on accelerator x: the paid
+ * balance, plus the free quota on a T4 (user decision 14:50). Null when the
+ * balance is not known or x was never measured.
+ */
+export function fitFor(a, x) {
+  const per = cuPerLecture(x);
+  if (!a || !per) return null;
+  let cu = typeof a.paid_balance_cu === 'number' && isFinite(a.paid_balance_cu) ? Math.max(0, a.paid_balance_cu) : null;
+  if (x === 'T4' && freeQuota(a)) cu = (cu || 0) + freeQuota(a);
+  return cu == null ? null : approxCount(cu / per);
+}
+
+/** "付费" / "免费层" (account.level; the settings' tier before colab-obs). */
+export function levelText(st) {
+  const a = accountOf(st);
+  const level = a ? a.level : st && st.tier;
+  return level === 'paid' ? t('resources.remote.tier.paid') : t('resources.remote.tier.free');
+}
+
+/** The accelerator lectures go to now: the choice, or the T4 while it is locked. */
+export function effectiveAccel(st) {
+  return (st && (st.effective_accelerator || st.accelerator)) || '';
+}
+
+/**
+ * Why accelerator x cannot be borrowed now ('' = it can): account_unknown,
+ * no_balance or ineligible (texts resources.remote.lock.*). Every
+ * accelerator is open with a back end that does not list them.
+ */
+export function lockOf(st, x) {
+  const list = st && st.selectable_accelerators;
+  if (!Array.isArray(list) || list.includes(x)) return '';
+  const a = accountOf(st);
+  if (!accountKnown(a)) return 'account_unknown';
+  if (!(a.paid_balance_cu > 0)) return 'no_balance';
+  return 'ineligible';
+}
+
+export function lockText(reason) {
+  return reason && has(`resources.remote.lock.${reason}`) ? t(`resources.remote.lock.${reason}`) : reason || '';
+}
+
+/** "免费额度约 3.2 CU，下次补充 10月28日 08:00" ('' without a free quota). */
+export function freeQuotaText(a) {
+  const q = freeQuota(a);
+  if (!q) return '';
+  const cu = cuText(q);
+  return a.free_refill_at ? t('resources.remote.free_quota', { cu, time: U.fmtDateTime(a.free_refill_at) }) : t('resources.remote.free_quota_now', { cu });
+}
+
+/** "查询于 14:02（2 分钟前）" ('' before the first query). */
+export function checkedText(a) {
+  return a && a.read_at ? t('resources.remote.checked_at', { time: U.fmtHM(a.read_at), ago: U.relTime(a.read_at) }) : '';
+}
+
+// ---- colab-obs: the resource card (remotes[]) and its memory bar ----
+
+/**
+ * The Colab area of a resource snapshot: the Colab card of remotes[]
+ * (internal/remote.Card) with the Colab status (snapshot.remote, else the
+ * card's colab part). {st, machine, usage, jobs, queued, ahead}; null when
+ * Colab is off. jobs: [{title, step, stage, progress, eta, split}].
+ */
+export function colabCard(res) {
+  if (!res) return null;
+  const card = Array.isArray(res.remotes) ? res.remotes.find((c) => c && c.kind === 'colab') || null : null;
+  const own = card && card.colab && typeof card.colab === 'object' ? card.colab : null;
+  const st = res.remote || own;
+  if (!st && !card) return null;
+  const s = st || {};
+  const c = card || {};
+  let jobs;
+  if (Array.isArray(c.jobs) && c.jobs.length) {
+    jobs = c.jobs.map((j) => ({ title: j.lecture_title || '', step: '', stage: j.stage || '', progress: j.progress, eta: j.eta_sec, split: j.split || 0 }));
+  } else {
+    const list = Array.isArray(s.jobs) && s.jobs.length ? s.jobs : s.current ? [s.current] : [];
+    jobs = list.map((j) => ({ title: j.lecture_title || '', step: j.step || '', stage: j.stage || '', progress: j.overall, eta: j.eta_sec, split: j.split || 0 }));
+  }
+  return {
+    st: s,
+    machine: c.machine || s.machine || null,
+    usage: c.usage || s.usage || null,
+    jobs,
+    queued: card ? c.queued || 0 : s.planned || 0,
+    ahead: card ? c.uploaded_ahead || 0 : s.uploaded_ahead || 0,
+  };
+}
+
+// RAM segment kinds left to right (internal/remote SegRAMDisk …); "used"
+// alone when the remote reports total and free only.
+export const SEG_KINDS = ['ramdisk', 'whisper', 'system', 'data', 'used'];
+
+/**
+ * The memory bar of a remote reading: {total, free, freeFrac, segs: [{kind,
+ * mb, frac}]} in SEG_KINDS order, the free part apart (it fills the rest);
+ * segments of 0 MB and unknown kinds are left out. The total is the
+ * segments' sum (they add up to the machine's memory). Null without one.
+ */
+export function ramSegments(usage) {
+  const list = usage && Array.isArray(usage.ram) ? usage.ram : [];
+  const mb = (k) => list.reduce((n, s) => n + (s && s.kind === k ? Math.max(0, Number(s.mb) || 0) : 0), 0);
+  const segs = SEG_KINDS.map((kind) => ({ kind, mb: mb(kind) })).filter((s) => s.mb > 0);
+  const free = mb('free');
+  const total = segs.reduce((n, s) => n + s.mb, 0) + free;
+  if (!(total > 0)) return null;
+  for (const s of segs) s.frac = s.mb / total;
+  return { total, free, freeFrac: free / total, segs };
+}
+
+// The accelerator a GPU name stands for (nvidia-smi names: "Tesla T4",
+// "NVIDIA L4", "NVIDIA A100-SXM4-40GB", G4 = "NVIDIA RTX PRO 6000
+// Blackwell Server Edition"); a requested accelerator the reported name
+// does not match is said (the card's identity comes from the remote).
+const GPU_NAMES = { T4: /\bT4\b/i, L4: /\bL4\b/i, A100: /A100/i, H100: /H100/i, G4: /RTX PRO 6000|Blackwell|\bG4\b/i };
+
+export function gpuMismatch(machine) {
+  if (!machine || !machine.gpu_name || !machine.requested) return false;
+  const re = GPU_NAMES[machine.requested];
+  return !!re && !re.test(machine.gpu_name);
+}
+
+/**
+ * The Colab cell of the collapsed resource rail (colab-obs) for a
+ * colabCard(): with a session the remote GPU's usage, the GPU below it and
+ * the memory segments (mini); without one the compute units left (the paid
+ * balance, else the free quota) above "CU"; "--" in the warning colour
+ * above "仅 T4" when the account was not read. Null while Colab is off.
+ */
+export function railColab(c) {
+  if (!c) return null;
+  const r = c.st;
+  const a = accountOf(r);
+  const accel = effectiveAccel(r);
+  if (ACTIVE_STATES.has(r.state) || r.current) {
+    const u = c.usage;
+    const value = u && typeof u.gpu_util_pct === 'number' ? U.fmtPercent(u.gpu_util_pct / 100, 0) : '--';
+    const lay = u ? ramSegments(u) : null;
+    const title = [t('resources.remote.service', { accelerator: accel }), t('resources.rail.gpu', { value }), lay ? t('resources.remote.ram_free', { free: U.fmtMB(lay.free), total: U.fmtMB(lay.total) }) : ''];
+    return { value, sub: (c.machine && c.machine.requested) || accel, title: title.filter(Boolean).join(' · '), warn: false, mini: lay };
+  }
+  const paid = a ? paidBalance(a) : typeof r.balance_cu === 'number' ? r.balance_cu : null;
+  const left = paid != null && paid > 0 ? paid : freeQuota(a) || paid;
+  const value = left == null ? '--' : U.fmtInt(Math.floor(left));
+  if (a && !accountKnown(a)) return { value: paid == null ? '--' : value, sub: t('resources.remote.cards_t4'), title: t('resources.remote.unknown_t4'), warn: true, mini: null };
+  const title = [t('resources.remote.unused'), levelText(r), paid != null ? t('resources.remote.balance', { balance: cuText(paid) }) : '', freeQuotaText(a)];
+  return { value, sub: 'CU', title: title.filter(Boolean).join(' · '), warn: false, mini: null };
+}
+
 // ---- requests ----
 
 const colabGet = () => appRequest('GET', '/api/colab');
@@ -136,6 +380,23 @@ const colabPut = (patch) => appRequest('PUT', '/api/colab/settings', patch);
 /** POST /api/colab/shutdown {mode}; resolves to the ColabView or throws. */
 export async function shutdownColab(mode) {
   const v = await appRequest('POST', '/api/colab/shutdown', { mode });
+  noteView(v);
+  return v;
+}
+
+/**
+ * "重新查询" (colab-obs): POST /api/colab/account/refresh reads the account
+ * from Colab now and answers the ColabView; a back end without the
+ * endpoint (404 / 405) answers GET /api/colab instead.
+ */
+export async function refreshAccount() {
+  let v;
+  try {
+    v = await appRequest('POST', '/api/colab/account/refresh');
+  } catch (e) {
+    if (!e || (e.status !== 404 && e.status !== 405)) throw e;
+    v = await colabGet();
+  }
   noteView(v);
   return v;
 }
@@ -165,7 +426,9 @@ function useColabError(e) {
   return (b && b.code && U.errorInfoText(b, e.message)) || (e && e.message) || t('common.unknown_error');
 }
 
-async function useColab(lec) {
+// Also the asr stage's allowed action use_colab (colabfix: Colab handed the
+// lecture back and no local device can take it; actions.js stageAction).
+export async function useColab(lec) {
   const ok = await confirmDialog({
     title: t('lecture.use_colab.title', { title: lec.title || '' }),
     message: t('lecture.use_colab.message'),
@@ -198,7 +461,10 @@ export function useColabMenuItem(lec, done) {
 
 // ---- the settings section ----
 
-const ACCELERATORS = ['T4', 'L4', 'G4', 'A100', 'H100'];
+// colab-obs: the radio list's order (the measured ones by speed, then the
+// H100); "极速模式" works on the larger GPUs only.
+const ACCELERATORS = ['T4', 'L4', 'A100', 'G4', 'H100'];
+const FAST_ACCELERATORS = ['L4', 'A100', 'G4', 'H100'];
 const PRECISIONS = ['float16', 'int8_float16', 'int8', 'bfloat16', 'float32', 'int8_bfloat16', 'int8_float32'];
 const MODELS = ['large-v3', 'large-v3-turbo', 'large-v2', 'medium', 'small'];
 const LIFECYCLES = ['days', 'session', 'manual'];
@@ -224,6 +490,7 @@ export function createColabSection(ui) {
   let modelDraft = null;
   let advancedOpen = null; // the "use your own gcloud" fold (null: not toggled yet)
   let loginStarted = false;
+  let refreshing = false; // "重新查询" of the account
   const redraw = () => alive && ui.rerender();
   // 3.1.0: the in-app sign-in (the gcloud component, then the Google sign-in)
   const appLogin = createColabLogin({
@@ -271,6 +538,21 @@ export function createColabSection(ui) {
       saveError = e.message;
     }
     saving = '';
+    redraw();
+  }
+
+  // "重新查询": the account is read from Colab now (the answer is shown).
+  async function recheck() {
+    if (refreshing) return;
+    refreshing = true;
+    redraw();
+    try {
+      const v = await refreshAccount();
+      if (alive && v && v.status) setView(v);
+    } catch (e) {
+      if (alive) toast(e.message, 'error');
+    }
+    refreshing = false;
     redraw();
   }
 
@@ -560,15 +842,149 @@ export function createColabSection(ui) {
     );
   }
 
+  // colab-obs: "账户" under the authorization — the tier (paid / free,
+  // from the account), the paid balance and how many lectures it covers on
+  // the GPU in use, the free quota, when it was read, "重新查询". Not read:
+  // "--", why and "only the T4" (the query button is then the primary one).
+  // No subscription type: Colab does not give it to other programs (user
+  // decision 14:50).
+  function accountRow() {
+    const st = view.status;
+    const a = accountOf(st);
+    if (!a) return null; // a back end without the account
+    const known = accountKnown(a);
+    const accel = effectiveAccel(st);
+    const fit = fitFor(a, accel);
+    const paid = a.level === 'paid';
+    const quota = freeQuotaText(a);
+    const balance = paidBalance(a) == null ? '--' : cuText(paidBalance(a));
+    const err = accountErrorText(a);
+    const box = h(
+      'div',
+      { class: 'acct-box' },
+      h('div', { class: 'acct-line' }, h('span', { class: 'chip ' + (paid ? 'chip-run' : 'chip-quiet'), title: known ? undefined : t('resources.remote.unknown_t4') }, levelText(st))),
+      h(
+        'div',
+        { class: 'acct-cu' },
+        h('span', { class: 'acct-num' }, balance),
+        h('span', { class: 'acct-unit' }, t('resources.remote.balance_k')),
+        fit > 0 ? h('span', { class: 'dim small' }, t('settings.colab.account_fit', { accelerator: accel, n: U.count(fit) })) : null,
+      ),
+      quota ? h('div', { class: 'acct-quota small' }, icon('coins', { size: 13 }), h('span', null, quota)) : null,
+      h(
+        'div',
+        { class: 'acct-foot' },
+        h('span', { class: 'dim small' }, checkedText(a)),
+        btn(t('resources.remote.refresh'), {
+          size: 'sm',
+          kind: accountNeedsCheck(a) ? 'primary' : 'ghost',
+          icon: refreshing ? 'loader-circle' : 'refresh-cw',
+          disabled: refreshing,
+          fkey: 'set:colab:recheck',
+          onclick: recheck,
+        }),
+      ),
+    );
+    const unlocked = known && ACCELERATORS.some((x) => x !== 'T4' && !lockOf(st, x));
+    return ui.formRow(t('settings.colab.account_label'), box, t('settings.colab.account_hint'), [
+      err ? h('p', { class: 'set-note is-warn', title: err.detail || undefined }, icon('circle-alert', { size: 13 }), h('span', null, err.text)) : null,
+      known ? null : note('lock', t('resources.remote.unknown_t4'), 'is-warn'),
+      unlocked ? note('lock-open', t('settings.colab.account_unlocked'), 'is-ok') : null,
+      known && !paid ? note('triangle-alert', t('settings.colab.tier_free_hint'), 'is-warn') : null,
+    ]);
+  }
+
+  // colab-obs: the accelerators as a radio list — GPU memory and memory of
+  // the measured runtime, the measured time and cost per lecture, how many
+  // lectures the balance covers (the free quota counts on the T4). A GPU
+  // the account cannot borrow now is greyed with its numbers kept and the
+  // reason in its row; a locked choice stays the user's, the T4 is used
+  // meanwhile (it comes back by itself). The checked row is where lectures
+  // go now (effective_accelerator).
   function accelRow() {
     const s = view.settings;
-    const list = ACCELERATORS.includes(s.accelerator) ? ACCELERATORS : [s.accelerator, ...ACCELERATORS];
-    const sel = h(
-      'select',
-      { class: 'select mono colab-sel', 'aria-label': t('settings.colab.accel_label'), disabled: !!saving, dataset: { fkey: 'set:colab:accel' }, onchange: (e) => save('accel', { accelerator: e.target.value }) },
-      list.map((a) => h('option', { value: a, selected: a === s.accelerator }, a)),
+    const st = view.status;
+    const a = accountOf(st);
+    const eff = effectiveAccel(st) || s.accelerator;
+    const list = ACCELERATORS.includes(s.accelerator) ? ACCELERATORS : [...ACCELERATORS, s.accelerator];
+    // a choice that is locked now (kept; a T4 meanwhile); a default never chosen is not one
+    const chosenLock = s.accelerator_chosen && s.accelerator !== eff ? lockOf(st, s.accelerator) || st.locked_reason || '' : '';
+    return ui.formRow(
+      t('settings.colab.accel_label'),
+      h('ul', { class: 'acc-list', role: 'radiogroup', 'aria-label': t('settings.colab.accel_label') }, list.map((x) => accelItem(x, eff, a))),
+      t('settings.colab.accel_measured_hint'),
+      [
+        chosenLock ? note('info', t('settings.colab.locked_note', { accelerator: s.accelerator, reason: lockText(chosenLock) })) : null,
+        s.accelerator_chosen ? null : note('info', t('settings.colab.accel_default_account')),
+        savingNote('accel'),
+      ],
     );
-    return ui.formRow(t('settings.colab.accel_label'), sel, t('settings.colab.accel_hint'), savingNote('accel'));
+  }
+
+  function accelItem(x, eff, a) {
+    const st = view.status;
+    const spec = SPECS[x] || null;
+    const lock = lockOf(st, x);
+    const on = x === eff;
+    const per = cuPerLecture(x);
+    const fit = lock ? null : fitFor(a, x);
+    const radio = h('input', {
+      class: 'acc-radio',
+      type: 'radio',
+      name: 'colab-accel',
+      value: x,
+      checked: on,
+      disabled: !!lock || !!saving,
+      dataset: { fkey: `set:colab:accel:${x}` },
+      onchange: () => save('accel', { accelerator: x }),
+    });
+    const size = (gb) => U.fmtMB(gb * 1024);
+    let side;
+    if (lock) side = [icon('lock', { size: 14 }), h('small', null, t('settings.colab.acc_locked'))];
+    else if (fit > 0) {
+      const byQuota = x === 'T4' && !(a.paid_balance_cu > 0);
+      side = [h('b', null, t('resources.remote.fit_n', { n: U.count(fit) })), h('small', null, t(byQuota ? 'settings.colab.acc_fit_free' : 'settings.colab.acc_fit_k'))];
+    } else side = null;
+    return h(
+      'li',
+      { class: 'acc' + (on ? ' is-sel' : '') + (lock ? ' is-locked' : ''), dataset: { accel: x } },
+      h(
+        'label',
+        { class: 'acc-in' },
+        radio,
+        h(
+          'span',
+          { class: 'acc-main' },
+          h(
+            'span',
+            { class: 'acc-line' },
+            h('span', { class: 'acc-name mono' }, x),
+            spec && spec.vram ? h('span', { class: 'chip chip-quiet' }, [t('resources.gpu.vram'), size(spec.vram)].join(' ')) : null,
+            spec && spec.ram ? h('span', { class: 'chip chip-quiet' }, [t('resources.system.mem'), size(spec.ram)].join(' ')) : null,
+            per ? null : h('span', { class: 'chip chip-draft' }, t('settings.colab.acc_unmeasured')),
+          ),
+          per && has(`settings.colab.accel_info.${x}`) ? h('span', { class: 'acc-meas' }, t(`settings.colab.accel_info.${x}`)) : null,
+          per ? h('span', { class: 'acc-sub' }, t('settings.colab.acc_rate', { rate: U.fmtDecimal(spec.cuh, 2) })) : null,
+          lock ? h('span', { class: 'acc-why' }, icon('lock', { size: 12 }), h('span', null, lockText(lock))) : null,
+        ),
+        side ? h('span', { class: 'acc-fit' }, side) : null,
+      ),
+    );
+  }
+
+  // colab-batch: "极速模式" (user decision 2026-10-27, off by default): on
+  // the larger GPUs a lecture is cut at silences into parts transcribed at
+  // once; the result differs slightly from the whole lecture's.
+  function fastRow() {
+    const s = view.settings;
+    const accel = effectiveAccel(view.status) || s.accelerator;
+    const effective = FAST_ACCELERATORS.includes(accel);
+    return ui.formRow(
+      t('settings.colab.fast_label'),
+      ui.switchBtn(!!s.fast_mode, t('settings.colab.fast_label'), () => save('fast', { fast_mode: !s.fast_mode }), 'set:colab:fast'),
+      t('settings.colab.fast_hint'),
+      [s.fast_mode && !effective ? note('info', t('settings.colab.fast_no_effect', { accelerator: accel })) : null, savingNote('fast')],
+    );
   }
 
   function modelRow() {
@@ -605,19 +1021,21 @@ export function createColabSection(ui) {
     );
   }
 
-  function tierRow() {
+  // Memory mode (on by default): the recording, the model and the Python
+  // environment stay in the Colab machine's memory; a lecture that does not
+  // fit uses the disk.
+  function memoryRow() {
     const s = view.settings;
-    const opts = [
-      ['paid', t('settings.colab.tier.paid')],
-      ['free', t('settings.colab.tier.free')],
-    ];
     return ui.formRow(
-      t('settings.colab.tier_label'),
-      ui.segmented('set:colab:tier', opts, s.tier, (v) => save('tier', { tier: v }), t('settings.colab.tier_label')),
-      s.tier === 'free' ? null : t('settings.colab.tier_paid_hint'),
-      [s.tier === 'free' ? note('triangle-alert', t('settings.colab.tier_free_hint'), 'is-warn') : null, savingNote('tier')],
+      t('settings.colab.memory_label'),
+      ui.switchBtn(!!s.memory_mode, t('settings.colab.memory_label'), () => save('memory', { memory_mode: !s.memory_mode }), 'set:colab:memory'),
+      t('settings.colab.memory_hint'),
+      savingNote('memory'),
     );
   }
+
+  // colab-obs: no paid / free switch any more — the tier follows the
+  // account (user decision 2026-10-27 07:00); the account row says it.
 
   function waitRow() {
     const s = view.settings;
@@ -689,12 +1107,14 @@ export function createColabSection(ui) {
         h('h3', { class: 'colab-sub' }, t('settings.colab.auth_title')),
         authed ? null : appLoginBlock(),
         authRow(),
+        authed ? accountRow() : null,
         authed ? null : advancedBlock(),
         h('h3', { class: 'colab-sub' }, t('settings.colab.use_title')),
         enabledRow(),
         accelRow(),
         modelRow(),
-        tierRow(),
+        memoryRow(),
+        fastRow(),
         waitRow(),
         batteryRow(),
       ),

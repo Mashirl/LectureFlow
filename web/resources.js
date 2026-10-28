@@ -25,11 +25,20 @@
 // lectures fit, the current lecture's step, the plan, compute units, the
 // authorization's time left) and the two shutdown buttons; without a
 // session it is one line "远端 GPU：未使用".
+// colab-obs (2026-10-27): the area also reads the snapshot's remotes[]
+// (internal/remote.Card: the machine and its readings) and the account of
+// the Colab status — see the remote GPU section below; the collapsed rail
+// has a Colab cell (GPU usage and a mini memory bar with a session, the
+// compute units left without one, "--" in the warning colour when the
+// account was not read).
 // mac-opti M6: a reading the system cannot give at all (system.unsupported,
 // e.g. the CPU temperature on macOS) is left out instead of showing "--";
 // on Apple silicon (system.unified_memory) the memory is "统一内存", and the
 // Apple GPU's card shows how much of it the GPU holds, without a
 // temperature tile.
+// stream-parallel: the system area says when playback files are being made
+// in the background (the stream task: a CPU slot, in parallel with
+// transcription), from the job events (opts.subscribe).
 
 import { h, clear, iconBtn, errorBlock, skeleton, preserveFocus, toast } from './dom.js';
 import { icon } from './icons.js';
@@ -127,11 +136,32 @@ function balanceErrorText(p) {
   return t('resources.balance_failed', { error: p.balance_error || (info && info.detail) || '' });
 }
 
-// opts: {onToggleGPU(), onToggleDevice(card), onCollapse(), onExpand()}
+// opts: {onToggleGPU(), onToggleDevice(card), onCollapse(), onExpand(),
+// subscribe(fn) (the app's job events)}
 export function mountInspector(el, opts) {
   let res = null;
   let error = '';
   let loading = true;
+  // stream-parallel: lecture id → progress of each playback file being made
+  // in the background now (stream jobs that run); emptied when the event
+  // stream comes back (the next progress event fills it again)
+  const bgStreams = new Map();
+  if (opts.subscribe) {
+    opts.subscribe((type, ev) => {
+      const had = bgStreams.size;
+      if (type === 'reconnected') bgStreams.clear();
+      else if (type === 'job' && ev && ev.stage === 'stream') {
+        if (ev.status === 'running') bgStreams.set(ev.scope_id, ev.progress || 0);
+        else bgStreams.delete(ev.scope_id);
+      } else return;
+      // a start or an end shows at once; the progress with the next snapshot
+      if (bgStreams.size !== had && parts && parts.sysBody) {
+        const b = systemBody();
+        parts.sysBody.replaceWith(b);
+        parts.sysBody = b;
+      }
+    });
+  }
   // While the full panel is shown: {sw (GPU switch, kept), gpuBody, prov,
   // foot, provKey}; while collapsed: {rail: {k: value element}}. Updates
   // every 2 s change values in place — interactive elements are never
@@ -344,43 +374,73 @@ export function mountInspector(el, opts) {
     for (const d of standby()) updateStandbyRow(d);
   }
 
-  // ---- remote GPU (SPEC-v3 V14.5) ----
+  // ---- remote GPU (SPEC-v3 V14.5; colab-obs 2026-10-27) ----
 
-  // parts.remote: {wrap, shape, body, line} — the area is rebuilt when its
-  // shape changes; otherwise only its text is replaced and the buttons stay
-  // (a click must not get lost). The wrapper keeps the area's place while
-  // Colab is off, so switching it on later fills the same slot.
+  // parts.remote: {wrap, shape, line | body + foot | top + ram + rest} —
+  // the area is rebuilt when its shape changes; otherwise its blocks
+  // without controls are replaced, the memory bar is updated in place (its
+  // hover card survives the 2-second refresh) and the buttons stay (a click
+  // must not get lost). The wrapper keeps the area's place while Colab is
+  // off, so switching it on later fills the same slot.
+  //
+  // colab-obs (user decisions 2026-10-27 07:00 and 14:50): without a
+  // session the area shows the account — tier (paid / free), the paid
+  // balance and how many lectures it covers on the GPU in use, the free
+  // quota, when it was read; not read: "--", "only the T4" and "重新查询".
+  // With a session, the remote machine as it reports itself (name and GPU
+  // memory, "来自 nvidia-smi · 申请 L4"), CPU and GPU sparklines, the
+  // segmented memory bar, the GPU memory used, the lectures running there
+  // (two at once on the larger GPUs), the queue with the lectures uploaded
+  // ahead, compute units, the usage window as one line, the authorization.
+  // A back end without the account keeps the one line of before.
   let remoteBusy = '';
-  const remoteOf = () => (res && res.remote) || null;
+  let refreshing = false;
+  const cardOf = () => C.colabCard(res);
   const remoteOpen = (r) => C.ACTIVE_STATES.has(r.state) || !!r.current;
   const remoteShapeOf = () => {
-    const r = remoteOf();
-    if (!r) return 'none';
-    return JSON.stringify([remoteOpen(r), r.state, !!r.shutdown_after_current, remoteBusy]);
+    const c = cardOf();
+    if (!c) return 'none';
+    const r = c.st;
+    const a = C.accountOf(r);
+    return JSON.stringify([remoteOpen(r), r.state, !!r.shutdown_after_current, remoteBusy, !!a, C.accountNeedsCheck(a), refreshing, !!(c.usage && C.ramSegments(c.usage))]);
   };
 
   function remoteArea() {
     const wrap = h('div', { class: 'insp-remote-slot' });
-    parts.remote = { wrap, shape: '', body: null, line: null };
+    parts.remote = { wrap, shape: '' };
     fillRemote();
     return wrap;
   }
 
+  const remoteHead = () => h('div', { class: 'insp-sec-head' }, h('h3', null, t('resources.remote.title')), settingsLink());
+
   function fillRemote() {
     const ref = parts.remote;
     ref.shape = remoteShapeOf();
-    ref.body = null;
-    ref.line = null;
+    for (const k of ['line', 'body', 'foot', 'footText', 'top', 'ram', 'rest']) ref[k] = null;
     clear(ref.wrap);
-    const r = remoteOf();
-    ref.wrap.hidden = !r;
-    if (!r) return;
+    const c = cardOf();
+    ref.wrap.hidden = !c;
+    if (!c) return;
+    const r = c.st;
     if (!remoteOpen(r)) {
-      ref.line = remoteLine(r);
-      ref.wrap.append(ref.line);
+      if (!C.accountOf(r)) {
+        ref.line = remoteLine(r);
+        ref.wrap.append(ref.line);
+        return;
+      }
+      ref.body = idleBody(c);
+      ref.foot = idleFoot(c);
+      ref.wrap.append(h('section', { class: 'insp-sec insp-remote', 'aria-label': t('resources.remote.title') }, remoteHead(), ref.body, ref.foot));
       return;
     }
-    ref.body = remoteBody(r);
+    ref.top = activeTop(c);
+    const lay = c.usage ? C.ramSegments(c.usage) : null;
+    if (lay) {
+      ref.ram = ramMeter();
+      ref.ram.update(lay, c);
+    }
+    ref.rest = activeRest(c);
     const stopping = r.state === 'stopping';
     const after = h(
       'button',
@@ -404,8 +464,8 @@ export function mountInspector(el, opts) {
       h(
         'section',
         { class: 'insp-sec insp-remote', 'aria-label': t('resources.remote.title') },
-        h('div', { class: 'insp-sec-head' }, h('h3', null, t('resources.remote.title')), settingsLink()),
-        ref.body,
+        remoteHead(),
+        h('div', { class: 'rc-body' }, ref.top, ref.ram ? ref.ram.el : null, ref.rest),
         stopping ? null : h('div', { class: 'rc-actions' }, after, now),
       ),
     );
@@ -419,14 +479,22 @@ export function mountInspector(el, opts) {
       preserveFocus(fillRemote);
       return;
     }
-    const r = remoteOf();
-    if (!r) return;
-    if (parts.remote.body) {
-      const b = remoteBody(r);
-      parts.remote.body.replaceWith(b);
-      parts.remote.body = b;
-    } else if (parts.remote.line) {
-      preserveFocus(fillRemote); // the line holds the settings link only
+    const c = cardOf();
+    if (!c) return;
+    const ref = parts.remote;
+    const swap = (k, el) => {
+      ref[k].replaceWith(el);
+      ref[k] = el;
+    };
+    if (ref.line) preserveFocus(fillRemote); // the line holds the settings link only
+    else if (ref.body) {
+      swap('body', idleBody(c));
+      ref.footText.textContent = C.checkedText(C.accountOf(c.st));
+    } else if (ref.top) {
+      swap('top', activeTop(c));
+      const lay = ref.ram && c.usage ? C.ramSegments(c.usage) : null;
+      if (lay) ref.ram.update(lay, c);
+      swap('rest', activeRest(c));
     }
   }
 
@@ -446,6 +514,21 @@ export function mountInspector(el, opts) {
     updateRemote();
   }
 
+  // "重新查询" (the account was not read): asks Colab now.
+  async function remoteRecheck() {
+    if (refreshing) return;
+    refreshing = true;
+    updateRemote();
+    try {
+      const v = await C.refreshAccount();
+      if (v && v.status && res) res = { ...res, remote: v.status };
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+    refreshing = false;
+    updateRemote();
+  }
+
   // The notes every remote state may carry: no authorization, a session
   // left over by an earlier run, the last error, the cool-down after a
   // used-up window, the automatic dispatch held after a shutdown button.
@@ -462,7 +545,8 @@ export function mountInspector(el, opts) {
     return out;
   }
 
-  // No session: one line ("远端 GPU：未使用" / "远端 GPU：已释放（原因）").
+  // No session and no account from the back end: one line ("远端 GPU：未使用" /
+  // "远端 GPU：已释放（原因）").
   function remoteLine(r) {
     const released = r.state === 'released' && r.last_release;
     const text = released ? t('resources.remote.released_line', { reason: C.releaseName(r.last_release.reason) }) : t('resources.remote.unused');
@@ -480,48 +564,255 @@ export function mountInspector(el, opts) {
     );
   }
 
-  function remoteBody(r) {
-    const used = r.window_used_sec || 0;
-    const total = r.window_total_sec || 0;
-    const frac = total ? used / total : null;
-    const st = r.state;
-    const kv = (ic, k, v, extra) => h('div', { class: 'rc-kv' }, h('span', { class: 'rc-k' }, icon(ic, { size: 13 }), k), h('span', { class: 'rc-v' }, v, extra || null));
-    const service = t('resources.remote.service', { accelerator: r.accelerator });
-    const rows = [
+  const kv = (ic, k, v, extra, cls = '') => h('div', { class: 'rc-kv' }, h('span', { class: 'rc-k' }, ic ? icon(ic, { size: 13 }) : null, k), h('span', { class: 'rc-v' + (cls ? ' ' + cls : '') }, v, extra || null));
+  const rcTile = (k, v, unit, title, cls = '') => h('div', { class: 'tile rc-tile' + (cls ? ' ' + cls : ''), title: title || undefined }, h('div', { class: 'tile-k' }, k), h('div', { class: 'tile-v' }, v, unit ? h('small', null, unit) : null));
+
+  // No session: the account (no controls; the query button is in the foot).
+  function idleBody(c) {
+    const r = c.st;
+    const a = C.accountOf(r);
+    const known = C.accountKnown(a);
+    const released = r.state === 'released' && r.last_release;
+    const accel = C.effectiveAccel(r);
+    const fit = C.fitFor(a, accel);
+    const err = C.accountErrorText(a);
+    const why = err ? err.text : t('resources.remote.unknown_t4');
+    const balance = C.paidBalance(a) == null ? NA : C.cuText(C.paidBalance(a));
+    const sel = Array.isArray(r.selectable_accelerators) ? r.selectable_accelerators : null;
+    const onlyT4 = !known || (sel && sel.length === 1 && sel[0] === 'T4');
+    const tiles = [rcTile(t('resources.remote.balance_k'), balance, null, err || !known ? why : null)];
+    if (fit > 0) tiles.push(rcTile(t('resources.remote.fit_k', { accelerator: accel }), U.fmtInt(fit), t('resources.remote.fit_unit', { n: U.count(fit) })));
+    else tiles.push(rcTile(t('settings.colab.accel_label'), onlyT4 ? t('resources.remote.cards_t4') : sel ? sel.join(' · ') : NA, null, null, 'is-text'));
+    const quota = C.freeQuotaText(a);
+    const notes = [];
+    if (!known) notes.push(h('p', { class: 'insp-note tone-warn' }, icon('lock', { size: 14 }), h('span', null, t('resources.remote.unknown_t4'))));
+    else {
+      if (a.level !== 'paid') notes.push(h('p', { class: 'insp-note' }, icon('info', { size: 14 }), h('span', null, t('resources.remote.free_t4'))));
+      // the chosen GPU is locked now: kept, a T4 meanwhile (it comes back by itself)
+      if (r.locked_reason) notes.push(h('p', { class: 'insp-note tone-warn' }, icon('lock', { size: 14 }), h('span', null, t('resources.remote.locked', { reason: C.lockText(r.locked_reason) }))));
+    }
+    if (err) notes.push(h('p', { class: 'insp-note', title: err.detail || undefined }, icon('circle-alert', { size: 14 }), h('span', null, err.text)));
+    const auth = C.authLeftText(r.auth);
+    return h(
+      'div',
+      { class: 'rc-body' },
       h(
         'div',
         { class: 'rc-head' },
         icon('server', { size: 15 }),
-        h('span', { class: 'rc-name', title: service }, service),
-        h('span', { class: 'rc-tags' }, h('span', { class: 'chip ' + (st === 'running' ? 'chip-ok' : st === 'stopping' ? 'chip-quiet' : 'chip-run') }, C.stateName(st)), h('span', { class: 'chip chip-quiet' }, r.tier === 'free' ? t('resources.remote.tier.free') : t('resources.remote.tier.paid'))),
+        h('span', { class: 'rc-name' }, t('resources.remote.service', { accelerator: accel })),
+        h('span', { class: 'rc-tags' }, h('span', { class: 'chip chip-quiet', title: released ? t('resources.remote.released_line', { reason: C.releaseName(r.last_release.reason) }) : undefined }, C.stateName(released ? 'released' : 'none'))),
       ),
+      kv('layers', t('resources.remote.level_k'), C.levelText(r)),
+      h('div', { class: 'tiles' }, tiles),
+      quota ? h('p', { class: 'rc-quota' }, icon('coins', { size: 13 }), h('span', null, quota)) : null,
+      notes,
+      auth ? kv('key-round', t('resources.remote.auth_k'), auth) : null,
+      remoteNotes(r),
+    );
+  }
+
+  // "查询于 14:02（2 分钟前）" and, while the account is not read, "重新查询".
+  function idleFoot(c) {
+    const a = C.accountOf(c.st);
+    const text = h('span', null, C.checkedText(a));
+    parts.remote.footText = text;
+    const again = !C.accountNeedsCheck(a)
+      ? null
+      : h(
+          'button',
+          { type: 'button', class: 'rc-link rc-link-btn', disabled: refreshing, dataset: { fkey: 'insp:remote:recheck' }, onclick: remoteRecheck },
+          refreshing ? icon('loader-circle', { size: 12 }) : icon('refresh-cw', { size: 12 }),
+          t('resources.remote.refresh'),
+        );
+    return h('p', { class: 'rc-checked', hidden: !again && !a.read_at }, text, again);
+  }
+
+  // With a session: the machine, its CPU and GPU (no controls).
+  function activeTop(c) {
+    const r = c.st;
+    const m = c.machine;
+    const u = c.usage;
+    const st = r.state;
+    const accel = C.effectiveAccel(r) || r.accelerator;
+    const name = m && m.gpu_name ? [m.gpu_name, m.vram_total_mb > 0 ? U.fmtMB(m.vram_total_mb) : ''].filter(Boolean).join(' · ') : t('resources.remote.service', { accelerator: accel });
+    const details = m ? [m.gpu_name, m.driver, m.cuda ? 'CUDA ' + m.cuda : '', m.compute_cap, m.vcpus > 0 ? m.vcpus + ' vCPU' : ''].filter(Boolean).join(' · ') : '';
+    const out = [
       h(
         'div',
-        { class: 'metric rc-window' },
-        h('div', { class: 'metric-top' }, h('span', { class: 'metric-k' }, icon('clock', { size: 14 }), t('resources.remote.window_k')), h('span', { class: 'metric-v' }, t('resources.remote.window', { used: C.durText(used) || C.durText(0), total: C.durText(total) }))),
-        meter(frac, frac != null && frac > 0.9 ? 'meter-warn' : 'meter-accent'),
+        { class: 'rc-head', title: details || undefined },
+        icon('server', { size: 15 }),
+        h('span', { class: 'rc-name', title: name }, name),
+        h(
+          'span',
+          { class: 'rc-tags' },
+          h('span', { class: 'chip ' + (st === 'running' ? 'chip-ok' : st === 'stopping' ? 'chip-quiet' : 'chip-run') }, C.stateName(st)),
+          h('span', { class: 'chip chip-quiet' }, C.levelText(r)),
+        ),
       ),
     ];
-    if (st !== 'stopping') rows.push(h('p', { class: 'rc-left' }, r.lectures_left > 0 ? t('resources.remote.left', { n: r.lectures_left }) : t('resources.remote.left_none')));
-    const cur = r.current;
-    if (cur) {
-      // the worker's stage only while it prepares (check, install, model…)
-      const stage = cur.step === 'remote_transcribe' && cur.stage && cur.stage !== 'transcribe' ? C.stageName(cur.stage) : '';
-      const step = [C.stepName(cur.step), stage, cur.step !== 'wait_accelerator' && cur.overall > 0 ? U.pct(cur.overall) : ''].filter(Boolean).join(' · ');
-      rows.push(kv('audio-lines', t('resources.remote.current_k'), step, cur.eta_sec > 0 ? h('span', { class: 'rc-sub' }, t('resources.remote.eta', { time: C.durText(cur.eta_sec) })) : null));
-    } else if (st === 'running') rows.push(kv('audio-lines', t('resources.remote.current_k'), t('resources.remote.idle')));
-    if (r.planned > 0) rows.push(kv('list-checks', t('resources.remote.plan_k'), t('resources.remote.plan', { n: r.planned, fit: r.planned_fit })));
-    if (r.tier === 'free') rows.push(kv('coins', t('resources.remote.balance_k'), t('resources.remote.balance_free')));
-    else {
-      const texts = [t('resources.remote.balance', { balance: r.balance_cu != null ? C.cuText(r.balance_cu) : NA })];
-      if (r.plan_cost_cu > 0) texts.push(t('resources.remote.plan_cost', { cost: C.cuText(r.plan_cost_cu) }));
-      rows.push(kv('coins', t('resources.remote.balance_k'), texts.join(' · '), r.session_spent_cu > 0 ? h('span', { class: 'rc-sub' }, t('resources.remote.spent', { cost: C.cuText(r.session_spent_cu) })) : null));
+    if (m && C.gpuMismatch(m)) out.push(h('p', { class: 'insp-note tone-warn' }, icon('triangle-alert', { size: 14 }), h('span', null, t('resources.remote.machine_mismatch', { accelerator: m.requested, name: m.gpu_name }))));
+    else if (m) out.push(h('div', { class: 'rc-smi' }, t('resources.remote.machine_src', { source: m.source === 'colab_resources' ? 'Colab' : m.source || NA, accelerator: m.requested || accel })));
+    if (u) {
+      const tile = (k, v, hist, title) =>
+        h('div', { class: 'tile', title: title || undefined }, h('div', { class: 'tile-k' }, k), h('div', { class: 'tile-v' }, num(v), v != null ? h('small', null, '%') : null), sparkline(hist, { lo: 0, hi: 100, label: k }));
+      out.push(
+        h(
+          'div',
+          { class: 'tiles' },
+          tile(t('resources.system.cpu'), u.cpu_pct, u.cpu_history, m && m.vcpus > 0 ? m.vcpus + ' vCPU' : ''),
+          tile(t('resources.remote.gpu_util'), u.gpu_util_pct, u.gpu_history),
+        ),
+      );
     }
+    return h('div', { class: 'rc-part' }, out);
+  }
+
+  // The memory bar (colab-obs): segments left to right — 内存盘, Whisper,
+  // 系统, 数据 (or 已用 alone when the remote reports total and free only) —
+  // with the free part filling the rest, a two-column legend and a hover
+  // card per segment (the others fade). Built once per area and updated in
+  // place; the narrowest segment keeps 3 px (CSS), so it can be hovered.
+  function ramMeter() {
+    const val = h('span', { class: 'metric-v' });
+    const bar = h('div', { class: 'rc-rbar', role: 'img' });
+    const legend = h('ul', { class: 'rc-legend' });
+    const tip = h('div', { class: 'rc-rtip', role: 'tooltip', hidden: true });
+    const low = h('p', { class: 'insp-note tone-warn', hidden: true }, icon('triangle-alert', { size: 14 }), h('span', null, t('resources.remote.ram_low')));
+    const el = h('div', { class: 'metric rc-ram' }, h('div', { class: 'metric-top' }, h('span', { class: 'metric-k' }, icon('memory-stick', { size: 14 }), t('resources.system.mem')), val), bar, legend, tip, low);
+    const segs = new Map(); // kind → element
+    let lay = null;
+    let hover = '';
+    const name = (k) => t(`resources.remote.seg.${k}`);
+    function showTip() {
+      const s = !hover || !lay ? null : hover === 'free' ? { kind: 'free', mb: lay.free, frac: lay.freeFrac } : lay.segs.find((x) => x.kind === hover);
+      if (!s) hover = '';
+      bar.classList.toggle('is-focus', !!s);
+      for (const [k, e] of segs) e.classList.toggle('is-on', k === hover);
+      if (!s) {
+        tip.hidden = true;
+        return;
+      }
+      clear(tip);
+      tip.append(
+        h('div', { class: 'rc-rtip-h' }, h('span', { class: 'rc-sw seg-' + s.kind }), h('span', null, name(s.kind)), h('span', { class: 'rc-rtip-n' }, [U.fmtMB(s.mb), U.fmtPercent(s.frac, 1)].join(' · '))),
+        h('p', null, t(`resources.remote.seg_tip.${s.kind}`, { total: U.fmtMB(lay.total) })),
+      );
+      tip.hidden = false;
+      const e = segs.get(hover);
+      const w = el.clientWidth;
+      const tw = tip.offsetWidth;
+      const center = e ? e.offsetLeft + e.offsetWidth / 2 : w / 2;
+      tip.style.left = `${Math.max(0, Math.min(w - tw, center - tw / 2))}px`;
+    }
+    const seg = (kind) => {
+      const e = h('span', { class: 'rc-seg seg-' + kind, dataset: { seg: kind } });
+      e.addEventListener('mouseenter', () => {
+        hover = kind;
+        showTip();
+      });
+      e.addEventListener('mouseleave', () => {
+        if (hover !== kind) return;
+        hover = '';
+        showTip();
+      });
+      return e;
+    };
+    function update(next, c) {
+      lay = next;
+      const order = [...lay.segs.map((s) => s.kind), 'free'];
+      for (const [k, e] of segs) {
+        if (order.includes(k)) continue;
+        e.remove();
+        segs.delete(k);
+      }
+      let prev = null;
+      for (const k of order) {
+        let e = segs.get(k);
+        if (!e) {
+          e = seg(k);
+          segs.set(k, e);
+        }
+        // in order, without moving an element already in place (the pointer may be on it)
+        const at = prev ? prev.nextSibling : bar.firstChild;
+        if (at !== e) bar.insertBefore(e, at);
+        prev = e;
+        const s = lay.segs.find((x) => x.kind === k);
+        if (s) e.style.flexBasis = `${(s.frac * 100).toFixed(3)}%`;
+      }
+      // "剩余 42.2 GB / 53 GB", the free amount in bold
+      const free = U.fmtMB(lay.free);
+      const [before, after] = t('resources.remote.ram_free', { total: U.fmtMB(lay.total) }).split('{free}');
+      clear(val);
+      val.append(before || '', h('b', null, free), after || '');
+      const isLow = lay.freeFrac < 0.15;
+      val.classList.toggle('is-low', isLow);
+      low.hidden = !(isLow && c.machine && c.machine.storage === 'memory');
+      bar.setAttribute('aria-label', [t('resources.system.mem'), ...lay.segs.map((s) => name(s.kind) + ' ' + U.fmtMB(s.mb)), name('free') + ' ' + free].join(' · '));
+      clear(legend);
+      for (const s of lay.segs) legend.append(h('li', null, h('span', { class: 'rc-sw seg-' + s.kind }), h('span', { class: 'rc-lg-k' }, name(s.kind)), h('span', { class: 'rc-lg-v' }, U.fmtMB(s.mb))));
+      if (hover) showTip();
+    }
+    return { el, update };
+  }
+
+  // A lecture running remotely: its title (or its step), the progress; the
+  // step, the time left and the parts of speed mode below.
+  // a card job's stage: the worker's own (check … write) or the step (wait, upload, download, verify)
+  const CARD_STEPS = { wait: 'wait_accelerator', upload: 'upload_audio', download: 'download_result', verify: 'verify' };
+  const jobStage = (s) => (!s ? '' : has(`colab.stage.${s}`) ? C.stageName(s) : C.stepName(CARD_STEPS[s] || s));
+  function jobLine(j) {
+    // the worker's stage only while it prepares (check, install, model…)
+    const stage = j.step ? [C.stepName(j.step), j.step === 'remote_transcribe' && j.stage && j.stage !== 'transcribe' ? C.stageName(j.stage) : ''].filter(Boolean).join(' · ') : jobStage(j.stage);
+    const title = j.title || stage;
+    const sub = [j.title ? stage : '', j.eta > 0 ? t('resources.remote.eta', { time: C.durText(j.eta) }) : '', j.split > 1 ? t('resources.remote.job_split', { n: j.split }) : ''].filter(Boolean).join(' · ');
+    const p = j.step !== 'wait_accelerator' && j.progress > 0 ? U.pct(j.progress) : '';
+    return [h('span', { class: 'rc-task' }, h('span', { class: 'rc-task-t', title }, title), p ? h('span', { class: 'rc-task-p' }, p) : null), sub ? h('span', { class: 'rc-sub' }, sub) : null];
+  }
+
+  // Compute units of the session: spent and the paid balance, the
+  // account's rate (all its runtimes); the free tier its free quota.
+  function cuRow(r, a) {
+    if (a ? a.level !== 'paid' : r.tier === 'free') return kv('coins', t('resources.remote.balance_k'), C.freeQuotaText(a) || t('resources.remote.balance_free'));
+    const bal = a && typeof a.paid_balance_cu === 'number' ? a.paid_balance_cu : r.balance_cu;
+    const texts = [];
+    if (r.session_spent_cu > 0) texts.push(t('resources.remote.spent', { cost: C.cuText(r.session_spent_cu) }));
+    texts.push(t('resources.remote.balance', { balance: bal != null ? C.cuText(bal) : NA }));
+    const sub = a && a.account_rate_cu_per_hour > 0 ? t('resources.remote.rate', { rate: U.fmtDecimal(a.account_rate_cu_per_hour, 2) }) : r.plan_cost_cu > 0 ? t('resources.remote.plan_cost', { cost: C.cuText(r.plan_cost_cu) }) : '';
+    return kv('coins', t('resources.remote.balance_k'), texts.join(' · '), sub ? h('span', { class: 'rc-sub' }, sub) : null);
+  }
+
+  // With a session: GPU memory, the lectures, the queue, compute units, the
+  // usage window, the authorization and the notes (no controls).
+  function activeRest(c) {
+    const r = c.st;
+    const u = c.usage;
+    const a = C.accountOf(r);
+    const st = r.state;
+    const rows = [];
+    const line = (k, v, title) => h('div', { class: 'metric-top rc-line-v', title: title || undefined }, h('span', { class: 'metric-k' }, icon('memory-stick', { size: 14 }), k), h('span', { class: 'metric-v' }, v));
+    if (u && u.vram_used_mb != null) rows.push(line(t('resources.remote.vram_used'), U.fmtMB(u.vram_used_mb), u.vram_whisper_mb != null ? t('resources.remote.seg.whisper') + ' ' + U.fmtMB(u.vram_whisper_mb) : ''));
+    if (u && u.data_disk_mb != null) rows.push(line(t('resources.remote.data_disk'), U.fmtMB(u.data_disk_mb)));
+    if (u) rows.push(h('div', { class: 'rc-sep' }));
+    if (c.jobs.length) rows.push(kv('audio-lines', t('resources.remote.jobs_k'), c.jobs.map(jobLine)));
+    else if (st === 'running') rows.push(kv('audio-lines', t('resources.remote.jobs_k'), t('resources.remote.idle')));
+    if (c.queued > 0 || c.ahead > 0) {
+      const q = [[U.fmtInt(c.queued), t('resources.remote.fit_unit', { n: U.count(c.queued) })].join(' ')];
+      if (c.ahead > 0) q.push(t('resources.remote.queue_ahead', { n: U.count(c.ahead) }));
+      const plan = r.planned > 0 && r.planned_fit < r.planned ? h('span', { class: 'rc-sub' }, t('resources.remote.plan', { n: r.planned, fit: r.planned_fit })) : null;
+      rows.push(kv('list-checks', t('resources.remote.queue_k'), q.join(' · '), plan));
+    }
+    rows.push(cuRow(r, a));
+    const used = r.window_used_sec || 0;
+    const total = r.window_total_sec || 0;
+    const late = total > 0 && used / total > 0.9;
+    const left = st === 'stopping' ? null : h('span', { class: 'rc-sub' }, r.lectures_left > 0 ? t('resources.remote.left', { n: r.lectures_left }) : t('resources.remote.left_none'));
+    rows.push(kv('clock', t('resources.remote.window_k'), t('resources.remote.window', { used: C.durText(used) || C.durText(0), total: C.durText(total) }), left, late ? 'tone-warn' : ''));
     const auth = C.authLeftText(r.auth);
     if (auth) rows.push(kv('key-round', t('resources.remote.auth_k'), auth));
     if (r.shutdown_after_current && st !== 'stopping') rows.push(h('p', { class: 'insp-note' }, icon('circle-pause', { size: 14 }), t('resources.remote.after_current_set')));
     rows.push(...remoteNotes(r));
-    return h('div', { class: 'rc-body' }, rows);
+    return h('div', { class: 'rc-part' }, rows);
   }
 
   // ---- upper area: system and power ----
@@ -549,6 +840,7 @@ export function mountInspector(el, opts) {
       'div',
       { class: 'sys-body' },
       powerLine(res.power),
+      bgStreamLine(),
       p && p.wait_ac > 0 ? h('p', { class: 'insp-note pw-wait tone-warn' }, icon('plug', { size: 14 }), t('resources.power.wait_ac', { n: p.wait_ac })) : null,
       p && p.wait_no_device > 0 ? h('p', { class: 'insp-note pw-wait tone-warn' }, icon('battery-low', { size: 14 }), t('resources.power.wait_no_device', { n: p.wait_no_device })) : null,
       tiles.length ? h('div', { class: 'tiles' }, tiles) : null,
@@ -566,6 +858,15 @@ export function mountInspector(el, opts) {
             meter(memFrac, memFrac != null && memFrac > 0.92 ? 'meter-warn' : 'meter-accent'),
           ),
     );
+  }
+
+  // The playback files made in the background (stream-parallel): one → its
+  // progress, several → how many.
+  function bgStreamLine() {
+    if (!bgStreams.size) return null;
+    const [p] = bgStreams.values();
+    const text = bgStreams.size === 1 ? t('resources.system.stream_bg_one', { pct: U.pct(p) }) : t('resources.system.stream_bg_many', { n: bgStreams.size });
+    return h('p', { class: 'insp-note', title: t('resources.system.stream_bg_tip') }, icon('play', { size: 14 }), text);
   }
 
   // The power state the power-aware choice follows: source (plugged in /
@@ -1034,7 +1335,8 @@ export function mountInspector(el, opts) {
     ref.body = body;
   }
 
-  // Collapsed: the toggle plus four live numbers (updated in place).
+  // Collapsed: the toggle plus four live numbers (updated in place), and
+  // the Colab cell while Colab is on (colab-obs).
   function buildRail() {
     const refs = {};
     const item = (k, ic, label) => {
@@ -1044,6 +1346,11 @@ export function mountInspector(el, opts) {
       return box;
     };
     parts = { rail: refs };
+    const colab = item('colab', 'server', 'Colab');
+    colab.classList.add('rail-colab');
+    refs.colab.sub = h('span', { class: 'rail-sub' });
+    refs.colab.mini = h('span', { class: 'rail-mini', 'aria-hidden': 'true', hidden: true });
+    colab.append(refs.colab.sub, refs.colab.mini);
     const wrap = h(
       'div',
       { class: 'insp-rail' },
@@ -1052,9 +1359,33 @@ export function mountInspector(el, opts) {
       item('temp', 'thermometer', t('resources.gpu.temp')),
       item('asr', 'audio-lines', 'ASR'),
       item('api', 'activity', 'API'),
+      colab,
     );
     updateRail();
     return wrap;
+  }
+
+  // The rail's Colab cell (C.railColab): the value, below it the GPU or
+  // "CU", the mini memory bar with a session; hidden while Colab is off.
+  function updateRailColab(ref) {
+    const cell = C.railColab(cardOf());
+    if (!cell) {
+      ref.box.hidden = true;
+      ref.box.style.display = 'none';
+      return;
+    }
+    ref.v.textContent = cell.value;
+    ref.sub.textContent = cell.sub;
+    ref.box.title = cell.title;
+    ref.box.classList.toggle('is-warn', cell.warn);
+    ref.box.hidden = false;
+    ref.box.style.display = '';
+    clear(ref.mini);
+    ref.mini.hidden = !cell.mini;
+    if (cell.mini) {
+      for (const s of cell.mini.segs) ref.mini.append(h('span', { class: 'seg-' + s.kind, style: { flexBasis: `${(s.frac * 100).toFixed(2)}%` } }));
+      ref.mini.append(h('span', { class: 'seg-free' }));
+    }
   }
 
   function updateRail() {
@@ -1098,6 +1429,7 @@ export function mountInspector(el, opts) {
       set('asr', `${used}/${max}`, title, !!g.paused || n > 0 || cards().some((d) => d.paused || (!policy() && d.battery_hold)));
     } else set('asr', `${g.asr_slots_used}/${g.asr_slots_max}`, t(g.paused ? 'resources.rail.asr_paused' : 'resources.rail.asr', { used: g.asr_slots_used, max: g.asr_slots_max }), !!g.paused);
     set('api', `${inflight}/${max}`, t('resources.rail.api', { used: inflight, max }));
+    updateRailColab(r.colab);
   }
 
   render();

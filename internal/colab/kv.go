@@ -35,6 +35,13 @@ const (
 	// KVCooldown is the time (RFC 3339) until which no new session starts
 	// after a session ended because its fair-use window was used up.
 	KVCooldown = "colab.window_cooldown_until"
+	// KVMemoryMode is memory mode (SPEC-ext "Colab 内存运行", memory.go):
+	// MemoryModeAuto (the default since 2026-10-27: absent and any value
+	// but "off" mean auto) or MemoryModeOff, written by the switch on the
+	// settings page (Backend.SetMemoryMode). Read at the start of every
+	// lecture. Not part of colab.settings, so that "never set" (follows the
+	// default) and "switched off by the user" stay apart.
+	KVMemoryMode = "colab.memory_mode"
 )
 
 // MemKV is an in-memory KV for tests and tools.

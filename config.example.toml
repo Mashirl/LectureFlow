@@ -36,8 +36,13 @@ keep_original_media = true
 [llm.providers.deepseek]
 base_url = "https://api.deepseek.com"
 api_key_env = "DEEPSEEK_API_KEY"
-max_concurrency = 8
-requests_per_minute = 300
+# DeepSeek limits concurrent requests per account (2500 for deepseek-flash) and
+# has no per-minute limit: 64 at a time translates a lecture in seconds;
+# requests_per_minute = 0 means no per-minute limit. Up to 512 is accepted (32
+# or 16 with 1200 per minute are gentler choices); beyond 64 a lecture barely
+# gets faster. An HTTP 429 halves the concurrency automatically.
+max_concurrency = 64
+requests_per_minute = 0
 
 [llm.roles]
 glossary = { provider = "deepseek", model = "deepseek-flash" }

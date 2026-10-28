@@ -539,6 +539,11 @@ func (m *mock) setLectureKind(w http.ResponseWriter, r *http.Request, s *store) 
 		return
 	}
 	l.Kind, l.KindSource = kind, src
+	if o := l.WeekOverride; o != nil && src == api.KindSourceUser { // course-ux: a contradicting kind ends the override (state.OverrideConflicts)
+		if k := s.kctx().kind(kind); k != nil && (o.Kind == api.WeekOverrideSupplement) == (k.Group == model.KindGroupSession) {
+			l.WeekOverride = nil
+		}
+	}
 	s.finalize(l)
 	s.fnChanged(c) // the other lectures of the week are renumbered too
 	writeJSON(w, http.StatusOK, *l)

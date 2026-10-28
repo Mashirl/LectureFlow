@@ -1,0 +1,80 @@
+{
+ "_source": "依据 memory_run_release.json 构造，非真实录制：探测的回答违反契约（内存盘不在允许的目录中），不上传任何文件，讲座交回本机，运行时立即释放。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/runtime.py#ColabRuntime.execute_code",
+   "colab_cli/client.py#Client.unassign"
+  ]
+ },
+ "recorded": false,
+ "extends": "memory_run_release.json",
+ "until": "kernel channels: memory probe",
+ "resume": "release: shut the kernel down",
+ "steps": [
+  {
+   "name": "kernel channels: memory probe",
+   "websocket": {
+    "path": "/api/kernels/kernel-replay-1/channels",
+    "query": {
+     "session_id": "{{any}}",
+     "token": "proxy-token-replay-1"
+    },
+    "headers": {
+     "X-Colab-Runtime-Proxy-Token": "proxy-token-replay-1",
+     "X-Colab-Client-Agent": "lectureflow"
+    },
+    "script": [
+     {
+      "expect": {
+       "channel": "shell",
+       "msg_type": "execute_request",
+       "content_contains": {
+        "code": "--memory-probe"
+       },
+       "content": {
+        "silent": false,
+        "store_history": false,
+        "allow_stdin": false
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "busy"
+       }
+      }
+     },
+     {
+      "stdout_raw": "{\"type\":\"memory\",\"ts\":1793260799.0,\"mode\":\"memory\",\"base\":\"/content/elsewhere\",\"reason\":\"ok\",\"mem_total_mb\":12985,\"mem_available_mb\":11934,\"need_mb\":11798,\"free_mb\":9886}\n"
+     },
+     {
+      "send": {
+       "channel": "iopub",
+       "msg_type": "status",
+       "content": {
+        "execution_state": "idle"
+       }
+      }
+     },
+     {
+      "send": {
+       "channel": "shell",
+       "msg_type": "execute_reply",
+       "content": {
+        "status": "ok",
+        "execution_count": 1,
+        "user_expressions": {},
+        "payload": []
+       }
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

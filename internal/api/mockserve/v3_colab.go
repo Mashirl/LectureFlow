@@ -9,37 +9,67 @@ package main
 // and "改用 Colab 处理" (POST /api/lectures/{id}/use-colab), with the bodies
 // of internal/api/handlers_colab.go.
 //
+// colab-obs (2026-10-27; colab-obs-web): the account (Status.Account: the
+// level follows the paid balance, eligibleGpus unlock the GPUs, the free
+// quota; "重新查询" is POST /api/colab/account/refresh), the accelerators
+// it allows (selectable_accelerators, effective_accelerator, locked_reason:
+// a locked pick is kept, a T4 is borrowed meanwhile), the paid / free tier
+// following the account (a PUT tier is ignored), and with a session the
+// machine and its readings (Status.Machine / Usage, the 2-second history)
+// plus the resource snapshot's remotes[] (internal/remote.Card, its jobs
+// with the lecture titles). The rules are the ones colab-obs-core's
+// internal/colab/account.go states.
+//
 // Scenarios (?mock=…; every other scenario starts with Colab switched off
 // and not authorized, and can be set up from the settings page):
 //
 //	colab_off        switched off, not authorized; gcloud's credential file
-//	                 is "found" after the first 检测授权 (the guide's flow)
+//	                 is "found" after the first 检测授权 (the guide's flow);
+//	                 the account is read at once after authorizing (paid)
 //	colab_none       on and authorized (by the in-app sign-in: source app), no
 //	                 session ("远端 GPU：未使用"); the first queued asr stage
-//	                 carries remote.back_to_local
-//	colab_queued     a session waiting for a T4 (排队等卡); the first running
+//	                 carries remote.back_to_local; a paid account (87.42 CU)
+//	colab_queued     a session waiting for an L4 (排队等卡); the first running
 //	                 asr stage runs remotely at the step wait_accelerator
-//	colab_running    a session 1 h 47 min into its usage window; the first
-//	                 running asr stage runs remotely (upload → transcribe →
-//	                 download → verify follow its progress)
+//	colab_running    a session 1 h 47 min into its usage window on a T4 (the
+//	                 user's pick); the first running asr stage runs remotely
+//	                 (upload → transcribe → download → verify follow its
+//	                 progress); the machine's readings (Tesla T4, 12.7 GB)
 //	colab_exhausted  as colab_running, 3 h 56 min into the window:
 //	                 use-colab answers 409 remote.unavailable {remote_window}
+//	colab_active     an L4 session transcribing two lectures at once (the
+//	                 first running and the first queued asr stage), three
+//	                 more waiting with one uploaded ahead; the machine's
+//	                 readings (NVIDIA L4, 53 GB); a paid account of 286.40
+//	                 CU; the first done lecture was transcribed in speed mode
+//	                 (asr_timing.postprocess.split: 4 parts)
+//	colab_idle       no session, a paid account read 2 minutes ago (286.40
+//	                 CU, every measured GPU, the H100 not offered); L4 picked
+//	colab_unknown    the account query fails (colab.unavailable): level free,
+//	                 only the T4; the L4 picked stays the choice (locked:
+//	                 account_unknown); "重新查询" keeps failing
+//	colab_free       paid balance 0 with a free quota of 3.2 CU (refill in
+//	                 9 h): the T4 is used as usual, nothing locked
+//	colab_locked     the paid balance used up (0, no free quota): the A100
+//	                 picked is kept, a T4 is borrowed (locked: no_balance)
 //
-// The resource snapshot ("remote"), the lecture views (stats.remote and the
-// Colab snapshot of the remote asr stage), the device list (the colab:remote
-// row) and the SSE "resources" events get the Colab parts through overlays
-// registered for the loopback host names: the routing tree prefers patterns
-// with a host, so the overlay runs the request through main.go's own handler
-// (with the host rewritten) and edits its JSON, without changing main.go
-// (v3-brief §7.5). Without Colab switched on the overlays pass everything
-// through unchanged.
+// The resource snapshot ("remote", "remotes"), the lecture views
+// (stats.remote and the Colab snapshot of the remote asr stage), the device
+// list (the colab:remote row) and the SSE "resources" events get the Colab
+// parts through overlays registered for the loopback host names: the
+// routing tree prefers patterns with a host, so the overlay runs the
+// request through main.go's own handler (with the host rewritten) and edits
+// its JSON, without changing main.go (v3-brief §7.5). Without Colab
+// switched on the overlays pass everything through unchanged.
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +77,7 @@ import (
 	"lectureflow/internal/api"
 	"lectureflow/internal/colab"
 	"lectureflow/internal/model"
+	"lectureflow/internal/remote"
 )
 
 const (
@@ -54,14 +85,19 @@ const (
 	colabInnerHost = "mock-inner.invalid"
 )
 
-// compute units per hour by accelerator (mock figures)
-var colabCUPerHour = map[string]float64{"T4": 1.84, "L4": 4.82, "G4": 6.1, "A100": 11.77, "H100": 18.7}
+// compute units per hour by accelerator (colab-prof's measurements; the
+// H100 never measured)
+var colabCUPerHour = map[string]float64{"T4": 1.07, "L4": 1.54, "G4": 8.9, "A100": 5.3, "H100": 20}
+
+// the accelerators besides the T4 an account may unlock, in the settings' order
+var colabUnlockable = []string{"L4", "A100", "G4", "H100"}
 
 func init() {
 	mockV3Routes = append(mockV3Routes, func(m *mock, mux *http.ServeMux) {
 		a := m.api
 		mux.HandleFunc("GET /api/colab", a(m.colabGet))
 		mux.HandleFunc("PUT /api/colab/settings", a(m.colabPutSettings))
+		mux.HandleFunc("POST /api/colab/account/refresh", a(m.colabRefreshAccount))
 		mux.HandleFunc("POST /api/colab/auth/import", a(m.colabImport))
 		mux.HandleFunc("POST /api/colab/auth/check", a(m.colabCheck))
 		mux.HandleFunc("DELETE /api/colab/auth", a(m.colabDisconnect))
@@ -90,6 +126,7 @@ type colabMock struct {
 	mu            sync.Mutex
 	enabled       bool
 	batteryPrefer bool
+	memoryOff     bool // memory mode switched off (on by default)
 	settings      colab.Settings
 	auth          *colab.CredentialInfo
 	adcFound      bool
@@ -98,10 +135,17 @@ type colabMock struct {
 	sess          *colabSession
 	lastRelease   *colab.ReleaseInfo
 	planned       int
+	ahead         int // of the planned lectures, audio already on the runtime
 	exhausted     bool
 	pinned        map[string]bool // lectures sent to Colab with use-colab
 	backToLocal   bool            // colab_none: the first queued asr carries remote.back_to_local
 	login         *colabLoginRun  // the Google sign-in of 3.1.0 (v31_onboarding.go)
+	// colab-obs: the account as Colab last answered; acctFail makes every
+	// query fail with it (the reading shown, if any, stays)
+	acct     colab.Account
+	acctFail *model.ErrorInfo
+	two      bool // colab_active: the first queued asr lecture runs remotely too
+	split    bool // colab_active: the first done lecture was transcribed in speed mode
 }
 
 var colabStates sync.Map // *mock + scenario → *colabMock
@@ -134,14 +178,39 @@ func colabAuth(lifecycle string, days int, now time.Time, source string) *colab.
 	return info
 }
 
+// colabAccount is a reading of ccu-info taken at: the paid balance, the
+// GPUs it lists for the account and the free quota (nil: none sent).
+func colabAccount(at time.Time, balance float64, eligible, ineligible []string, quota *float64, refill *time.Time) colab.Account {
+	rate, n := 0.0, 0
+	a := colab.Account{ReadAt: &at, ReadOK: true, Level: colab.LevelFree, PaidBalanceCU: &balance, AccountRateCUPerHour: &rate, AccountRuntimes: &n,
+		FreeQuotaCU: quota, FreeRefillAt: refill, EligibleGPUs: append([]string{}, eligible...), IneligibleGPUs: append([]string{}, ineligible...),
+		EligibilityKnown: true}
+	if balance > 0 {
+		a.Level = colab.LevelPaid
+	}
+	return a
+}
+
+// colabPaid: a paid account that may borrow every measured GPU (not the H100).
+func colabPaid(at time.Time, balance float64) colab.Account {
+	return colabAccount(at, balance, []string{"G4", "A100", "L4", "T4"}, []string{"H100"}, nil, nil)
+}
+
+// colabUnread: never read (level free, only the T4).
+func colabUnread() colab.Account {
+	return colab.Account{Level: colab.LevelFree, EligibleGPUs: []string{}, IneligibleGPUs: []string{}}
+}
+
 func newColabMock(sc string, now time.Time) *colabMock {
-	c := &colabMock{settings: colab.DefaultSettings(), pinned: map[string]bool{}}
+	c := &colabMock{settings: colab.DefaultSettings(), pinned: map[string]bool{}, acct: colabUnread()}
 	switch sc {
-	case "colab_none", "colab_queued", "colab_running", "colab_exhausted":
+	case "colab_none", "colab_queued", "colab_running", "colab_exhausted", "colab_active", "colab_idle", "colab_unknown", "colab_free", "colab_locked":
 		c.enabled, c.adcFound = true, true
 		// signed in in the app a few hours ago with the default 7 days
 		c.auth = colabAuth("7d", 7, now.Add(-4*time.Hour-12*time.Minute), colab.SourceApp)
+		c.acct = colabPaid(now.Add(-2*time.Minute), 87.42)
 	}
+	pick := func(a string) { c.settings.Accelerator, c.settings.AcceleratorChosen = a, true }
 	switch sc {
 	case "colab_none":
 		c.backToLocal = true
@@ -149,11 +218,34 @@ func newColabMock(sc string, now time.Time) *colabMock {
 		c.sess = &colabSession{start: now.Add(-3 * time.Minute), queuedUntil: now.Add(2 * time.Hour), bootUntil: now.Add(2 * time.Hour)}
 		c.planned = 2
 	case "colab_running":
+		pick("T4")
 		c.sess = &colabSession{start: now.Add(-107 * time.Minute), queuedUntil: now.Add(-105 * time.Minute), bootUntil: now.Add(-103 * time.Minute)}
-		c.planned = 3
+		c.planned, c.ahead = 2, 1
 	case "colab_exhausted":
+		pick("T4")
 		c.sess = &colabSession{start: now.Add(-236 * time.Minute), queuedUntil: now.Add(-230 * time.Minute), bootUntil: now.Add(-228 * time.Minute)}
 		c.planned, c.exhausted = 2, true
+	case "colab_active":
+		pick("L4")
+		c.acct = colabPaid(now.Add(-40*time.Second), 286.40)
+		rate, n := 1.54, 1
+		c.acct.AccountRateCUPerHour, c.acct.AccountRuntimes = &rate, &n
+		c.sess = &colabSession{start: now.Add(-26 * time.Minute), queuedUntil: now.Add(-25 * time.Minute), bootUntil: now.Add(-24 * time.Minute)}
+		c.planned, c.ahead, c.two, c.split = 3, 1, true, true
+	case "colab_idle":
+		pick("L4")
+		c.acct = colabPaid(now.Add(-2*time.Minute), 286.40)
+	case "colab_unknown":
+		pick("L4")
+		c.acct = colabUnread()
+		c.acctFail = &model.ErrorInfo{Code: colab.CodeUnavailable, Params: map[string]any{"endpoint": "tun/m/ccu-info"}}
+		c.acct.ReadError = c.acctFail
+	case "colab_free":
+		quota, refill := 3.2, now.Add(9*time.Hour).Truncate(time.Hour)
+		c.acct = colabAccount(now.Add(-3*time.Minute), 0, []string{"T4"}, []string{"L4", "A100", "G4", "H100"}, &quota, &refill)
+	case "colab_locked":
+		pick("A100")
+		c.acct = colabAccount(now.Add(-1*time.Minute), 0, []string{"G4", "A100", "L4", "T4"}, []string{"H100"}, nil, nil)
 	}
 	return c
 }
@@ -188,40 +280,137 @@ func (c *colabMock) sessionState(now time.Time) string {
 	return colab.StateRunning
 }
 
-// remoteLecture is the lecture whose asr runs on Colab: the first running
-// asr stage of the store while a session is queued, booting or running.
-type remoteLecture struct {
-	id       string
-	progress float64
-	started  time.Time
+// ---------- the account (colab-obs; the rules of internal/colab/account.go) ----------
+
+// account is Status.Account. A credential (an import or the in-app sign-in)
+// is followed by a reading at once, as on the real server. c.mu is held.
+func (c *colabMock) account(now time.Time) colab.Account {
+	if c.auth != nil && c.acct.ReadAt == nil && c.acctFail == nil {
+		c.acct = colabPaid(now, 87.42)
+	}
+	return c.acct
 }
 
-func (c *colabMock) remoteLecture(s *store, now time.Time) *remoteLecture {
+func (c *colabMock) paidBalance() float64 {
+	if c.acct.PaidBalanceCU == nil {
+		return 0
+	}
+	return *c.acct.PaidBalanceCU
+}
+
+// selectable: the T4 always, the others listed in eligibleGpus with a paid balance.
+func (c *colabMock) selectable() []string {
+	out := []string{"T4"}
+	if !c.acct.EligibilityKnown || c.paidBalance() <= 0 {
+		return out
+	}
+	for _, a := range colabUnlockable {
+		if slices.Contains(c.acct.EligibleGPUs, a) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+// preferred: the user's pick, else the level's default (paid L4, free T4).
+func (c *colabMock) preferred() string {
+	if c.settings.AcceleratorChosen {
+		return c.settings.Accelerator
+	}
+	if c.acct.Level == colab.LevelPaid {
+		return colab.DefaultAccelerator(colab.TierPaid)
+	}
+	return colab.DefaultAccelerator(colab.TierFree)
+}
+
+// effective is the accelerator the next borrowing asks for and, when that
+// is not the preferred one, why.
+func (c *colabMock) effective() (string, string) {
+	p := c.preferred()
+	if slices.Contains(c.selectable(), p) {
+		return p, ""
+	}
+	switch {
+	case !c.acct.EligibilityKnown:
+		return "T4", colab.LockAccountUnknown
+	case c.paidBalance() <= 0:
+		return "T4", colab.LockNoBalance
+	}
+	return "T4", colab.LockIneligible
+}
+
+func (c *colabMock) tier() string {
+	if c.acct.Level == colab.LevelPaid {
+		return colab.TierPaid
+	}
+	return colab.TierFree
+}
+
+// userSettings: the settings the page shows (the preferred accelerator, the
+// account's tier).
+func (c *colabMock) userSettings() colab.Settings {
+	s := c.settings
+	s.Accelerator, s.Tier = c.preferred(), c.tier()
+	return s
+}
+
+// ---------- the remote lectures, the machine and its readings ----------
+
+// remoteLecture is a lecture whose asr runs on Colab: the first running asr
+// stage of the store while a session is queued, booting or running (and in
+// colab_active the first queued one as well, two at once).
+type remoteLecture struct {
+	id       string
+	title    string
+	progress float64
+	started  time.Time
+	second   bool // its asr stage is queued in the store; the overlay shows it running
+}
+
+func (c *colabMock) remoteLectures(s *store, now time.Time) []remoteLecture {
 	st := c.sessionState(now)
 	if st != colab.StateQueued && st != colab.StateBooting && st != colab.StateRunning {
 		return nil
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var first, second *remoteLecture
 	for _, l := range s.lectures {
 		j := stageIndex(&l, model.StageASR)
-		if j < 0 || l.Stages[j].Status != model.StatusRunning {
+		if j < 0 {
 			continue
 		}
-		rl := &remoteLecture{id: l.ID, progress: l.Stages[j].Progress, started: now.Add(-6 * time.Minute)}
-		if p := l.Stages[j].StartedAt; p != nil {
-			if t, err := time.Parse(time.RFC3339, *p); err == nil {
-				rl.started = t
+		switch l.Stages[j].Status {
+		case model.StatusRunning:
+			if first != nil {
+				continue
+			}
+			rl := &remoteLecture{id: l.ID, title: l.Title, progress: l.Stages[j].Progress, started: now.Add(-6 * time.Minute)}
+			if p := l.Stages[j].StartedAt; p != nil {
+				if t, err := time.Parse(time.RFC3339, *p); err == nil {
+					rl.started = t
+				}
+			}
+			first = rl
+		case model.StatusQueued:
+			if c.two && second == nil && st == colab.StateRunning {
+				second = &remoteLecture{id: l.ID, title: l.Title, progress: 0.18, started: now.Add(-2 * time.Minute), second: true}
 			}
 		}
-		return rl
 	}
-	return nil
+	var out []remoteLecture
+	for _, rl := range []*remoteLecture{first, second} {
+		if rl != nil {
+			out = append(out, *rl)
+		}
+	}
+	return out
 }
 
-// step of the remote lecture: its progress mapped on the five steps.
-func (c *colabMock) step(rl *remoteLecture, now time.Time) model.RemoteStats {
-	rs := model.RemoteStats{Steps: append([]string{}, model.RemoteSteps...), Accelerator: c.settings.Accelerator, EtaSec: -1}
+// step of a remote lecture: its progress mapped on the five steps.
+func (c *colabMock) step(rl remoteLecture, now time.Time) model.RemoteStats {
+	acc, _ := c.effective()
+	rs := model.RemoteStats{Steps: append([]string{}, model.RemoteSteps...), Accelerator: acc, EtaSec: -1}
 	switch st := c.sessionState(now); {
 	case st == colab.StateQueued || st == colab.StateBooting:
 		rs.Step = model.RemoteStepWaitAccelerator
@@ -239,27 +428,129 @@ func (c *colabMock) step(rl *remoteLecture, now time.Time) model.RemoteStats {
 		rs.Step = model.RemoteStepVerify
 	}
 	rs.EtaSec = int64((1 - rl.progress) * 26 * 60)
+	if acc == "L4" { // faster than the T4 the five minutes count for
+		rs.EtaSec = int64((1 - rl.progress) * 3 * 60)
+	}
 	return rs
 }
 
 func (c *colabMock) cuPerHour() float64 {
-	if v, ok := colabCUPerHour[c.settings.Accelerator]; ok {
+	acc, _ := c.effective()
+	if v, ok := colabCUPerHour[acc]; ok {
 		return v
 	}
 	return 2
 }
 
-func (c *colabMock) status(rl *remoteLecture, now time.Time) colab.Status {
+// colabMachines: what nvidia-smi and /proc report on each runtime (the
+// measured specs of colab-setup-time.md §5.1; mock driver versions).
+var colabMachines = map[string]remote.Machine{
+	"T4":   {GPUName: "Tesla T4", GPUArch: "Turing", ComputeCap: "7.5", VRAMTotalMB: ptr(15360), VCPUs: ptr(2), MemTotalMB: ptr(13002)},
+	"L4":   {GPUName: "NVIDIA L4", GPUArch: "Ada Lovelace", ComputeCap: "8.9", VRAMTotalMB: ptr(23034), VCPUs: ptr(12), MemTotalMB: ptr(54272)},
+	"A100": {GPUName: "NVIDIA A100-SXM4-40GB", GPUArch: "Ampere", ComputeCap: "8.0", VRAMTotalMB: ptr(40960), VCPUs: ptr(12), MemTotalMB: ptr(87040)},
+	"G4":   {GPUName: "NVIDIA RTX PRO 6000 Blackwell Server Edition", GPUArch: "Blackwell", ComputeCap: "12.0", VRAMTotalMB: ptr(97887), VCPUs: ptr(24), MemTotalMB: ptr(185344)},
+	"H100": {GPUName: "NVIDIA H100 80GB HBM3", GPUArch: "Hopper", ComputeCap: "9.0", VRAMTotalMB: ptr(81559), VCPUs: ptr(26), MemTotalMB: ptr(240640)},
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// machine is Status.Machine while the session runs (nil before).
+func (c *colabMock) machine(now time.Time) *remote.Machine {
+	if c.sessionState(now) != colab.StateRunning && c.sessionState(now) != colab.StateStopping {
+		return nil
+	}
+	acc, _ := c.effective()
+	m, ok := colabMachines[acc]
+	if !ok {
+		return nil
+	}
+	m.Source, m.Driver, m.CUDA, m.GPUCount, m.Storage, m.Requested = remote.SourceNvidiaSMI, "550.54.15", "12.4", ptr(1), remote.StorageMemory, acc
+	if c.memoryOff {
+		m.Storage = remote.StorageDisk
+	}
+	return &m
+}
+
+// wave is a reading of the history slot i (one per 2 s): base with a slow
+// swing, kept within 0–100.
+func wave(base, amp float64, i int64) int {
+	v := base + amp*math.Sin(float64(i)*0.7) + amp*0.4*math.Sin(float64(i)*2.3)
+	return int(math.Round(math.Max(0, math.Min(100, v))))
+}
+
+// usage is Status.Usage while the session runs: the worker's readings with
+// jobs running (memory split into memory disk, Whisper, system and data),
+// else the runtime's own report (used / free only, no CPU).
+func (c *colabMock) usage(now time.Time, jobs int) *remote.Usage {
+	m := c.machine(now)
+	if m == nil {
+		return nil
+	}
+	slot := now.Unix() / 2
+	at := now.Truncate(2 * time.Second)
+	total := *m.MemTotalMB
+	u := &remote.Usage{At: at, AgeSec: int(now.Sub(at).Seconds()), Source: remote.SourceWorker}
+	cpuBase, gpuBase := 38.0, 90.0
+	if m.Requested == "T4" {
+		cpuBase, gpuBase = 57, 88
+	}
+	hist := func(base, amp float64) []*int {
+		out := make([]*int, remote.HistoryLen)
+		for k := range out {
+			out[k] = ptr(wave(base, amp, slot-int64(remote.HistoryLen-1-k)))
+		}
+		return out
+	}
+	if jobs == 0 { // between lectures: the runtime's resources endpoint only
+		used := 4100
+		u.Source = remote.SourceColabResources
+		u.RAM = []remote.RAMSegment{{Kind: remote.SegUsed, MB: used}, {Kind: remote.SegFree, MB: total - used}}
+		u.GPUUtilPct, u.VRAMUsedMB = ptr(0), ptr(310)
+		u.CPUHistory, u.GPUHistory, u.VRAMHistory = make([]*int, remote.HistoryLen), hist(0, 0), make([]*int, remote.HistoryLen)
+		return u
+	}
+	ramdisk, whisper, system, data := 3441, 4731, 2365, 491
+	vram, vramW := 8090, 7612
+	if m.Requested == "T4" {
+		whisper, system, data, vram, vramW = 3390, 2437, 276, 4710, 4280
+	}
+	if c.memoryOff { // disk mode: no memory disk, the job files on the disk
+		u.DataDiskMB, ramdisk, data = ptr(data), 0, 0
+	}
+	free := total - ramdisk - whisper - system - data
+	for _, s := range []remote.RAMSegment{{Kind: remote.SegRAMDisk, MB: ramdisk}, {Kind: remote.SegWhisper, MB: whisper}, {Kind: remote.SegSystem, MB: system}, {Kind: remote.SegData, MB: data}, {Kind: remote.SegFree, MB: free}} {
+		if s.MB > 0 || s.Kind == remote.SegFree {
+			u.RAM = append(u.RAM, s)
+		}
+	}
+	u.CPUHistory, u.GPUHistory = hist(cpuBase, 4), hist(gpuBase, 3)
+	u.VRAMHistory = make([]*int, remote.HistoryLen)
+	for k := range u.VRAMHistory {
+		u.VRAMHistory[k] = ptr(vram)
+	}
+	u.CPUPct, u.GPUUtilPct = u.CPUHistory[remote.HistoryLen-1], u.GPUHistory[remote.HistoryLen-1]
+	u.VRAMUsedMB, u.VRAMWhisperMB, u.VRAMReservedMB = ptr(vram), ptr(vramW), ptr(392)
+	u.GPUTempC, u.GPUPowerW = ptr(61), ptr(58.5)
+	return u
+}
+
+func (c *colabMock) status(rls []remoteLecture, now time.Time) colab.Status {
+	acct := c.account(now) // first: a credential without a reading is read now
+	acc, locked := c.effective()
 	st := colab.Status{
-		Service: "colab", Configured: c.auth != nil, Accelerator: c.settings.Accelerator, Tier: c.settings.Tier,
+		Service: "colab", Configured: c.auth != nil, Accelerator: acc, Tier: c.tier(),
 		State: c.sessionState(now), WindowTotalSec: int64(colab.FairWindow.Seconds()), CUPerHour: c.cuPerHour(),
-		ShutdownAfter: c.afterCurrent, LastRelease: c.lastRelease, Planned: c.planned,
+		ShutdownAfter: c.afterCurrent, LastRelease: c.lastRelease, Planned: c.planned, Slots: 1,
+		Account: acct, SelectableAccelerators: c.selectable(), EffectiveAccelerator: acc, LockedReason: locked,
+	}
+	if acc == "L4" || acc == "A100" || acc == "G4" { // two lectures at once on the larger GPUs
+		st.Slots = 2
 	}
 	if c.auth != nil {
 		st.Auth = *c.authInfo(now)
 	}
-	if c.settings.Tier == colab.TierPaid && c.auth != nil {
-		b := 87.42
+	if c.acct.ReadAt != nil && c.acct.PaidBalanceCU != nil && c.acct.Level == colab.LevelPaid {
+		b := *c.acct.PaidBalanceCU
 		st.BalanceCU = &b
 	}
 	left := 4
@@ -273,6 +564,8 @@ func (c *colabMock) status(rl *remoteLecture, now time.Time) colab.Status {
 			st.SessionSpentCU = round2(now.Sub(s.queuedUntil).Hours() * c.cuPerHour())
 		}
 		left = int((colab.FairWindow - used).Minutes() / 50)
+		st.UploadedAhead = c.ahead
+		st.Machine, st.Usage = c.machine(now), c.usage(now, len(rls))
 	}
 	if c.exhausted {
 		left = 0
@@ -283,16 +576,67 @@ func (c *colabMock) status(rl *remoteLecture, now time.Time) colab.Status {
 		st.LecturesLeft = st.PlannedFit
 		st.PlanCostCU = round2(float64(st.PlannedFit) * 0.45 * c.cuPerHour())
 	}
-	if rl != nil {
+	for _, rl := range rls {
 		rs := c.step(rl, now)
 		overall := rl.progress
 		if rs.Step == model.RemoteStepWaitAccelerator {
 			overall = 0
 		}
-		st.Current = &colab.JobInfo{ID: asrJobID(rl.id), Step: rs.Step, Stage: rs.Stage, Fraction: -1, Overall: overall,
-			ETASec: float64(rs.EtaSec), StartedAt: rl.started}
+		st.Jobs = append(st.Jobs, colab.JobInfo{ID: asrJobID(rl.id), Step: rs.Step, Stage: rs.Stage, Fraction: -1, Overall: overall,
+			ETASec: float64(rs.EtaSec), StartedAt: rl.started})
+	}
+	if len(st.Jobs) > 0 {
+		st.Current = &st.Jobs[0]
 	}
 	return st
+}
+
+// card is the snapshot's remotes[] entry (internal/remote.Card) of the
+// status; its jobs carry the lecture titles (lecture_title, as the device
+// cards' tasks do).
+func (c *colabMock) card(st colab.Status, rls []remoteLecture) any {
+	card := remote.Card{ID: model.DeviceColab, Kind: remote.KindColab, Label: "Google Colab", State: st.State,
+		Machine: st.Machine, Usage: st.Usage, Slots: st.Slots, Queued: st.Planned, UploadedAhead: st.UploadedAhead, Colab: st}
+	for i, rl := range rls {
+		j := st.Jobs[i]
+		p := j.Overall
+		eta := int(j.ETASec)
+		card.Jobs = append(card.Jobs, remote.CardJob{LectureID: rl.id, Stage: colabCardStage(j), Progress: &p, ETASec: &eta})
+	}
+	if st.LastError != nil {
+		card.LastError = &remote.CardError{Code: st.LastError.Code, Params: st.LastError.Params, At: time.Now()}
+	}
+	v := toJSON(card)
+	if obj, ok := v.(map[string]any); ok {
+		if jobs, ok := obj["jobs"].([]any); ok {
+			for i, j := range jobs {
+				if jm, ok := j.(map[string]any); ok && i < len(rls) {
+					jm["lecture_title"] = rls[i].title
+				}
+			}
+		}
+	}
+	return v
+}
+
+// colabCardStage is a card job's stage as the real server writes it
+// (internal/resources/remotes.go): the worker's own while it transcribes,
+// else the step (wait, upload, download, verify).
+func colabCardStage(j colab.JobInfo) string {
+	switch j.Step {
+	case model.RemoteStepRemoteTranscribe:
+		if j.Stage != "" {
+			return j.Stage
+		}
+		return "check"
+	case model.RemoteStepUploadAudio:
+		return "upload"
+	case model.RemoteStepDownloadResult:
+		return "download"
+	case model.RemoteStepVerify:
+		return "verify"
+	}
+	return "wait"
 }
 
 func round2(v float64) float64 { return float64(int64(v*100+0.5)) / 100 }
@@ -320,10 +664,10 @@ func (c *colabMock) adc() api.ColabADCView {
 func (m *mock) colabView(r *http.Request, c *colabMock) api.ColabView {
 	now := time.Now()
 	c.advance(now)
-	rl := c.remoteLecture(m.storeFor(r), now)
+	rls := c.remoteLectures(m.storeFor(r), now)
 	return api.ColabView{
-		Status:   c.status(rl, now),
-		Settings: api.ColabSettingsView{Settings: c.settings, Enabled: c.enabled, BatteryPrefer: c.batteryPrefer},
+		Status:   c.status(rls, now),
+		Settings: api.ColabSettingsView{Settings: c.userSettings(), MemoryMode: !c.memoryOff, Enabled: c.enabled, BatteryPrefer: c.batteryPrefer},
 		ADC:      c.adc(),
 		Held:     c.held,
 	}
@@ -338,6 +682,25 @@ func (m *mock) colabGet(w http.ResponseWriter, r *http.Request, _ *store) {
 	writeJSON(w, http.StatusOK, m.colabView(r, c))
 }
 
+// "重新查询": the account is read now (colab_unknown: the query fails again,
+// the reading shown stays).
+func (m *mock) colabRefreshAccount(w http.ResponseWriter, r *http.Request, _ *store) {
+	c := m.colabState(r)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	switch {
+	case c.acctFail != nil:
+		c.acct.ReadOK, c.acct.ReadError = false, c.acctFail
+	case c.auth != nil:
+		if c.acct.ReadAt == nil {
+			c.acct = colabPaid(now, 87.42)
+		}
+		c.acct.ReadAt, c.acct.ReadOK, c.acct.ReadError = &now, true, nil
+	}
+	writeJSON(w, http.StatusOK, m.colabView(r, c))
+}
+
 func (m *mock) colabPutSettings(w http.ResponseWriter, r *http.Request, _ *store) {
 	var p api.ColabSettingsPatch
 	if err := decodeBody(r, &p); err != nil {
@@ -349,10 +712,11 @@ func (m *mock) colabPutSettings(w http.ResponseWriter, r *http.Request, _ *store
 	defer c.mu.Unlock()
 	set := c.settings
 	if p.Accelerator != nil {
-		set.Accelerator = *p.Accelerator
+		set.Accelerator, set.AcceleratorChosen = *p.Accelerator, true
 	}
-	if p.Tier != nil {
-		set.Tier = *p.Tier
+	// p.Tier is ignored: the tier follows the account (colab-obs)
+	if p.FastMode != nil {
+		set.FastMode = *p.FastMode
 	}
 	if p.MaxQueueWaitMin != nil {
 		set.MaxQueueWaitMin = *p.MaxQueueWaitMin
@@ -384,6 +748,9 @@ func (m *mock) colabPutSettings(w http.ResponseWriter, r *http.Request, _ *store
 		return
 	}
 	c.settings = set
+	if p.MemoryMode != nil {
+		c.memoryOff = !*p.MemoryMode
+	}
 	if p.Enabled != nil {
 		c.enabled = *p.Enabled
 		if c.enabled {
@@ -486,7 +853,7 @@ func (m *mock) colabShutdown(w http.ResponseWriter, r *http.Request, _ *store) {
 	switch req.Mode {
 	case "after_current":
 		c.afterCurrent = true
-		if c.remoteLecture(m.storeFor(r), now) == nil && c.sess != nil {
+		if len(c.remoteLectures(m.storeFor(r), now)) == 0 && c.sess != nil {
 			c.sess.stopAt, c.sess.stopReason = now, "after_current"
 		}
 	case "now":
@@ -498,7 +865,7 @@ func (m *mock) colabShutdown(w http.ResponseWriter, r *http.Request, _ *store) {
 		return
 	}
 	c.held = true
-	c.planned = 0
+	c.planned, c.ahead = 0, 0
 	clear(c.pinned)
 	writeJSON(w, http.StatusOK, m.colabView(r, c))
 }
@@ -630,10 +997,11 @@ func (m *mock) colabFix(r *http.Request, c *colabMock, path string, body []byte)
 	}
 	now := time.Now()
 	c.advance(now)
-	rl := c.remoteLecture(m.storeFor(r), now)
+	s := m.storeFor(r)
+	rls := c.remoteLectures(s, now)
 	switch {
 	case path == "/api/resources":
-		v = c.fixResources(v, rl, now)
+		v = c.fixResources(v, rls, now)
 	case path == "/api/settings":
 		if obj, ok := v.(map[string]any); ok {
 			if list, ok := obj["devices"].([]any); ok {
@@ -645,7 +1013,7 @@ func (m *mock) colabFix(r *http.Request, c *colabMock, path string, body []byte)
 			v = c.fixDevices(list)
 		}
 	default:
-		v = c.fixLectures(v, rl, c.backToLocalLecture(m.storeFor(r)), now)
+		v = c.fixLectures(v, rls, c.backToLocalLecture(s), c.splitLecture(s), now)
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -656,16 +1024,22 @@ func (m *mock) colabFix(r *http.Request, c *colabMock, path string, body []byte)
 	return buf.Bytes()
 }
 
-// fixResources adds "remote" (while switched on) and takes the remote
-// lecture off the local device cards.
-func (c *colabMock) fixResources(v any, rl *remoteLecture, now time.Time) any {
+// fixResources adds "remote" and "remotes" (while switched on) and takes
+// the remote lectures off the local device cards.
+func (c *colabMock) fixResources(v any, rls []remoteLecture, now time.Time) any {
 	obj, ok := v.(map[string]any)
 	if !ok || !c.on() {
 		return v
 	}
-	obj["remote"] = toJSON(c.status(rl, now))
-	if rl == nil {
+	st := c.status(rls, now)
+	obj["remote"] = toJSON(st)
+	obj["remotes"] = []any{c.card(st, rls)}
+	if len(rls) == 0 {
 		return v
+	}
+	remoteIDs := map[string]bool{}
+	for _, rl := range rls {
+		remoteIDs[rl.id] = true
 	}
 	if devs, ok := obj["devices"].([]any); ok {
 		for _, d := range devs {
@@ -676,13 +1050,15 @@ func (c *colabMock) fixResources(v any, rl *remoteLecture, now time.Time) any {
 			tasks, _ := dm["tasks"].([]any)
 			keep := []any{}
 			for _, tk := range tasks {
-				if tm, ok := tk.(map[string]any); ok && tm["lecture_id"] == rl.id {
-					if num, ok := dm["slots_used"].(json.Number); ok {
-						if n, err := num.Int64(); err == nil && n > 0 {
-							dm["slots_used"] = n - 1
+				if tm, ok := tk.(map[string]any); ok {
+					if id, _ := tm["lecture_id"].(string); remoteIDs[id] {
+						if num, ok := dm["slots_used"].(json.Number); ok {
+							if n, err := num.Int64(); err == nil && n > 0 {
+								dm["slots_used"] = n - 1
+							}
 						}
+						continue
 					}
-					continue
 				}
 				keep = append(keep, tk)
 			}
@@ -709,8 +1085,9 @@ func (c *colabMock) fixDevices(list []any) []any {
 	if !c.on() || c.auth == nil {
 		return list
 	}
+	acc, _ := c.effective()
 	row := api.ASRDeviceView{
-		ID: model.DeviceColab, Backend: "colab", Kind: model.DeviceKindRemote, Label: "Google Colab · " + c.settings.Accelerator,
+		ID: model.DeviceColab, Backend: "colab", Kind: model.DeviceKindRemote, Label: "Google Colab · " + acc,
 		Enabled: true, Model: c.settings.Model, Precision: c.settings.ComputeType, MaxParallel: 1, Priority: 5, Present: true,
 		SelfTest: api.SelfTestView{DeviceID: model.DeviceColab, State: "idle"}, Running: []api.DeviceTaskView{},
 		Options: api.DeviceOptions{Models: []string{c.settings.Model}, Precisions: []string{c.settings.ComputeType}},
@@ -719,10 +1096,16 @@ func (c *colabMock) fixDevices(list []any) []any {
 }
 
 // fixLectures walks a lecture view, a lecture list or the dashboard: the
-// remote lecture's asr stage gets stats.remote and the Colab snapshot; a
-// pinned queued one the Colab snapshot; in colab_none the first queued asr
-// stage the note remote.back_to_local.
-func (c *colabMock) fixLectures(v any, rl *remoteLecture, backID string, now time.Time) any {
+// remote lectures' asr stages get stats.remote and the Colab snapshot (the
+// second one of colab_active shows running); a pinned queued one the Colab
+// snapshot; in colab_none the first queued asr stage the note
+// remote.back_to_local; in colab_active the first done one the speed mode's
+// parts (asr_timing.postprocess.split).
+func (c *colabMock) fixLectures(v any, rls []remoteLecture, backID, splitID string, now time.Time) any {
+	byID := map[string]remoteLecture{}
+	for _, rl := range rls {
+		byID[rl.id] = rl
+	}
 	var walk func(x any)
 	walk = func(x any) {
 		switch t := x.(type) {
@@ -739,8 +1122,13 @@ func (c *colabMock) fixLectures(v any, rl *remoteLecture, backID string, now tim
 						continue
 					}
 					status, _ := sm["status"].(string)
+					rl, remoteNow := byID[id]
+					if remoteNow && rl.second && status == model.StatusQueued {
+						sm["status"], sm["progress"], status = model.StatusRunning, json.Number("0.18"), model.StatusRunning
+						sm["started_at"] = rl.started.UTC().Format(time.RFC3339)
+					}
 					switch {
-					case rl != nil && id == rl.id && status == model.StatusRunning:
+					case remoteNow && status == model.StatusRunning:
 						rs := c.step(rl, now)
 						stats, _ := sm["stats"].(map[string]any)
 						if stats == nil {
@@ -753,6 +1141,18 @@ func (c *colabMock) fixLectures(v any, rl *remoteLecture, backID string, now tim
 						sm["model"] = c.snapshot()
 					case id == backID && status == model.StatusQueued && sm["note_info"] == nil:
 						sm["note_info"] = toJSON(model.ErrorInfo{Code: "remote.back_to_local", Params: map[string]any{"cause": colab.CodeSessionReclaimed}})
+					case id == splitID && status == model.StatusDone:
+						tm, _ := sm["asr_timing"].(map[string]any)
+						if tm == nil {
+							tm = toJSON(model.ASRTiming{LoadMS: 5200, TranscribeMS: 61000, AudioMS: 3300000}).(map[string]any)
+							sm["asr_timing"] = tm
+						}
+						pp, _ := tm["postprocess"].(map[string]any)
+						if pp == nil {
+							pp = map[string]any{}
+							tm["postprocess"] = pp
+						}
+						pp["split"] = map[string]any{"parts": 4, "cuts_ms": []int{812400, 1650300, 2471800}}
 					}
 				}
 			}
@@ -781,10 +1181,27 @@ func (c *colabMock) backToLocalLecture(s *store) string {
 	return ""
 }
 
+// splitLecture is the lecture colab_active says was transcribed in speed
+// mode: the first one (store order) whose asr stage is done.
+func (c *colabMock) splitLecture(s *store) string {
+	if !c.split {
+		return ""
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, l := range s.lectures {
+		if j := stageIndex(&l, model.StageASR); j >= 0 && l.Stages[j].Status == model.StatusDone {
+			return l.ID
+		}
+	}
+	return ""
+}
+
 func (c *colabMock) snapshot() any {
 	s := c.settings
+	acc, _ := c.effective()
 	return toJSON(api.StageModel{
-		Label: "Google Colab · " + s.Accelerator + " · " + s.Model + " · " + s.ComputeType + " · en", Model: s.Model,
+		Label: "Google Colab · " + acc + " · " + s.Model + " · " + s.ComputeType + " · en", Model: s.Model,
 		ASR: &model.ASRSnapshot{DeviceID: model.DeviceColab, Backend: "colab", Model: s.Model, Precision: s.ComputeType, Language: "en"},
 	})
 }

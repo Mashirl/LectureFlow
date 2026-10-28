@@ -47,7 +47,13 @@
 //
 // Programmable failures: FailNext (per role, including RolePing), SetError
 // (every request until cleared), SetDelay (latency before every answer),
-// RequireKey (401 echoing the wrong key, to test that callers redact it).
+// RequireKey (401 echoing the wrong key, to test that callers redact it),
+// SetConcurrencyLimit (429 above n chat requests in flight, like DeepSeek's
+// account-level concurrency limit; perf-llm).
+//
+// SetCacheAfterAnswer models DeepSeek's context cache more closely
+// (perf-llm): a system prompt is a cache hit only for requests that arrive
+// after a request with it was answered.
 //
 // Programmable answers: Handle(role, fn) answers every request of role with
 // fn(system, user) (e.g. janitor actions naming term ids created at run time);
@@ -196,6 +202,15 @@ type Server struct {
 	errMsg     string
 	delay      time.Duration
 	requireKey string
+
+	// perf-llm: concurrency limit and cache timing
+	concLimit   int
+	inflight    int
+	maxInflight int
+	throttled   int
+	cacheAfter  bool
+	built       map[string]bool // SetCacheAfterAnswer: system prompts answered once
+	cacheMisses int             // SetCacheAfterAnswer: chat requests whose system prompt missed
 }
 
 type translateFixture struct {
@@ -224,6 +239,7 @@ func NewFromDir(tb testing.TB, dir string) *Server {
 		handlers:  map[string]func(system, user string) string{},
 		fails:     map[string][]Failure{},
 		seen:      map[string]bool{},
+		built:     map[string]bool{},
 		models:    append([]string(nil), DefaultModels...),
 		syllabus:  DefaultSyllabusMarkdown,
 	}
@@ -485,6 +501,83 @@ type wireRequest struct {
 	ResponseFormat map[string]string `json:"response_format"`
 }
 
+// SetConcurrencyLimit makes the server answer HTTP 429 (without
+// Retry-After) to a chat request that arrives while n chat requests are being
+// answered, like DeepSeek's account-level concurrency limit (perf-llm); 0 =
+// no limit. Throttled counts these answers, MaxInflight the peak.
+func (s *Server) SetConcurrencyLimit(n int) {
+	s.mu.Lock()
+	s.concLimit = n
+	s.mu.Unlock()
+}
+
+// Throttled returns the number of 429 answers of SetConcurrencyLimit.
+func (s *Server) Throttled() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.throttled
+}
+
+// MaxInflight returns the most chat requests answered at the same time
+// (requests refused by SetConcurrencyLimit do not count).
+func (s *Server) MaxInflight() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.maxInflight
+}
+
+// SetCacheAfterAnswer switches the OpenAI-compatible cache simulation: on, a
+// system prompt counts as a cache hit only for requests that arrived after a
+// request with the same system prompt was answered (DeepSeek builds the
+// cache from a request it processed; requests sent together all miss); off
+// (the default), once a request with it was seen.
+func (s *Server) SetCacheAfterAnswer(on bool) {
+	s.mu.Lock()
+	s.cacheAfter = on
+	s.mu.Unlock()
+}
+
+type arrivalHitKey struct{}
+
+// beginChat counts a chat request in flight; ok is false when the
+// concurrency limit refuses it. hit is the arrival-time cache state of the
+// request's system prompt (SetCacheAfterAnswer; nil when off).
+func (s *Server) beginChat(body []byte) (ok bool, hit *bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.concLimit > 0 && s.inflight >= s.concLimit {
+		s.throttled++
+		return false, nil
+	}
+	s.inflight++
+	s.maxInflight = max(s.maxInflight, s.inflight)
+	if s.cacheAfter {
+		var wr wireRequest
+		if json.Unmarshal(body, &wr) == nil && len(wr.Messages) == 2 && wr.Messages[0].Role == "system" {
+			h := s.built[wr.Messages[0].Content]
+			hit = &h
+			if !h {
+				s.cacheMisses++
+			}
+		}
+	}
+	return true, hit
+}
+
+// CacheMisses returns the chat requests whose system prompt was not cached
+// when they arrived (SetCacheAfterAnswer only).
+func (s *Server) CacheMisses() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.cacheMisses
+}
+
+func (s *Server) endChat() {
+	s.mu.Lock()
+	s.inflight--
+	s.mu.Unlock()
+}
+
 // anthropicJSONInstruction mirrors llm.JSONInstruction (A6).
 const anthropicJSONInstruction = "\n\nRespond with JSON only."
 
@@ -496,6 +589,17 @@ func (s *Server) handle(w http.ResponseWriter, r *http.Request) {
 	delay, errStatus, errMsg, requireKey := s.delay, s.errStatus, s.errMsg, s.requireKey
 	s.mu.Unlock()
 	anthropic := strings.HasSuffix(r.URL.Path, "/v1/messages") || r.Header.Get("anthropic-version") != ""
+	if r.Method == http.MethodPost {
+		ok, hit := s.beginChat(body)
+		if !ok {
+			writeAPIErr(w, anthropic, http.StatusTooManyRequests, "Too many concurrent requests (llmtest concurrency limit)")
+			return
+		}
+		defer s.endChat()
+		if hit != nil {
+			r = r.WithContext(context.WithValue(r.Context(), arrivalHitKey{}, *hit))
+		}
+	}
 	if delay > 0 {
 		t := time.NewTimer(delay)
 		select {
@@ -591,6 +695,12 @@ func (s *Server) handleOpenAI(w http.ResponseWriter, r *http.Request, body []byt
 	if status != 0 {
 		writeFailure(w, false, status, content, fail)
 		return
+	}
+	if h, ok := r.Context().Value(arrivalHitKey{}).(bool); ok {
+		cacheHit = h // SetCacheAfterAnswer: the cache state when the request arrived
+		s.mu.Lock()
+		s.built[req.System] = true
+		s.mu.Unlock()
 	}
 	finish := "stop"
 	if c, cut := cutTruncated(content); cut {

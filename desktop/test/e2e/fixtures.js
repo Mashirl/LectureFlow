@@ -30,13 +30,35 @@ function cleanEnv() {
 const test = base.test.extend({
   serverKind: ['fake', { option: true }],
 
-  // launch({ env, dataDir, lang, appData }) → { app, page, dataDir, env }
+  // launch({ env, dataDir, lang, appData, args }) → { app, page, dataDir, env }
   // With appData set, LECTUREFLOW_DATA_DIR is not used: the data dir is
   // resolved like in a real installation, below {appData}/LectureFlow.
-  launch: async ({ serverKind }, use) => {
+  // args are extra command-line arguments of the shell (e.g. --background).
+  // The service never serves the per-user browser extension endpoint here
+  // (LECTUREFLOW_NM_ENDPOINT=off), so a test run never stands in for a real
+  // LectureFlow.
+  launch: async ({ serverKind }, use, testInfo) => {
     const apps = [];
     const dirs = [];
-    const launch = async ({ env = {}, dataDir, lang = 'en-US', appData } = {}) => {
+    // electron.launch has been seen to hang (flake-hunt #12): Playwright was
+    // attached to the main process's inspector, but Electron's "DevTools
+    // listening" line did not come within 60 s, twice in a row while the
+    // whole machine stalled; the launches before and after took seconds. A
+    // hung Electron does not recover by waiting longer, so it is ended
+    // (Playwright does that on the timeout) and started once more, with the
+    // test's time extended by the same 60 s. Any other launch error fails
+    // the test at once, as before.
+    const electronLaunch = async (opts) => {
+      try {
+        return await base._electron.launch({ ...opts, timeout: 60_000 });
+      } catch (err) {
+        if (!err || err.name !== 'TimeoutError') throw err;
+        testInfo.setTimeout(testInfo.timeout + 60_000);
+        testInfo.annotations.push({ type: 'electron.launch', description: 'timed out after 60 s; launched again' });
+        return base._electron.launch({ ...opts, timeout: 60_000 });
+      }
+    };
+    const launch = async ({ env = {}, dataDir, lang = 'en-US', appData, args = [] } = {}) => {
       const dir = appData ? path.join(appData, 'LectureFlow') : dataDir || fs.mkdtempSync(path.join(os.tmpdir(), 'lf-e2e-'));
       if (!dataDir && !appData) dirs.push(dir);
       const fullEnv = {
@@ -44,9 +66,10 @@ const test = base.test.extend({
         ...(appData ? { LECTUREFLOW_TEST_APPDATA: appData } : { LECTUREFLOW_DATA_DIR: dir }),
         LECTUREFLOW_SERVER: serverKind === 'go' ? GO_BIN : FAKE,
         LECTUREFLOW_RESOURCES: REPO,
+        LECTUREFLOW_NM_ENDPOINT: 'off',
         ...env,
       };
-      const app = await base._electron.launch({ args: [DESKTOP, `--lang=${lang}`], env: fullEnv, cwd: DESKTOP, timeout: 60_000 });
+      const app = await electronLaunch({ args: [DESKTOP, `--lang=${lang}`, ...args], env: fullEnv, cwd: DESKTOP });
       apps.push(app);
       const page = await app.firstWindow();
       return { app, page, dataDir: dir, env: fullEnv };

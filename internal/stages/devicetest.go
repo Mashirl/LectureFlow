@@ -21,6 +21,7 @@ import (
 	"lectureflow/internal/db"
 	"lectureflow/internal/devices"
 	"lectureflow/internal/model"
+	"lectureflow/internal/pyenv"
 	"lectureflow/internal/sched"
 	"lectureflow/internal/wav"
 )
@@ -459,6 +460,15 @@ var componentImportModules = map[string][]string{
 	model.BackendMLX:           {"mlx_whisper", "mlx.core"},
 }
 
+// importCheckCmd is the command of componentImportCheck: `{py} -I -c` with
+// the telemetry packages blocked before the imports (`import openvino`
+// alone used to report to Google Analytics) and pyenv's environment.
+func importCheckCmd(ctx context.Context, py string, modules []string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, py, "-I", "-c", pyenv.ImportCheck(modules))
+	cmd.Env = pyenv.Environ("PYTHONIOENCODING=utf-8")
+	return cmd
+}
+
 // componentImportCheck runs `{python} -I -c "import …"` (tests replace it).
 var componentImportCheck = func(ctx context.Context, python string, modules []string) error {
 	py, err := executable(python)
@@ -467,8 +477,7 @@ var componentImportCheck = func(ctx context.Context, python string, modules []st
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, py, "-I", "-c", "import "+strings.Join(modules, ", "))
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
+	cmd := importCheckCmd(ctx, py, modules)
 	cmd.WaitDelay = 3 * time.Second
 	tail := &tailBuffer{n: stderrTailBytes}
 	cmd.Stderr = tail

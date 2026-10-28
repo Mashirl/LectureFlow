@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lectureflow:schema:report:1",
+  "title": "LectureFlow detection report (redacted)",
+  "description": "Exported from the extension and submitted as a fixture (fixtures/<profile id>/). It records the inputs of the three detection routes and every fetch the detection made, redacted, plus the result; a replay (src/lib/replay.js) runs generic detection on the inputs and must reproduce `expected`. No cookies, no query values, no page text: URLs keep scheme, host, path (ID-like runs replaced by fakes of the same shape) and query parameter names with placeholder values; manifests are rebuilt from the attributes the detection understands; page text is reduced to its shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "reportVersion", "generatedAt", "extension", "page", "profile", "inputs", "dom", "expected"],
+  "properties": {
+    "kind": { "const": "lectureflow-detection-report" },
+    "reportVersion": { "const": 1 },
+    "generatedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "browser"],
+      "properties": {
+        "version": { "type": "string", "maxLength": 32 },
+        "browser": { "enum": ["chrome", "edge", "firefox", ""] }
+      }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "frames"],
+      "properties": {
+        "url": { "$ref": "#/$defs/url" },
+        "frames": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["frameId", "url"],
+            "properties": { "frameId": { "type": "integer" }, "url": { "$ref": "#/$defs/url" } }
+          }
+        }
+      }
+    },
+    "profile": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "version", "reviewed"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,39}$" },
+            "version": { "type": "string", "maxLength": 40 },
+            "reviewed": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frames", "webRequests", "fetches"],
+      "properties": {
+        "frames": {
+          "description": "Route 1 (media elements, same-origin iframes included) and route 2 (resource timing), per frame.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["frameId", "url", "encryptedEvents", "elements", "resources"],
+            "properties": {
+              "frameId": { "type": "integer" },
+              "url": { "$ref": "#/$defs/url" },
+              "encryptedEvents": { "type": "integer", "minimum": 0 },
+              "elements": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["tag", "src", "currentSrc", "sources", "mediaKeys", "videoWidth", "videoHeight", "duration", "readyState"],
+                  "properties": {
+                    "tag": { "enum": ["video", "audio"] },
+                    "src": { "$ref": "#/$defs/urlOrEmpty" },
+                    "currentSrc": { "$ref": "#/$defs/urlOrEmpty" },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["src", "type"],
+                        "properties": { "src": { "$ref": "#/$defs/url" }, "type": { "type": "string", "maxLength": 120 } }
+                      }
+                    },
+                    "mediaKeys": { "type": "boolean" },
+                    "videoWidth": { "type": ["integer", "null"] },
+                    "videoHeight": { "type": ["integer", "null"] },
+                    "duration": { "type": ["number", "null"] },
+                    "readyState": { "type": ["integer", "null"] }
+                  }
+                }
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["url", "initiatorType", "responseStatus"],
+                  "properties": {
+                    "url": { "$ref": "#/$defs/url" },
+                    "initiatorType": { "type": "string", "maxLength": 40 },
+                    "responseStatus": { "type": ["integer", "null"] }
+                  }
+                }
+              },
+              "observed": {
+                "description": "What the profile's observe took from the page's own responses: the declared names only, URLs redacted like any other, other strings reduced to their shape.",
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["key", "index", "url", "values"],
+                  "properties": {
+                    "key": { "type": "string", "maxLength": 80 },
+                    "index": { "type": "integer", "minimum": 0, "maximum": 3 },
+                    "url": { "$ref": "#/$defs/url" },
+                    "values": {
+                      "type": "object",
+                      "maxProperties": 8,
+                      "additionalProperties": false,
+                      "patternProperties": {
+                        "^[a-z][A-Za-z0-9]{0,31}$": {
+                          "oneOf": [
+                            { "$ref": "#/$defs/observedScalar" },
+                            { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/observedScalar" } }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "webRequests": {
+          "description": "Route 3: media and manifest responses seen by webRequest (authorized sites only).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["url", "frameId", "resourceType", "statusCode", "contentType", "contentLength", "contentRangeTotal"],
+            "properties": {
+              "url": { "$ref": "#/$defs/url" },
+              "frameId": { "type": "integer" },
+              "resourceType": { "type": "string", "maxLength": 40 },
+              "statusCode": { "type": ["integer", "null"] },
+              "contentType": { "type": "string", "maxLength": 120 },
+              "contentLength": { "type": ["integer", "null"] },
+              "contentRangeTotal": { "type": ["integer", "null"] }
+            }
+          }
+        },
+        "fetches": {
+          "description": "Every request detection made, in order: manifests, media playlists probed for duration and DRM, single files probed for size and type.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["purpose", "url", "ok", "status", "contentType"],
+            "properties": {
+              "purpose": { "enum": ["manifest", "probe", "file"] },
+              "url": { "$ref": "#/$defs/url" },
+              "ok": { "type": "boolean" },
+              "status": { "type": "integer" },
+              "contentType": { "type": "string", "maxLength": 120 },
+              "text": { "type": "string", "description": "Redacted manifest text." },
+              "truncated": { "const": true },
+              "size": { "type": "integer" },
+              "error": { "type": "string", "maxLength": 81 }
+            }
+          }
+        }
+      }
+    },
+    "dom": {
+      "description": "Only the nodes the profile's selectors hit: their structure, the shape of the value read.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frameId", "key", "selector", "attr", "count", "valueShape", "nodes"],
+        "properties": {
+          "frameId": { "type": "integer" },
+          "key": { "type": "string", "pattern": "^(session\\.idFrom|lecture\\.(title|recordedAt|durationSec)\\.\\d|downloadPolicy\\.disabledWhen\\.\\d)$" },
+          "selector": { "type": "string", "maxLength": 300 },
+          "attr": { "type": "string", "maxLength": 64 },
+          "count": { "type": "integer", "minimum": -1 },
+          "valueShape": { "type": "string", "maxLength": 130 },
+          "nodes": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "attrNames"],
+              "properties": {
+                "path": {
+                  "type": "array",
+                  "maxItems": 8,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["tag", "id", "classes"],
+                    "properties": {
+                      "tag": { "type": "string", "maxLength": 32 },
+                      "id": { "type": "string", "maxLength": 64 },
+                      "classes": { "type": "array", "maxItems": 8, "items": { "type": "string", "maxLength": 64 } }
+                    }
+                  }
+                },
+                "attrNames": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "tracks", "segmentRuns", "evidence", "profile"],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "audio", "video", "unknown", "protected"],
+          "properties": {
+            "total": { "type": "integer", "minimum": 0 },
+            "audio": { "type": "integer", "minimum": 0 },
+            "video": { "type": "integer", "minimum": 0 },
+            "unknown": { "type": "integer", "minimum": 0 },
+            "protected": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "tracks": { "type": "array", "items": { "$ref": "#/$defs/track" } },
+        "segmentRuns": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": false, "required": ["count"], "properties": { "count": { "type": "integer", "minimum": 3 } } }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mse", "mediaKeys", "mediaKeysOnStream", "encrypted"],
+          "properties": {
+            "mse": { "type": "boolean" },
+            "mediaKeys": { "type": "boolean" },
+            "mediaKeysOnStream": { "type": "boolean" },
+            "encrypted": { "type": "boolean" }
+          }
+        },
+        "profile": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "version", "sessionIdSource", "lecture", "downloadPolicy", "tracks", "others"],
+              "properties": {
+                "id": { "type": "string" },
+                "version": { "type": "string" },
+                "sessionIdSource": { "enum": ["profile", "generic"] },
+                "lecture": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["titleShape", "recordedAtShape", "durationSec"],
+                  "properties": {
+                    "titleShape": { "type": "string", "maxLength": 130 },
+                    "recordedAtShape": { "type": "string", "maxLength": 40 },
+                    "durationSec": { "type": "integer", "minimum": 0 }
+                  }
+                },
+                "downloadPolicy": { "enum": ["enabled", "disabled", "unknown"] },
+                "tracks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "role", "labelIndex", "recommended"],
+                    "properties": {
+                      "id": { "type": "string" },
+                      "role": { "type": "string" },
+                      "labelIndex": { "type": "integer", "minimum": 0 },
+                      "recommended": { "type": "boolean" }
+                    }
+                  }
+                },
+                "others": { "type": "integer", "minimum": 0 }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "url": {
+      "description": "A redacted URL: http(s) with no fragment, \"blob:\", \"data:\" or \"(invalid)\".",
+      "type": "string",
+      "maxLength": 4096,
+      "pattern": "^(https?://[^#\\s]+|blob:|data:|\\(invalid\\)|[a-z][a-z0-9+.-]*:)$"
+    },
+    "urlOrEmpty": { "anyOf": [{ "const": "" }, { "$ref": "#/$defs/url" }] },
+    "observedScalar": { "type": ["string", "number", "boolean", "null"], "maxLength": 4096 },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "url", "kind", "format", "sizeBytes", "sizeEstimated", "sources", "frameIds", "protected"],
+      "properties": {
+        "id": { "type": "string" },
+        "url": { "$ref": "#/$defs/url" },
+        "selector": { "type": "string", "pattern": "^(audio|video|unknown):[^:]+:\\d+$" },
+        "kind": { "enum": ["audio", "video", "unknown"] },
+        "format": { "enum": ["file", "hls", "dash"] },
+        "quality": { "type": "string", "maxLength": 20 },
+        "sizeBytes": { "type": "integer", "minimum": -1 },
+        "sizeEstimated": { "type": "boolean" },
+        "durationSec": { "type": "number", "minimum": 0 },
+        "sources": { "type": "array", "items": { "enum": ["element", "performance", "webrequest"] }, "minItems": 1, "uniqueItems": true },
+        "frameIds": { "type": "array", "items": { "type": "integer" } },
+        "protected": { "type": "boolean" },
+        "mime": { "type": "string", "maxLength": 120 },
+        "variants": { "type": "array", "items": { "type": "object" } },
+        "name": { "type": "string", "maxLength": 130 },
+        "language": { "type": "string", "maxLength": 40 },
+        "unreadable": { "const": true }
+      }
+    }
+  }
+}

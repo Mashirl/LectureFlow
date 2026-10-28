@@ -141,9 +141,9 @@ func TestPoolWithSettingsHotUpdate(t *testing.T) {
 	r4 := expectGranted(t, "fourth", rel4, err4)
 	r4()
 
-	// requests_per_minute: 60 = one token per second, burst 1.
-	patchLimits(t, set, a.ID, 10, 60)
-	if st := pool.Status()[a.ID]; st.RPM != 60 || st.Max != 10 {
+	// requests_per_minute: 6 = one token per 10 s, burst 1.
+	patchLimits(t, set, a.ID, 10, 6)
+	if st := pool.Status()[a.ID]; st.RPM != 6 || st.Max != 10 {
 		t.Fatalf("rpm status %+v", st)
 	}
 	r, err := pool.Acquire(ctx, a.ID) // the one token in the bucket
@@ -152,13 +152,14 @@ func TestPoolWithSettingsHotUpdate(t *testing.T) {
 	}
 	r()
 	rel5, err5 := acquireAsync(pool, ctx, a.ID)
-	expectBlocked(t, "no token left at 60 rpm", rel5, err5)
-	start := time.Now()
-	patchLimits(t, set, a.ID, 0, 10000) // a faster bucket applies to the waiter now
+	expectBlocked(t, "no token left at 6 rpm", rel5, err5)
+	// A faster bucket applies to the waiter at once: at the old rate its
+	// token would come about 10 s after the first one, far beyond
+	// expectGranted's 2 s. (At 60 rpm the test had to time the grant
+	// against 500 ms, settings write included: too tight on a loaded
+	// machine, 708 ms on 2026-10-28.)
+	patchLimits(t, set, a.ID, 0, 10000)
 	expectGranted(t, "after rpm raise", rel5, err5)()
-	if d := time.Since(start); d > 500*time.Millisecond {
-		t.Fatalf("rpm raise took %v to apply", d)
-	}
 
 	// A provider created later appears; renames show in Status.
 	b := mkProvider(t, set, "ProvB", 1, 10000)
@@ -348,7 +349,7 @@ func TestLegacyPoolUsesConfigPrices(t *testing.T) {
 	if u.EstimatedCost == nil || *u.EstimatedCost != 7 || u.PromptTokens != 3_000_000 {
 		t.Fatalf("legacy usage %+v", u)
 	}
-	if st := pool.Status()["deepseek"]; st.Name != "deepseek" || st.Max != 8 || st.RPM != 300 {
+	if st := pool.Status()["deepseek"]; st.Name != "deepseek" || st.Max != 64 || st.RPM != 0 { // perf-llm: the DeepSeek default
 		t.Fatalf("legacy status %+v", st)
 	}
 	// The v1 kv ledger is not written any more.

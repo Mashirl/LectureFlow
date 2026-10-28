@@ -4,17 +4,22 @@
 package stages
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"lectureflow/internal/model"
+	"lectureflow/internal/procutil"
+	"lectureflow/internal/sched"
 )
 
 // H.264 encoder choice for the playback file (SPEC-v3 V7 "ffmpeg"). The
@@ -24,13 +29,24 @@ import (
 // player runs in audio mode with the reason MediaNoH264Encoder). libx264 is
 // never used, not even when a user-supplied ffmpeg has it, so that every
 // installation behaves like the distributed one. A remux (-c copy) needs
-// no encoder and is not affected.
+// no encoder and is not affected. An encoder that passes the test encode
+// can still fail during a transcode (qsv-retry): a hardware encoder is then
+// tried once more, then the next usable one (makeStream).
 
 // MediaNoH264Encoder: a transcode to H.264 is needed but this ffmpeg has no
 // usable H.264 encoder. Recorded as the error of a failed stream state
 // (the player's audio mode); params.tried lists the encoders checked, the
 // detail tells what happened to each.
 const MediaNoH264Encoder = "media.no_h264_encoder"
+
+// MediaEncoderFailed: the transcode failed because the H.264 encoder itself
+// failed (it could not be opened or rejected a frame: a busy GPU, a driver
+// glitch such as QSV's "Invalid FrameType"), with every usable encoder and
+// the hardware ones tried twice. Not a problem of the file, and a retry may
+// succeed; recorded like the other media.* errors (prep stays done, the
+// stream task fails and can be retried). params.tried lists the encoders
+// tried, the detail has each attempt's ffmpeg output.
+const MediaEncoderFailed = "media.encoder_failed"
 
 // H.264 encoders in order of preference (V7). libx264 is deliberately not
 // among them.
@@ -158,12 +174,16 @@ type encoderProber struct {
 // defaultEncoderProber serves execMedia.
 var defaultEncoderProber = &encoderProber{run: runCombined}
 
-// runCombined runs exe and returns stdout and stderr together.
+// runCombined runs exe and returns stdout and stderr together. Like every
+// ffmpeg it ends with LectureFlow (procutil.Tied; test-chaos 1).
 func runCombined(ctx context.Context, exe string, args []string) (string, error) {
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.WaitDelay = 3 * time.Second
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := procutil.Run(cmd, procutil.Tied)
+	return out.String(), err
 }
 
 func (p *encoderProber) key(exe string) string {
@@ -242,6 +262,169 @@ func tailText(s string) string {
 func (m *execMedia) H264Encoders(ctx context.Context) ([]encoderCheck, error) {
 	return defaultEncoderProber.check(ctx, m.ffmpeg)
 }
+
+// ---------- a failing encoder during the transcode ----------
+
+// hardwareEncoder: an encoder on a GPU or media engine. Its failures can be
+// transient (a busy device, sessions used up by other programs, a driver
+// glitch), so a transcode tries it a second time before the next encoder.
+func hardwareEncoder(enc string) bool {
+	return enc == encNVENC || enc == encQSV || enc == encVideoToolbox
+}
+
+// encoderAttempts is how often a transcode runs enc when the encoder itself
+// fails.
+func encoderAttempts(enc string) int {
+	if hardwareEncoder(enc) {
+		return 2
+	}
+	return 1
+}
+
+// videoEncoderFailures are fftools' messages that the video encoder could
+// not be opened or failed on a frame: "Error submitting video frame to the
+// encoder" (ffmpeg 6+), "Video encoding failed" (up to 5) / "video encoding
+// failed" (7+), "Error while opening encoder - maybe incorrect parameters
+// …" (7+; up to 6 "… for output stream #0:0 - …", also inside "Error
+// initializing output stream 0:0 -- …").
+var videoEncoderFailures = []string{
+	"Error submitting video frame to the encoder",
+	"Video encoding failed", "video encoding failed",
+	"Error while opening encoder",
+}
+
+// encoderErrorWords mark a line of the encoder's own that reports a failure
+// (its warnings, e.g. QSV's "partial acceleration", do not count).
+var encoderErrorWords = regexp.MustCompile(`(?i)error|fail|invalid|cannot|unable|not supported|unsupported`)
+
+// outputStreamRE finds "output stream #0:N" in the messages of ffmpeg up to
+// 6, which name the stream instead of tagging the line.
+var outputStreamRE = regexp.MustCompile(`output stream #\d+:(\d+)`)
+
+// loggedBy reports whether an ffmpeg output line is logged by encoder enc:
+// its codec context "[h264_qsv @ 0x…]", ffmpeg 7+'s encoder "[enc:h264_qsv
+// @ …]" or video output stream "[vost#0:0/h264_qsv @ …]". tagged reports
+// whether the line has a "[… @ …]" tag at all.
+func loggedBy(line, enc string) (by, tagged bool) {
+	if !strings.HasPrefix(line, "[") {
+		return false, false
+	}
+	tag, _, ok := strings.Cut(line[1:], " @ ")
+	if !ok || strings.Contains(tag, "]") {
+		return false, false
+	}
+	return tag == enc || tag == "enc:"+enc || (strings.HasPrefix(tag, "vost#") && strings.HasSuffix(tag, "/"+enc)), true
+}
+
+// encoderFailed reports whether the output of a failed transcode with
+// encoder enc shows that the encoder itself failed: one of fftools'
+// messages about the video encoder (untagged, or tagged by enc), or an
+// error line of enc's own — e.g. QSV's "Invalid FrameType:0.", NVENC's
+// "OpenEncodeSessionEx failed", and ffmpeg 7+'s "[vost#0:0/h264_qsv @ …]
+// Error encoding a frame: Invalid data found when processing input". The
+// encoder is opened only after the input was opened and its first frame
+// decoded, so such a failure is not the input file's: its error code
+// (AVERROR_INVALIDDATA above) says nothing about the file.
+func encoderFailed(stderr, enc string) bool {
+	if enc == "" {
+		return false
+	}
+	for _, line := range strings.Split(stderr, "\n") {
+		line = strings.TrimSpace(line)
+		by, tagged := loggedBy(line, enc)
+		if by && encoderErrorWords.MatchString(line) {
+			return true
+		}
+		if tagged && !by {
+			continue // another component's line, e.g. the audio encoder's "[aost#0:1/aac @ …]"
+		}
+		for _, m := range videoEncoderFailures {
+			if !strings.Contains(line, m) {
+				continue
+			}
+			// up to ffmpeg 6: only the video stream (#0:0, streamArgs maps it first)
+			if s := outputStreamRE.FindStringSubmatch(line); s != nil && s[1] != "0" {
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// transcodeError classifies a failed transcode with encoder enc (remux: "").
+// A failure of the encoder itself is MediaEncoderFailed (fault true; the
+// caller tries again or moves to the next encoder) unless the output could
+// not be written (a full disk is no encoder's fault); everything else is
+// classified by mediaError (appendix D6) as before.
+func transcodeError(stderr string, err error, enc string) (merr error, fault bool) {
+	if encoderFailed(stderr, enc) && !outputFailed(stderr) {
+		return model.Errorf(MediaEncoderFailed, map[string]any{"tried": enc}, errors.New(ffmpegDetail(stderr, err))), true
+	}
+	return mediaError(stderr, err), false
+}
+
+// encoderTry is a failed transcode attempt.
+type encoderTry struct {
+	enc     string
+	attempt int   // 1, 2 (the second run of a hardware encoder)
+	err     error // transcodeError's
+	fault   bool  // the encoder itself failed
+}
+
+// tryNames are the encoders of tries, each once, in order.
+func tryNames(tries []encoderTry) []string {
+	var names []string
+	for _, t := range tries {
+		if !slices.Contains(names, t.enc) {
+			names = append(names, t.enc)
+		}
+	}
+	return names
+}
+
+// transcodeFailure is the error of a transcode after every usable encoder
+// failed (tries in order, at least one). As before (V7 ruling 4) it is the
+// last attempt's error; when that is an encoder failure it becomes one
+// MediaEncoderFailed for all of them: params.tried = the encoders tried,
+// the detail every attempt's ffmpeg output (each the tail of stderr, at
+// most stderrTailBytes; the failing line can come well before the end).
+func transcodeFailure(tries []encoderTry) error {
+	last := tries[len(tries)-1]
+	if !last.fault {
+		return last.err
+	}
+	parts := make([]string, 0, len(tries))
+	for _, t := range tries {
+		parts = append(parts, fmt.Sprintf("%s (attempt %d): %s", t.enc, t.attempt, errDetail(t.err)))
+	}
+	return model.Errorf(MediaEncoderFailed, map[string]any{"tried": strings.Join(tryNames(tries), ", ")},
+		errors.New("the H.264 encoder failed during the transcode (not a problem of the file)\n"+strings.Join(parts, "\n\n")))
+}
+
+// errDetail is the wrapped error's text of a CodedError (its "查看详情"), or
+// err's text.
+func errDetail(err error) string {
+	var ce *model.CodedError
+	if errors.As(err, &ce) && ce.Err != nil {
+		return ce.Err.Error()
+	}
+	return err.Error()
+}
+
+// noteEncoderRetried records on the job (prep or the stream task) that the
+// playback file was made only after the encoder failed: failed lists the
+// encoders that failed (tryNames), enc made the file.
+func noteEncoderRetried(ctx context.Context, failed []string, enc string) {
+	names := strings.Join(failed, ", ")
+	sched.UpdateStats(ctx, func(st *model.JobStats) {
+		st.Note = fmt.Sprintf(EncoderRetriedNote, names, enc)
+		st.NoteInfo = noteInfo(part(NotePrepEncoderRetried, map[string]any{"failed": names, "encoder": enc}))
+	})
+}
+
+// EncoderRetriedNote is the Chinese text of NotePrepEncoderRetried.
+const EncoderRetriedNote = "转码时视频编码器 %s 出错，已用 %s 重新生成播放文件"
 
 // noEncoderState is the stream state when no encoder can transcode: failed
 // with MediaNoH264Encoder (the player's audio mode; GET /media answers the

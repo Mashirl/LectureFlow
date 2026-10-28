@@ -17,7 +17,8 @@ lists (NVIDIA CUDA libraries, CTranslate2, PyAV, regex), which the
 component manager downloads from PyPI on the user's computer and whose
 licenses are not compatible with the AGPL. By submitting a contribution
 you agree that it may be used under both. The permission does not change
-the license of those libraries, and LectureFlow does not distribute them.
+the license of those libraries, does not relax any other condition of the
+AGPL, and LectureFlow does not distribute those libraries.
 
 ### Contributor License Agreement (CLA)
 
@@ -40,6 +41,15 @@ repository, and turns green. You sign once; later pull requests are
 recognised automatically. If the check does not update, comment `recheck`.
 Pull requests whose authors have not signed are not merged.
 
+### Platform profiles for the browser extension
+
+Teaching the browser extension a new recording platform takes a profile
+(`extension/profiles/<id>.json`) and redacted detection reports
+(`extension/fixtures/<id>/`), no code. Follow
+[CONTRIBUTING-profiles.md](CONTRIBUTING-profiles.md). Profiles and fixtures
+are released under CC0 1.0, so a pull request that contains only them needs
+no CLA; the CLA check passes it by itself.
+
 ### Pull requests
 
 1. Open an issue first for larger changes, so that we can agree on the
@@ -53,13 +63,17 @@ Pull requests whose authors have not signed are not merged.
        // Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE.
 
    (use the comment syntax of the language). CI checks it. Python files
-   of `worker/` (except tests) carry a third line:
+   of `worker/` (except tests) carry a third line, which CI checks too:
 
        # Additional permission under AGPL-3.0 section 7: see LICENSE-EXCEPTION.md
 4. New third-party dependencies must have a license compatible with
    AGPL-3.0 (MIT, BSD, Apache-2.0, MPL-2.0, LGPL, GPL-3.0, ...). Run
    `go run ./scripts/licaudit` (or `make.ps1 audit`) and commit the updated
    `THIRD_PARTY_NOTICES.md`. CI fails on incompatible or unknown licenses.
+   Only the maintainers can accept an incompatible Python package, and only
+   as downloaded on the user's computer, never distributed; the package
+   must then also be added to the list of libraries in
+   `LICENSE-EXCEPTION.md`, which the audit checks.
 5. Never commit API keys, personal data or lecture recordings.
 
 ## 简体中文
@@ -70,7 +84,7 @@ LectureFlow 是自由软件，以 **GNU AGPL-3.0-or-later** 许可发布（见 `
 
 贡献以 GNU AGPL-3.0-or-later **连同 [LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md) 中的附加许可**接受。
 该附加许可允许 LectureFlow 与其中列出的库（NVIDIA CUDA 库、CTranslate2、PyAV、regex）组合使用；这些库由组件管理器在用户电脑上从 PyPI 下载，其许可证与 AGPL 不兼容。
-提交贡献即表示你同意贡献按这两者使用。附加许可不改变这些库的许可证，LectureFlow 也不分发这些库。
+提交贡献即表示你同意贡献按这两者使用。附加许可不改变这些库的许可证，也不放宽 AGPL 的其他任何条件；LectureFlow 也不分发这些库。
 （附加许可以 LICENSE-EXCEPTION.md 的英文文本为准。）
 
 ### 贡献者许可协议（CLA）
@@ -86,13 +100,19 @@ LectureFlow 是自由软件，以 **GNU AGPL-3.0-or-later** 许可发布（见 `
 检查会把你的 GitHub 用户名、PR 编号与日期记录在本仓库 `cla-signatures` 分支的 `signatures/version1/cla.json` 中，并变为通过。
 只需签署一次，以后的 PR 会自动识别。检查没有更新时，回复 `recheck`。未签署的 PR 不会合并。
 
+### 浏览器扩展的对策文件
+
+让浏览器扩展认识一个新的录播平台，只需要一份对策文件（`extension/profiles/<id>.json`）和脱敏的探测报告（`extension/fixtures/<id>/`），不需要写代码。步骤见 [CONTRIBUTING-profiles.md](CONTRIBUTING-profiles.md)。
+对策文件与 fixtures 以 CC0 1.0 发布，只包含它们的 PR 不需要签署 CLA，CLA 检查会自动通过。
+
 ### PR 流程
 
 1. 较大的改动请先开 issue 讨论做法。
 2. 每个 PR 只做一件事，提交前运行测试：Windows 上 `powershell -File make.ps1 test`，其他系统 `make test`。
 3. 每个新源文件开头加上仓库统一的两行许可证声明（见上文英文部分，注释符号按语言替换），持续集成会检查。
-   `worker/` 中的 Python 文件（测试除外）还有第三行，引用 LICENSE-EXCEPTION.md（见上文英文部分）。
+   `worker/` 中的 Python 文件（测试除外）还有第三行，引用 LICENSE-EXCEPTION.md（见上文英文部分），持续集成同样会检查。
 4. 新增的第三方依赖必须使用与 AGPL-3.0 兼容的许可证（MIT、BSD、Apache-2.0、MPL-2.0、LGPL、GPL-3.0 等）。
    运行 `go run ./scripts/licaudit`（或 `make.ps1 audit`），并提交更新后的 `THIRD_PARTY_NOTICES.md`；
    不兼容或无法识别的许可证会让持续集成失败。
+   不兼容的 Python 包只能由维护者接受，而且只能由用户电脑自行下载、绝不随 LectureFlow 分发；这时还必须把它加进 `LICENSE-EXCEPTION.md` 的库列表，审计会核对。
 5. 不要提交 API key、个人信息或讲座录音。

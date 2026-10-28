@@ -4,10 +4,12 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"lectureflow/internal/components"
+	"lectureflow/internal/config"
 	"lectureflow/internal/model"
 	"lectureflow/internal/settings"
 )
@@ -36,11 +38,11 @@ var providerEnvVars = map[string]string{
 
 // fallbackPresetProviders stand in for the presets without a component
 // manager: DeepSeek only, with the limits of config.example.toml and of the
-// shipped manifest's preset (8 concurrent requests, 300 per minute; V12.2
-// acceptance issue 2).
+// shipped manifest's preset (64 concurrent requests, no per-minute limit;
+// perf-llm, NOTES.md).
 var fallbackPresetProviders = []components.PresetProvider{{
 	ID: "deepseek", Name: "DeepSeek", Type: model.ProviderOpenAI, BaseURL: "https://api.deepseek.com",
-	DefaultModel: "deepseek-flash", BalanceAPI: model.BalanceDeepSeek, MaxConcurrency: 8, RPM: 300,
+	DefaultModel: "deepseek-flash", BalanceAPI: model.BalanceDeepSeek, MaxConcurrency: config.DeepSeekMaxConcurrency, RPM: 0,
 }}
 
 // EnvKeyView is one row of GET /api/onboarding/env-keys.
@@ -91,12 +93,15 @@ func (s *Server) getEnvKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/onboarding/use-env-key {"provider_type"}: updates the key of
-// the provider with the preset's base_url (or else its name), or creates
-// the provider from the preset (201) with the preset's max_concurrency and
-// rpm (the settings defaults 4 / 60 only where the preset gives none),
+// the provider with the preset's base_url, or creates the provider from the
+// preset (201) with the preset's max_concurrency (the settings default 4
+// where the preset gives none) and rpm (0 = no per-minute limit, perf-llm),
 // through the settings service like the v1.1 provider endpoints. An
-// existing provider keeps its limits: they may be the user's own. 404
-// onboarding.env_key_missing when the variable is not set.
+// existing provider keeps its limits: they may be the user's own. A
+// provider is matched by its base_url only, never by its name: the key goes
+// to the host it was issued for (sec2-app L2); a provider that merely has
+// the preset's name leaves the new one a free name ("DeepSeek (deepseek)").
+// 404 onboarding.env_key_missing when the variable is not set.
 func (s *Server) useEnvKey(w http.ResponseWriter, r *http.Request) {
 	if !s.requireSettings(w) {
 		return
@@ -133,14 +138,6 @@ func (s *Server) useEnvKey(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if match == nil {
-		for i := range ps {
-			if strings.EqualFold(strings.TrimSpace(ps[i].Name), pp.Name) {
-				match = &ps[i]
-				break
-			}
-		}
-	}
 	if match != nil {
 		p, err := s.set.UpdateProvider(r.Context(), match.ID, settings.ProviderInput{APIKey: &key})
 		if err != nil {
@@ -150,7 +147,7 @@ func (s *Server) useEnvKey(w http.ResponseWriter, r *http.Request) {
 		s.respondProvider(w, r, p, http.StatusOK)
 		return
 	}
-	name, typ, base := pp.Name, pp.Type, pp.BaseURL
+	name, typ, base := freeProviderName(ps, pp), pp.Type, pp.BaseURL
 	pin := settings.ProviderInput{Name: &name, Type: &typ, BaseURL: &base, APIKey: &key}
 	if pp.BalanceAPI != "" {
 		b := pp.BalanceAPI
@@ -160,14 +157,36 @@ func (s *Server) useEnvKey(w http.ResponseWriter, r *http.Request) {
 		c := pp.MaxConcurrency
 		pin.MaxConcurrency = &c
 	}
-	if pp.RPM > 0 {
-		rpm := pp.RPM
-		pin.RPM = &rpm
-	}
+	rpm := max(pp.RPM, 0) // 0 = no per-minute limit
+	pin.RPM = &rpm
 	p, err := s.set.CreateProvider(r.Context(), pin)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	s.respondProvider(w, r, p, http.StatusCreated)
+}
+
+// freeProviderName is the name of a provider created from preset pp: the
+// preset's name, else "{name} ({id})", else that with a number, whichever
+// no provider of ps has (names are unique, case-insensitive).
+func freeProviderName(ps []model.Provider, pp *components.PresetProvider) string {
+	taken := func(n string) bool {
+		for _, p := range ps {
+			if strings.EqualFold(strings.TrimSpace(p.Name), n) {
+				return true
+			}
+		}
+		return false
+	}
+	name := pp.Name
+	if !taken(name) {
+		return name
+	}
+	base := fmt.Sprintf("%s (%s)", pp.Name, pp.ID)
+	name = base
+	for i := 2; taken(name); i++ {
+		name = fmt.Sprintf("%s %d", base, i)
+	}
+	return name
 }

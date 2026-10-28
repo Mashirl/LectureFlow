@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "echo360",
+  "version": "0.1.0-unverified",
+  "name": "Echo360（草稿，未经真实账号验证）",
+  "maintainers": ["@your-github-handle"],
+  "draft": true,
+  "match": {
+    "hosts": [
+      "*.echo360.org",
+      "*.echo360.org.uk",
+      "*.echo360.net.au",
+      "*.echo360.ca",
+      "*.echo360.org.au"
+    ],
+    "pathPattern": "^/lesson/[^/]+/classroom/?$"
+  },
+  "session": {
+    "idFrom": { "pathPattern": "^/lesson/([^/]+)/classroom" }
+  },
+  "lecture": {
+    "title": { "selector": "title" }
+  },
+  "tracks": [
+    {
+      "role": "primary-audio",
+      "label": { "zh-CN": "主讲音频", "en": "Lecture audio" },
+      "detect": { "urlPattern": "/s0(_a|q\\d)\\.m3u8$", "kind": "audio", "format": "hls" },
+      "recommended": true
+    },
+    {
+      "role": "view-1",
+      "label": { "zh-CN": "画面 1", "en": "View 1" },
+      "detect": { "urlPattern": "/s1(_av|_v|q\\d)\\.m3u8$", "kind": "video", "format": "hls" },
+      "recommended": true
+    },
+    {
+      "role": "view-2",
+      "label": { "zh-CN": "画面 2", "en": "View 2" },
+      "detect": { "urlPattern": "/s[2-9](_av|_v|q\\d)\\.m3u8$", "kind": "video", "format": "hls" },
+      "recommended": false
+    },
+    {
+      "role": "whole-file",
+      "label": { "zh-CN": "整段文件", "en": "Whole file" },
+      "detect": { "urlPattern": "/(s\\dq\\d|[hs]d[12])\\.(mp4|m4s)$", "format": "file" },
+      "recommended": false
+    }
+  ],
+  "request": {
+    "sendReferer": true,
+    "cookieUrls": ["track"],
+    "maxConnectionsPerFile": 4
+  },
+  "fixtures": "fixtures/echo360/"
+}

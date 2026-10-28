@@ -139,6 +139,12 @@ type Service struct {
 	// devices is the device registry of SPEC-v2 I6 (SetDeviceSource; nil =
 	// the legacy ASR fields, as before phase 3b).
 	devices DeviceSource
+	// unreadable: providers whose stored key no data key opens (cred-enc,
+	// keys.go): their APIKey is "", the user enters the key again.
+	unreadable map[string]bool
+	// unsealed: providers whose key is stored in the clear (sec3 L2,
+	// keys.go: saved while there was no data key).
+	unsealed map[string]bool
 
 	// wmu serialises writes (database write + cache reload) so a slower
 	// reload can never store an older state over a newer one. It is never
@@ -264,9 +270,18 @@ func (s *Service) Load(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	unreadable, err := unreadableKeys(ctx, s.st)
+	if err != nil {
+		return fmt.Errorf("读取提供商失败: %w", err)
+	}
+	unsealed, err := unsealedKeys(ctx, s.st)
+	if err != nil {
+		return fmt.Errorf("读取提供商失败: %w", err)
+	}
 	s.mu.Lock()
 	s.providers, s.roles, s.asr, s.general, s.defaults = provs, roles, asr, general, defaults
 	s.tariffs, s.holidays, s.holidaysEdited = tariffs, holidays, edited
+	s.unreadable, s.unsealed = unreadable, unsealed
 	s.mu.Unlock()
 	return nil
 }
@@ -418,6 +433,10 @@ func (s *Service) SnapshotUsableInfo(stage, raw string) (ok bool, reason *model.
 		return false, &model.ErrorInfo{Code: CodeSnapshotProviderDeleted, Params: map[string]any{"provider": name},
 			Detail: fmt.Sprintf("提供商「%s」已删除", name)}
 	}
+	if p.APIKey == "" && s.KeyUnreadable(p.ID) { // cred-enc (keys.go)
+		return false, &model.ErrorInfo{Code: CodeSnapshotKeyUnreadable, Params: map[string]any{"provider": p.Name},
+			Detail: fmt.Sprintf("提供商「%s」保存的 API key 无法在这台电脑或这个账户上解密，需要重新输入", p.Name)}
+	}
 	if p.APIKey == "" && !IsLocal(p.BaseURL) {
 		return false, &model.ErrorInfo{Code: CodeSnapshotNoAPIKey, Params: map[string]any{"provider": p.Name},
 			Detail: fmt.Sprintf("提供商「%s」没有设置 API key", p.Name)}
@@ -450,7 +469,8 @@ func probedModels(ctx context.Context, st db.Store, providerID string) (model.Pr
 // ---------- writes ----------
 
 // CreateProvider validates (name non-empty and unique, type openai|anthropic,
-// base_url http(s), max_concurrency 1..64, rpm 1..10000, balance_api
+// base_url http(s), max_concurrency 1..512, rpm 0..10000 with 0 = no
+// per-minute limit (perf-llm), balance_api
 // none|deepseek, prices >= 0, tariff) and inserts a provider with a new
 // ULID. v2 P12.2 / D3: a DeepSeek provider (IsDeepSeek) created without a
 // tariff in the input gets tariff.DeepSeekPreset().
@@ -492,7 +512,10 @@ func (s *Service) CreateProvider(ctx context.Context, in ProviderInput) (model.P
 	return cloneProvider(p), nil
 }
 
-// UpdateProvider applies a patch (same validation). APIKey nil or "" keeps the key.
+// UpdateProvider applies a patch (same validation). APIKey nil or "" keeps
+// the key — unless the patch moves base_url to another origin (scheme, host
+// or port): the key is then cleared, so it never follows the provider to a
+// host it was not issued for (sec2-app L2); the user enters it again.
 func (s *Service) UpdateProvider(ctx context.Context, id string, in ProviderInput) (model.Provider, error) {
 	s.wmu.Lock()
 	p, err := s.st.GetProvider(ctx, id)
@@ -501,11 +524,18 @@ func (s *Service) UpdateProvider(ctx context.Context, id string, in ProviderInpu
 		return model.Provider{}, userErr(db.ErrNotFound, CodeProviderNotFound, nil, "提供商不存在（可能已被删除）")
 	}
 	if err == nil {
+		oldBase := p.BaseURL
 		if err = applyInput(&p, in); err != nil {
 			s.wmu.Unlock()
 			return model.Provider{}, err
 		}
-		err = s.st.UpdateProvider(ctx, p)
+		newKey := in.APIKey != nil && strings.TrimSpace(*in.APIKey) != ""
+		if !newKey && !SameOrigin(oldBase, p.BaseURL) {
+			p.APIKey = ""
+			slog.Info("provider moved to another host; its API key was cleared", "provider", p.Name)
+		}
+		// cred-enc: a key to enter again stays stored while other fields change
+		err = s.updateProviderRow(ctx, p, !newKey && SameOrigin(oldBase, p.BaseURL))
 	}
 	if err == nil {
 		err = s.Load(ctx)
@@ -525,6 +555,10 @@ func (s *Service) DeleteProvider(ctx context.Context, id string) (DeleteInfo, er
 	refs, err := s.SnapshotRefs(ctx, id)
 	if err != nil {
 		return DeleteInfo{}, err
+	}
+	hadKey := false
+	if p, ok := s.Provider(id); ok {
+		hadKey = p.APIKey != "" || s.KeyUnreadable(id)
 	}
 	s.wmu.Lock()
 	err = s.st.Tx(ctx, func(tx db.Store) error {
@@ -547,6 +581,9 @@ func (s *Service) DeleteProvider(ctx context.Context, id string) (DeleteInfo, er
 		// The Store has no kv delete: an empty value reads as "no cache".
 		return tx.SetKV(ctx, model.KVProviderModelsPref+id, "")
 	})
+	if err == nil && hadKey {
+		s.scrubFreedKey(ctx) // cred-enc / L5: the deleted key leaves no copy (keys.go)
+	}
 	if err == nil {
 		err = s.Load(ctx)
 	}

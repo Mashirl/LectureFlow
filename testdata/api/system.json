@@ -6,6 +6,7 @@
     {"name": "faster-whisper", "status": "ok", "detail": "可以导入 faster_whisper", "hint": "", "detail_info": {"code": "check.import_ok", "params": {"module": "faster_whisper"}}},
     {"name": "pypdf", "status": "ok", "detail": "可以导入 pypdf", "hint": "", "detail_info": {"code": "check.import_ok", "params": {"module": "pypdf"}}},
     {"name": "gpu", "status": "ok", "detail": "总显存 12227 MB，剩余 11883 MB", "hint": "", "detail_info": {"code": "check.gpu_vram", "params": {"total": 12227, "free": 11883}}},
+    {"name": "cudnn", "status": "ok", "detail": "cuDNN 9.1.0 可以加载", "hint": "", "detail_info": {"code": "check.cudnn_ok", "params": {"version": "9.1.0"}}},
     {"name": "cuda", "status": "warn", "detail": "尚未运行（点击“重新检查”运行）", "hint": "", "detail_info": {"code": "check.not_run"}},
     {"name": "api_key:deepseek", "status": "error", "detail": "环境变量 DEEPSEEK_API_KEY 未设置", "hint": "设置环境变量 DEEPSEEK_API_KEY 后重启服务", "detail_info": {"code": "check.key_env_unset", "params": {"env": "DEEPSEEK_API_KEY"}}, "hint_info": {"code": "check.hint_key_env", "params": {"env": "DEEPSEEK_API_KEY"}}},
     {"name": "api:deepseek", "status": "warn", "detail": "未检查：缺少 API key", "hint": "", "detail_info": {"code": "check.api_skipped_no_key"}},

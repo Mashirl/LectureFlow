@@ -232,7 +232,7 @@ func Run(opt Options) (*Report, error) {
 	if err != nil {
 		return nil, err
 	}
-	steps := []func(Options, *Report, *allowlist) error{auditGo, auditVendor, auditNPM, auditPython, auditOffline, auditException, auditModels, auditTools, auditBinaries, auditMedia, auditReferences}
+	steps := []func(Options, *Report, *allowlist) error{auditGo, auditVendor, auditNPM, auditPython, auditOffline, auditException, auditModels, auditTools, auditBinaries, auditMedia, auditReferences, auditExtension}
 	for _, s := range steps {
 		if err := s(opt, r, al); err != nil {
 			return nil, err
@@ -258,7 +258,7 @@ func Run(opt Options) (*Report, error) {
 }
 
 func kindOrder(k string) int {
-	for i, x := range []string{KindGo, KindVendor, KindNPM, KindPython, KindModel, KindTool, KindBinary, KindMedia, KindReference} {
+	for i, x := range []string{KindGo, KindVendor, KindNPM, KindPython, KindModel, KindTool, KindBinary, KindMedia, KindReference, KindExtension} {
 		if x == k {
 			return i
 		}

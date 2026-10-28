@@ -97,7 +97,8 @@ func (s *Scheduler) gpuAdmit(ctx context.Context, sc *scanState, r *run) string 
 	if paused {
 		return model.WaitGPUPaused
 	}
-	if n >= s.maxGPU() {
+	if sc.gpuFull || n >= s.maxGPU() {
+		sc.gpuFull = true // a slot freed later in this scan goes to the next one (scanState)
 		return model.WaitGPUSlot
 	}
 	if s.fakeASR() {
@@ -111,6 +112,7 @@ func (s *Scheduler) gpuAdmit(ctx context.Context, sc *scanState, r *run) string 
 	if sc.gpuErr != nil {
 		// Reading failed: allow a single GPU task (SPEC §5).
 		if n > 0 {
+			sc.gpuFull = true
 			return model.WaitGPUSlot
 		}
 		return ""

@@ -18,3 +18,9 @@ func NewFallbackError(code string, params map[string]any) error {
 func NewRequeueError() error {
 	return newErr(CodeShutdownRequeue, nil, kindRequeue, "", errors.New("the remote runtime was shut down; the lecture goes back to the queue"))
 }
+
+// NewBusyError is the error Transcribe returns when the runtime cannot take
+// the lecture yet (IsBusy, CodeBusy); for fakes, like NewFallbackError.
+func NewBusyError() error {
+	return busyErr(errors.New("the remote runtime is busy (being released or started)"))
+}

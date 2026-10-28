@@ -1,0 +1,14 @@
+{
+ "_source": "依据 borrow_run_release.json 的前两步（上游 google-colab-cli 0.7.5 colab_cli/client.py 的 Client.get_consumption_user_info）构造，非真实录制：诊断页的连通性检查只刷新令牌并读一次 ccu-info，不分配运行时。",
+ "upstream": {
+  "package": "google-colab-cli",
+  "version": "0.7.5",
+  "files": [
+   "colab_cli/client.py#Client.get_consumption_user_info"
+  ]
+ },
+ "recorded": false,
+ "extends": "borrow_run_release.json",
+ "until": "assign: GET (XSRF token)",
+ "steps": []
+}

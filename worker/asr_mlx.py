@@ -5,6 +5,14 @@
 
 Usage (interpreter = the venv of the asr-mlx component, macOS arm64):
     python worker/asr_mlx.py --in job.json --out result.json.tmp
+    python worker/asr_mlx.py --selftest --model MODEL_DIR [--precision fp16]
+
+--selftest (ext-step1, the diagnostics' "MLX 推理测试"; the contract of asr.py --selftest):
+load the model of MODEL_DIR (the model component's or {data_dir}/models/mlx/{model}; no
+download), transcribe 1 s of silence (mlx_whisper has no VAD), print "SELFTEST ok
+device=mlx:gpu load_s=... transcribe_s=... segments=N". Without --model, or with an
+incomplete model directory: exit 2; MLX / Metal unusable: ERROR_CODE device_unavailable,
+exit 2; anything else exit 1. stderr's last line is "ERROR: <reason>" as always.
 
 Same protocol as worker/asr.py and worker/asr_openvino.py (SPEC §6.0):
   * Exit code 0 = success; 2 = input error, or MLX / the Metal GPU is not usable (the
@@ -31,7 +39,8 @@ job.json: {"audio", "model", "precision" (fp16|fp32|int8|int4, default fp16: the
            "chunk_s"})}. Unknown fields are ignored.
 result.json: as worker/asr_openvino.py: "prompt_terms_used", "sentences" (start_ms,
              end_ms, text, low_conf_words, words), "timing" (always; first_compile is
-             always false) and "parts" when job.checkpoint is set. mlx_whisper gives word
+             always false; "postprocess": {"textrepair": ...}, textrepair-int) and
+             "parts" when job.checkpoint is set. mlx_whisper gives word
              probabilities, so low_conf_words is filled as with faster-whisper. Without
              word timestamps the sentences have no "words" (Go interpolates, SPEC-v2 P4.4).
 
@@ -83,6 +92,8 @@ from asr_openvino import (
     PROGRESS_CAP, WorkerError, clamp_long_words, drop_silent, frame_rms, make_monotonic,
     next_cut, read_wav, silent_spans, voiced_threshold, words_from_chunks,
 )
+# The statistical repair of degenerate text before the sentence split (textrepair-int).
+import textrepair
 
 # Go: model.BackendMLX, model.DeviceMLXGPU (SPEC-v3 V3.1).
 BACKEND_MLX = "mlx"
@@ -399,12 +410,21 @@ def chunk_words(result: dict, start: float, end: float, frames, threshold: float
 
 
 def finish_sentences(words: Sequence[Word], duration: float, with_words: bool, counts,
-                     emit: Callable[[str], None]) -> List[dict]:
-    """Orders the words (make_monotonic), removes repeats, splits sentences; without
-    word timestamps the sentences carry no "words"."""
+                     emit: Callable[[str], None], job=None,
+                     postprocess: Optional[dict] = None) -> List[dict]:
+    """Orders the words (make_monotonic), removes repeats, repairs the text of an English
+    lecture (textrepair.repair_transcript with job's whole term list, without window
+    starts: lead's brief for textrepair-int), splits sentences; without word timestamps
+    the sentences carry no "words". postprocess (optional) receives the repair's
+    counters as postprocess["textrepair"]."""
     words = make_monotonic(words, duration)
     n_before = len(words)
     words = remove_repeats(words)
+    words, repaired = textrepair.repair_transcript(
+        words, job.initial_prompt if job is not None else "",
+        job.language if job is not None else None, None, emit)
+    if postprocess is not None:
+        postprocess["textrepair"] = repaired
     sentences = split_sentences(words)
     if not with_words:
         for s in sentences:
@@ -431,7 +451,8 @@ def _seed(mlx: MLX, ms: int) -> None:
 def transcribe(mlx: MLX, audio, job: Job, emit: Callable[[str], None],
                count_tokens: Optional[Callable[[str], int]] = None,
                checkpointer: Optional[Checkpointer] = None,
-               resume: Optional[Resume] = None, model=None) -> Tuple[dict, float]:
+               resume: Optional[Resume] = None, model=None,
+               postprocess: Optional[dict] = None) -> Tuple[dict, float]:
     """Returns ({"prompt_terms_used", "sentences"[, "parts"]}, transcribe seconds).
 
     One transcribe() per chunk from the resume point (or 0) on; one chunk to the end
@@ -495,7 +516,7 @@ def transcribe(mlx: MLX, audio, job: Job, emit: Callable[[str], None],
     with_words = job.word_timestamps
     if resume is None and n_chunks == 1:
         with_words = with_words and single_with_words
-    sentences = finish_sentences(words, duration, with_words, counts, emit)
+    sentences = finish_sentences(words, duration, with_words, counts, emit, job, postprocess)
     result = {"prompt_terms_used": terms_used, "sentences": sentences}
     if checkpointer is not None:
         result["parts"] = checkpointer.parts(resume, audio_ms(n))
@@ -529,12 +550,40 @@ def run(in_path: str, out_path: str, emit: Callable[[str], None] = emit_stdout) 
          % (job.model, job.precision, job.device, load_s, mlx.version))
     # the first PROGRESS line: 0.00, or where a resumed run begins
     emit(format_progress(min(PROGRESS_CAP, start / float(len(audio)))))
+    post: dict = {}
     result, transcribe_s = transcribe(mlx, audio, job, emit, checkpointer=checkpointer,
-                                      resume=resume, model=model)
+                                      resume=resume, model=model, postprocess=post)
     result["timing"] = make_timing(load_s, transcribe_s,
-                                   (len(audio) - start) / float(SAMPLE_RATE), False)
+                                   (len(audio) - start) / float(SAMPLE_RATE), False,
+                                   postprocess=post)
     write_result(out_path, result)
     emit(format_progress(1.0))
+
+
+def selftest(model_dir: Optional[str], precision: str = DEFAULT_PRECISION,
+             emit: Callable[[str], None] = emit_stdout) -> None:
+    """--selftest: the model loads on the Apple GPU and transcribes 1 s of silence."""
+    import numpy as np
+    if not model_dir:
+        raise InputError("--model is required: the MLX model directory")
+    if precision not in PRECISIONS:
+        raise InputError("unsupported precision %r (expected %s)" % (precision, ", ".join(PRECISIONS)))
+    if not model_ready(model_dir):
+        raise InputError("model is not installed: %s needs %s and %s"
+                         % (model_dir, MODEL_CONFIG, " or ".join(MODEL_WEIGHTS)))
+    mlx = import_mlx()
+    job = Job("", os.path.basename(os.path.normpath(model_dir)) or "model", precision, model_dir,
+              MLX_DEVICES[0], "en", "", False)
+    t0 = time.monotonic()
+    load_model(mlx, job)
+    t1 = time.monotonic()
+    audio = np.zeros(SAMPLE_RATE, dtype=np.float32)
+    res = mlx.transcribe_module.transcribe(
+        audio, **dict(TRANSCRIBE_KWARGS, path_or_hf_repo=model_dir, language="en",
+                      word_timestamps=False, fp16=precision != "fp32"))
+    n = len([seg for seg in (res or {}).get("segments") or [] if isinstance(seg, dict)])
+    emit("SELFTEST ok device=%s load_s=%.1f transcribe_s=%.2f segments=%d"
+         % (MLX_DEVICES[0], t1 - t0, time.monotonic() - t1, n))
 
 
 # ---------------------------------------------------------------------------
@@ -545,12 +594,19 @@ def build_parser() -> argparse.ArgumentParser:
     p = ArgParser(prog="asr_mlx.py", description="LectureFlow MLX Whisper worker")
     p.add_argument("--in", dest="in_path", help="job.json")
     p.add_argument("--out", dest="out_path", help="result file to write (e.g. result.json.tmp)")
+    p.add_argument("--selftest", action="store_true",
+                   help="load the model of --model and transcribe 1 s of silence")
+    p.add_argument("--model", dest="model_dir", default=None, help="selftest: the MLX model directory")
+    p.add_argument("--precision", default=DEFAULT_PRECISION, help="selftest precision (default fp16)")
     return p
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         args = build_parser().parse_args(argv)
+        if args.selftest:
+            selftest(args.model_dir, args.precision)
+            return EXIT_OK
         if not args.in_path or not args.out_path:
             raise InputError("--in and --out are required")
         run(args.in_path, args.out_path)

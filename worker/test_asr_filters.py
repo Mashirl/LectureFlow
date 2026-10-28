@@ -7,6 +7,7 @@ import pytest
 
 import asr
 from asr import keep_segment, remove_repeats, truncate_prompt
+from conftest import all_speech_vad
 
 
 def count_words(text):
@@ -139,8 +140,9 @@ def test_remove_repeats_reaches_fixpoint():
     assert joined(remove_repeats(words("x x x y x x x y x x x y"))) == "x y"
 
 
-def test_filters_then_split_in_transcribe_job():
+def test_filters_then_split_in_transcribe_job(monkeypatch):
     """Segments are filtered, words flattened across segments, repeats removed, split."""
+    all_speech_vad(monkeypatch, asr)          # the worker's VAD step: all of it is speech
     segs = [
         SimpleNamespace(start=0.0, end=2.0, no_speech_prob=0.1, avg_logprob=-0.2,
                         words=[W("We", 0), W("start", 1), W("now.", 2)]),
@@ -158,7 +160,8 @@ def test_filters_then_split_in_transcribe_job():
 
     job = asr.Job("a.wav", "large-v3", "float16", "en", "", "cuda", 4)
     lines = []
-    result = asr.transcribe_job(Model(), [0.0] * 16000, job, lines.append, count_words)
+    # 8 s of audio: progress is measured against the lecture's audio (textrepair-int)
+    result = asr.transcribe_job(Model(), [0.0] * (8 * 16000), job, lines.append, count_words)
     assert [s["text"] for s in result["sentences"]] == ["We start now.", "Thank you."]
     assert result["prompt_terms_used"] == 0
     assert [l for l in lines if l.startswith("PROGRESS")] == [

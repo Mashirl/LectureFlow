@@ -521,6 +521,8 @@ func TestSPDXCheck(t *testing.T) {
 		"make.ps1":                   "# " + spdxTag + "\n",
 		"run.sh":                     "#!/bin/sh\necho hi\n",
 		"web/vendor/lib/x.js":        "third party\n",
+		"extension/src/vendor/p.js":  "third party, audited by extension.go\n",
+		"extension/src/lib/own.js":   "export {}\n",
 		"internal/x/testdata/a.go":   "package a\n",
 		"docs/demo.html":             "<p>doc</p>\n",
 		"desktop/node_modules/m.cjs": "module.exports = 1\n",
@@ -537,7 +539,7 @@ func TestSPDXCheck(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"cmd/missing.go", "internal/db/m.sql", "run.sh", "web/app.mjs", "worker/late.py"}
+	want := []string{"cmd/missing.go", "extension/src/lib/own.js", "internal/db/m.sql", "run.sh", "web/app.mjs", "worker/late.py"}
 	if !reflect.DeepEqual(missing, want) {
 		t.Fatalf("missing = %v, want %v", missing, want)
 	}

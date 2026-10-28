@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "serial": 2,
-  "published": "2026-10-26",
-  "app_version": "3.1.0",
+  "serial": 3,
+  "published": "2026-10-27",
+  "app_version": "3.2.0",
   "compat": ">=3.0.0 <4.0.0",
   "sources": {
     "files": {
@@ -75,15 +75,28 @@
   "components": [
     {
       "id": "core",
-      "version": "3.1.0",
-      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1",
+      "version": "3.2.0",
+      "upstream": "LectureFlow: Electron shell, Go service, web UI, ffmpeg (LGPL build), uv 0.13.1, aria2 1.37.0",
       "kind": "binary",
       "bundled": true,
       "name_key": "compui.name.core",
       "desc_key": "compui.hint.core",
       "license": "AGPL-3.0-or-later",
       "license_note": "Third-party parts: THIRD_PARTY_NOTICES.md",
-      "platforms": {}
+      "platforms": {
+        "windows-x64": {
+          "download_size": 0,
+          "installed_size": 0,
+          "files": [
+            {
+              "name": "bin/aria2c.exe",
+              "url": "",
+              "sha256": "be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2",
+              "size": 5649408
+            }
+          ]
+        }
+      }
     },
     {
       "id": "python",
@@ -120,6 +133,26 @@
             "packages": 4
           },
           "min_os": "13.0"
+        },
+        "linux-x64": {
+          "download_size": 39752201,
+          "installed_size": 146561138,
+          "installed_size_estimated": true,
+          "files": [
+            {
+              "name": "cpython-3.12.15+20261013-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+              "url": "{python}/20261013/cpython-3.12.15%2B20261013-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+              "sha256": "178d3d83b6e8e99285a65d3fce9c16b87952cc5efdb4d1a0e3ff3be18ff0fc9c",
+              "size": 34340172,
+              "unpack": "tar.gz"
+            }
+          ],
+          "exe": "python/bin/python3",
+          "lock": {
+            "path": "locks/python-linux-x64.txt",
+            "sha256": "178256d6c8a3338b944f1b921f29cd4de6ff64ef189cc1755eafbc941e4318c1",
+            "packages": 4
+          }
         },
         "windows-x64": {
           "download_size": 26500587,
@@ -164,6 +197,16 @@
         "av"
       ],
       "platforms": {
+        "linux-x64": {
+          "download_size": 1569598543,
+          "installed_size": 2589837596,
+          "installed_size_estimated": true,
+          "lock": {
+            "path": "locks/asr-cuda-linux-x64.txt",
+            "sha256": "f52686d283282438dfc666f065aa0597505837f6469497c5413b142dba30c332",
+            "packages": 26
+          }
+        },
         "windows-x64": {
           "download_size": 1461190705,
           "installed_size": 2410964664,
@@ -328,6 +371,42 @@
       "source": "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478",
       "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
       "platforms": {
+        "linux-x64": {
+          "download_size": 3090835702,
+          "installed_size": 3090835702,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
+              "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+              "size": 2394
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
+              "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+              "size": 3087284237
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
+              "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+              "size": 2480617
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 3090835702,
           "installed_size": 3090835702,
@@ -382,6 +461,42 @@
       "source": "https://huggingface.co/Systran/faster-whisper-large-v3/tree/edaa852ec7e145841d8ffdb056a99866b5f0a478",
       "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
       "platforms": {
+        "linux-x64": {
+          "download_size": 3090835702,
+          "installed_size": 3090835702,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
+              "sha256": "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9",
+              "size": 2394
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
+              "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+              "size": 3087284237
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
+              "sha256": "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca",
+              "size": 2480617
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 3090835702,
           "installed_size": 3090835702,
@@ -436,6 +551,42 @@
       "source": "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
       "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
       "platforms": {
+        "linux-x64": {
+          "download_size": 1621665983,
+          "installed_size": 1621665983,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json",
+              "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+              "size": 2263
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin",
+              "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+              "size": 1617884929
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json",
+              "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+              "size": 2710337
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 1621665983,
           "installed_size": 1621665983,
@@ -490,6 +641,42 @@
       "source": "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
       "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
       "platforms": {
+        "linux-x64": {
+          "download_size": 1621665983,
+          "installed_size": 1621665983,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/config.json",
+              "sha256": "b0253ea6c0d3bea6b1e19e91a02acfd3b53f4467362efcb5a3e6b16c9b3a9b7e",
+              "size": 2263
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/model.bin",
+              "sha256": "e76620f83d5f5b69efd3d87e3dc180c1bd21df9fbebacfd4335e5e1efcc018da",
+              "size": 1617884929
+            },
+            {
+              "name": "preprocessor_config.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/preprocessor_config.json",
+              "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+              "size": 340
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/tokenizer.json",
+              "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+              "size": 2710337
+            },
+            {
+              "name": "vocabulary.json",
+              "url": "{models}/dropbox-dash/faster-whisper-large-v3-turbo/resolve/0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf/vocabulary.json",
+              "sha256": "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1",
+              "size": 1068114
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 1621665983,
           "installed_size": 1621665983,
@@ -544,6 +731,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-large-v2/tree/f0fe81560cb8b68660e564f55dd99207059c092e",
       "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
       "platforms": {
+        "linux-x64": {
+          "download_size": 3089578858,
+          "installed_size": 3089578858,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/config.json",
+              "sha256": "d86b7a7664a12559d644aa210a32ce9a7e03913e794b7ea4fb7182de69e273a7",
+              "size": 2796
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/model.bin",
+              "sha256": "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a",
+              "size": 3086912962
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 3089578858,
           "installed_size": 3089578858,
@@ -592,6 +809,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-large-v2/tree/f0fe81560cb8b68660e564f55dd99207059c092e",
       "revision": "f0fe81560cb8b68660e564f55dd99207059c092e",
       "platforms": {
+        "linux-x64": {
+          "download_size": 3089578858,
+          "installed_size": 3089578858,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/config.json",
+              "sha256": "d86b7a7664a12559d644aa210a32ce9a7e03913e794b7ea4fb7182de69e273a7",
+              "size": 2796
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/model.bin",
+              "sha256": "bf2a9746382e1aa7ffff6b3a0d137ed9edbd9670c3b87e5d35f5e85e70d0333a",
+              "size": 3086912962
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-large-v2/resolve/f0fe81560cb8b68660e564f55dd99207059c092e/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 3089578858,
           "installed_size": 3089578858,
@@ -640,6 +887,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f",
       "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
       "platforms": {
+        "linux-x64": {
+          "download_size": 1530571735,
+          "installed_size": 1530571735,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json",
+              "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807",
+              "size": 2257
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/model.bin",
+              "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+              "size": 1527906378
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 1530571735,
           "installed_size": 1530571735,
@@ -688,6 +965,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f",
       "revision": "08e178d48790749d25932bbc082711ddcfdfbc4f",
       "platforms": {
+        "linux-x64": {
+          "download_size": 1530571735,
+          "installed_size": 1530571735,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json",
+              "sha256": "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807",
+              "size": 2257
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/model.bin",
+              "sha256": "9b45e1009dcc4ab601eff815b61d80e60ce3fd8c74c1a14f4a282258286b51ae",
+              "size": 1527906378
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 1530571735,
           "installed_size": 1530571735,
@@ -736,6 +1043,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120",
       "revision": "536b0662742c02347bc0e980a01041f333bce120",
       "platforms": {
+        "linux-x64": {
+          "download_size": 486212372,
+          "installed_size": 486212372,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/config.json",
+              "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+              "size": 2370
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/model.bin",
+              "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+              "size": 483546902
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 486212372,
           "installed_size": 486212372,
@@ -784,6 +1121,36 @@
       "source": "https://huggingface.co/Systran/faster-whisper-small/tree/536b0662742c02347bc0e980a01041f333bce120",
       "revision": "536b0662742c02347bc0e980a01041f333bce120",
       "platforms": {
+        "linux-x64": {
+          "download_size": 486212372,
+          "installed_size": 486212372,
+          "files": [
+            {
+              "name": "config.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/config.json",
+              "sha256": "b55496ac7940a7ae47d2c01eab40edfd8701feec1229d9cce3b40014383fb828",
+              "size": 2370
+            },
+            {
+              "name": "model.bin",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/model.bin",
+              "sha256": "3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671",
+              "size": 483546902
+            },
+            {
+              "name": "tokenizer.json",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/tokenizer.json",
+              "sha256": "fb7b63191e9bb045082c79fd742a3106a12c99513ab30df4a0d47fa6cb6fd0ab",
+              "size": 2203239
+            },
+            {
+              "name": "vocabulary.txt",
+              "url": "{models}/Systran/faster-whisper-small/resolve/536b0662742c02347bc0e980a01041f333bce120/vocabulary.txt",
+              "sha256": "34ce3fe1c5041027b3f8d42912270993f986dbc4bb34cf27f951e34a1e453913",
+              "size": 459861
+            }
+          ]
+        },
         "windows-x64": {
           "download_size": 486212372,
           "installed_size": 486212372,
@@ -2173,8 +2540,7 @@
           "onboarding.preset.deepseek.step3"
         ],
         "cost_key": "onboarding.preset.deepseek.cost",
-        "max_concurrency": 8,
-        "rpm": 300,
+        "max_concurrency": 64,
         "balance_api": "deepseek",
         "refs": [
           "https://api-docs.deepseek.com/quick_start/rate_limit"

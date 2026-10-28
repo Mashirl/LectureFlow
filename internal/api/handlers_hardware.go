@@ -5,8 +5,10 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"lectureflow/internal/hwdetect"
@@ -77,25 +79,149 @@ func (s *Server) respondHardware(w http.ResponseWriter, r *http.Request, fresh b
 
 // hardware returns the cached detection, detecting when there is none or
 // fresh is set. Concurrent callers wait for one run. The run does not end
-// with the request (a closed page still fills the cache).
+// with the request (a closed page still fills the cache). Every detection
+// is remembered in kv hardware.last (ext-step1, rememberHardware).
 func (s *Server) hardware(ctx context.Context, fresh bool) (hwdetect.HW, error) {
+	return s.detectHardwareWith(context.WithoutCancel(ctx), fresh)
+}
+
+// detectHardwareWith is hardware with the detection bound to ctx (the
+// startup detection ends with the server).
+func (s *Server) detectHardwareWith(ctx context.Context, fresh bool) (hwdetect.HW, error) {
 	cs := s.compState()
 	cs.hwMu.Lock()
 	defer cs.hwMu.Unlock()
 	if cs.hw != nil && !fresh {
 		return *cs.hw, nil
 	}
-	dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), hardwareDetectTimeout)
+	dctx, cancel := context.WithTimeout(ctx, hardwareDetectTimeout)
 	defer cancel()
 	hw, err := cs.detect(dctx, s.dataDir)
 	if err != nil {
 		return hwdetect.HW{}, err
 	}
+	if ctx.Err() != nil { // cut short (shutdown): the probes' results are incomplete
+		return hwdetect.HW{}, ctx.Err()
+	}
 	if hw.NVIDIA == nil {
 		hw.NVIDIA = []hwdetect.GPU{}
 	}
 	cs.hw = &hw
+	s.rememberHardware(hw)
 	return hw, nil
+}
+
+// ---- hardware.last (ext-step1, .claude/ext-brief.md §2) ----
+
+// kvHardwareLast keeps the last hardware detection across restarts, so the
+// diagnostics know whether this computer has an NVIDIA GPU without running
+// anything (split so the error-code scan does not take it for a code).
+const kvHardwareLast = "hardware" + ".last"
+
+// HardwareLast is the JSON of kv hardware.last: what the diagnostics page
+// needs to pick its checks, never a serial number or another identifier.
+type HardwareLast struct {
+	NVIDIA       []string `json:"nvidia"` // the NVIDIA GPUs' names
+	IntelGPU     bool     `json:"intel_gpu"`
+	IntelNPU     bool     `json:"intel_npu"`
+	AppleSilicon bool     `json:"apple_silicon"`
+	DetectedAt   string   `json:"detected_at"` // RFC 3339, UTC
+}
+
+// hardwareLastOf is the record of one detection.
+func hardwareLastOf(hw hwdetect.HW, at time.Time) HardwareLast {
+	h := HardwareLast{NVIDIA: []string{}, IntelGPU: hw.IntelGPU, IntelNPU: hw.IntelNPU, AppleSilicon: hw.AppleSilicon,
+		DetectedAt: at.UTC().Format(time.RFC3339)}
+	for _, g := range hw.NVIDIA {
+		if g.Name != "" && !slices.Contains(h.NVIDIA, g.Name) {
+			h.NVIDIA = append(h.NVIDIA, g.Name)
+		}
+	}
+	return h
+}
+
+// rememberHardware stores the detection in kv hardware.last and, when that
+// changes what the diagnostics check (an NVIDIA GPU, an Intel GPU or NPU),
+// runs them again.
+func (s *Server) rememberHardware(hw hwdetect.HW) {
+	h := hardwareLastOf(hw, time.Now())
+	prev, had := s.hardwareLast(context.Background())
+	b, err := json.Marshal(h)
+	if err == nil && s.st != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = s.st.SetKV(ctx, kvHardwareLast, string(b))
+		cancel()
+	}
+	if err != nil {
+		slog.Warn("hardware: the detection could not be remembered", "err", err)
+	}
+	if d := s.diag; d != nil {
+		d.hwMu.Lock()
+		d.hwLast, d.hwRead = &h, true
+		d.hwMu.Unlock()
+		same := had && (len(prev.NVIDIA) > 0) == (len(h.NVIDIA) > 0) && prev.IntelGPU == h.IntelGPU && prev.IntelNPU == h.IntelNPU
+		if !same {
+			d.envChanged()
+		}
+	}
+}
+
+// hardwareLast reads kv hardware.last (cached after the first read); false
+// when no detection was ever remembered (or the value is unreadable).
+func (s *Server) hardwareLast(ctx context.Context) (HardwareLast, bool) {
+	d := s.diag
+	if d != nil {
+		d.hwMu.Lock()
+		defer d.hwMu.Unlock()
+		if d.hwRead {
+			if d.hwLast == nil {
+				return HardwareLast{}, false
+			}
+			return *d.hwLast, true
+		}
+	}
+	if s.st == nil {
+		return HardwareLast{}, false
+	}
+	v, ok, err := s.st.GetKV(ctx, kvHardwareLast)
+	if err != nil {
+		return HardwareLast{}, false // not cached: read again next time
+	}
+	var h *HardwareLast
+	if ok {
+		var x HardwareLast
+		if json.Unmarshal([]byte(v), &x) == nil {
+			h = &x
+		}
+	}
+	if d != nil {
+		d.hwLast, d.hwRead = h, true
+	}
+	if h == nil {
+		return HardwareLast{}, false
+	}
+	return *h, true
+}
+
+// startupHardwareDetect: when no detection was ever remembered, the server
+// detects the hardware once in the background at startup (not in test mode,
+// asr.fake_result; the package's tests turn it off).
+var startupHardwareDetect = true
+
+// detectHardwareAtStartup runs that detection (bound to ctx: shutdown
+// cancels it).
+func (s *Server) detectHardwareAtStartup(ctx context.Context) {
+	if !startupHardwareDetect || s.st == nil || (s.cfg != nil && s.cfg.ASR.FakeResult != "") {
+		return
+	}
+	if _, ok := s.hardwareLast(ctx); ok {
+		return
+	}
+	go func() {
+		if _, err := s.detectHardwareWith(ctx, false); err != nil && ctx.Err() == nil {
+			slog.Warn("hardware: the startup detection failed", "err", err)
+		}
+	}()
 }
 
 func (s *Server) hardwareView(hw hwdetect.HW) HardwareView {

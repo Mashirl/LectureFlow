@@ -4,9 +4,14 @@
 package state
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
+	"sync/atomic"
 
+	"lectureflow/internal/media"
 	"lectureflow/internal/model"
 )
 
@@ -82,6 +87,21 @@ func AllowedActions(j model.Job, o ActionOpts) []string {
 	return []string{}
 }
 
+// WithTextRepair adds model.ActionRerunTextOnly ("修复断句", textrepair-int)
+// to the actions of a lecture's asr job when it is done or stale, its rerun
+// is allowed now (acts holds ActionRerun: no downstream stage runs) and
+// offer holds: the caller found the stored transcript worth repairing (word
+// timestamps, an English lecture, degenerate text; see api textRepairOffer).
+// Any other job or state: acts unchanged.
+func WithTextRepair(j model.Job, acts []string, offer bool) []string {
+	if !offer || j.Scope != model.ScopeLecture || j.Stage != model.StageASR ||
+		(j.Status != model.StatusDone && j.Status != model.StatusStale) ||
+		!slices.Contains(acts, model.ActionRerun) || slices.Contains(acts, model.ActionRerunTextOnly) {
+		return acts
+	}
+	return append(slices.Clone(acts), model.ActionRerunTextOnly)
+}
+
 // StageActions computes AllowedActions for every current job of one scope
 // (a lecture's six jobs, a material's two, a course's glossary_seed), and
 // AuxActions for its auxiliary tasks (v2). A running auxiliary task never
@@ -131,9 +151,11 @@ func Reviewable(jobs []model.Job) bool {
 
 // MediaExists reports whether the lecture's original media file exists.
 // media_path may be absolute, relative to the working directory, or
-// relative to the lecture directory.
+// relative to the lecture directory. A media_path naming another computer
+// outside the data directory (StoredPathUnsafe) is missing and never
+// stat'ed.
 func MediaExists(dataDir string, l model.Lecture) bool {
-	if l.MediaPath == "" {
+	if l.MediaPath == "" || StoredPathUnsafe(PathLectureMedia, l.ID, l.MediaPath) {
 		return false
 	}
 	if _, err := os.Stat(l.MediaPath); err == nil {
@@ -144,4 +166,66 @@ func MediaExists(dataDir string, l model.Lecture) bool {
 	}
 	_, err := os.Stat(filepath.Join(model.LectureDir(dataDir, l.CourseID, l.ID), l.MediaPath))
 	return err == nil
+}
+
+// What a stored path is (StoredPathUnsafe's log line and the startup scan).
+const (
+	PathLectureMedia = "lecture.media_path"
+	PathMaterial     = "material.path"
+	PathSyllabus     = "syllabus.path"
+)
+
+// unsafeWarned holds the stored paths StoredPathUnsafe has logged.
+var unsafeWarned sync.Map
+
+// trustedDataDir is the data directory of this process (SetDataDir),
+// absolute; nil or "" until set, and then nothing is trusted.
+var trustedDataDir atomic.Pointer[string]
+
+// SetDataDir records the data directory of this process; cmd sets it once
+// at startup, before anything reads a stored path (a data directory move
+// or import takes effect through a restart, so the next start sets the new
+// one). A stored path inside it is the user's own data even when the data
+// directory is on a network share — the app opens its database there
+// anyway — so StoredPathUnsafe lets it through (netpath-datadir). dir is
+// made absolute (lexically; nothing is touched on disk); "" trusts
+// nothing.
+func SetDataDir(dir string) {
+	if dir != "" {
+		if a, err := filepath.Abs(dir); err == nil {
+			dir = a
+		}
+	}
+	trustedDataDir.Store(&dir)
+}
+
+// TrustedDataDir returns the data directory SetDataDir recorded ("" before).
+func TrustedDataDir() string {
+	if p := trustedDataDir.Load(); p != nil {
+		return *p
+	}
+	return ""
+}
+
+// StoredPathUnsafe reports whether p, a path stored in the database (what:
+// one of the Path* kinds; id: its row, for the log), names another computer
+// rather than a plain local file — a UNC share, a device path or a URL
+// (media.UnsafeStoredPath; security review 2, M3) — and does not lie inside
+// the data directory (SetDataDir; media.ForeignStoredPath, the rule the
+// data import uses too). Such a path counts as a missing file and is never
+// stat'ed or opened: on Windows that would connect to the server with the
+// user's NTLM credentials, and ffmpeg would read from it. LectureFlow
+// itself stores plain paths (inside the data directory, which may be on a
+// share) and the data import refuses other ones, so only a database edited
+// elsewhere (or imported by an older version) has them. Each such path is
+// logged once per process (Warn).
+func StoredPathUnsafe(what, id, p string) bool {
+	if !media.ForeignStoredPath(p, TrustedDataDir()) {
+		return false
+	}
+	if _, seen := unsafeWarned.LoadOrStore(p, true); !seen {
+		slog.Warn("stored path points to another computer outside the data directory: treated as a missing file, not opened",
+			"what", what, "id", id, "path", p)
+	}
+	return true
 }

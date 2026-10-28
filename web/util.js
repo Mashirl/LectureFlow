@@ -164,7 +164,7 @@ export const JANITOR_ACTION_NAMES = nameTable('glossary.janitor_action.', ['enfo
 const CHECK_PRODUCTS = { ffmpeg: 'ffmpeg', python: 'Python', 'faster-whisper': 'faster-whisper', pypdf: 'pypdf', gpu: 'GPU', openvino: 'OpenVINO', mlx: 'MLX' };
 // SPEC-v2 I10 added openvino_venv, openvino_devices and npu_driver; 3.1.0
 // (mac-opti M3) mlx_python and mlx_model
-const CHECK_KEYS = new Set(['data_dir', 'cuda', 'disk', 'openvino_venv', 'openvino_devices', 'npu_driver', 'mlx_python', 'mlx_model']);
+const CHECK_KEYS = new Set(['data_dir', 'credentials', 'data_dir_location', 'cuda', 'disk', 'openvino_venv', 'openvino_devices', 'npu_driver', 'mlx_python', 'mlx_model']);
 
 export function checkName(name) {
   if (CHECK_KEYS.has(name)) return t(`common.check.${name}`);
@@ -193,6 +193,10 @@ const WAIT_MATERIAL_TERMS = 'material_terms:';
 const WAIT_RETRY_BACKOFF = 'retry_backoff:';
 const WAIT_OFFPEAK = 'offpeak:';
 const WAIT_DEVICE_PAUSED = 'device_paused:';
+// fresh-cuda: the device's environment or model is missing or being installed
+const WAIT_COMPONENT_MISSING = 'component_missing:';
+const WAIT_MODEL_MISSING = 'model_missing:';
+const WAIT_COMPONENT_INSTALLING = 'component_installing:';
 const WAIT_DEVICE_SELFTEST = 'device_selftest:';
 const WAIT_POWER_QUEUE = 'power_queue:';
 const WAIT_POWER_SWITCH = 'power_switch_pending:';
@@ -332,6 +336,9 @@ export function waitingForText(w, sys, res) {
   const withDevices = (!sys && !res) || hasDevices(sys, res) || !!(res && res.power) || !!(sys && sys.power);
   if (w === 'gpu_paused') return withDevices ? t('waiting.all_paused') : t('waiting.gpu_paused');
   if (w.startsWith(WAIT_DEVICE_PAUSED)) return t('waiting.device_paused', { device: deviceLabel(w.slice(WAIT_DEVICE_PAUSED.length), sys, res) });
+  if (w.startsWith(WAIT_COMPONENT_MISSING)) return t('waiting.component_missing', { device: deviceLabel(w.slice(WAIT_COMPONENT_MISSING.length), sys, res) });
+  if (w.startsWith(WAIT_MODEL_MISSING)) return t('waiting.model_missing', { device: deviceLabel(w.slice(WAIT_MODEL_MISSING.length), sys, res) });
+  if (w.startsWith(WAIT_COMPONENT_INSTALLING)) return t('waiting.component_installing', { device: deviceLabel(w.slice(WAIT_COMPONENT_INSTALLING.length), sys, res) });
   if (w.startsWith(WAIT_DEVICE_SELFTEST)) {
     // on a machine with a battery the job waits for the test because only
     // one device is active at a time (power-aware, requirement 7)
@@ -350,6 +357,17 @@ export function waitingForText(w, sys, res) {
     const p = w.slice(WAIT_POWER_SWITCH.length).split(':');
     if (p.length === 4 && p.every(Boolean)) return t('waiting.power_switch_pending', { from: deviceLabel(`${p[0]}:${p[1]}`, sys, res), to: deviceLabel(`${p[2]}:${p[3]}`, sys, res) });
   }
+  // SPEC-v3 V14.5: Google Colab; remote_busy / remote_fallback / remote_held
+  // (colabfix): the lecture waits for a busy Colab, or Colab handed it back
+  // or a shutdown holds the automatic dispatch while no local device can
+  // take it (the asr stage then offers use_colab)
+  if (w === 'remote_queue') return t('waiting.remote_queue');
+  if (w === 'remote_window') return t('waiting.remote_window');
+  if (w === 'remote_auth') return t('waiting.remote_auth');
+  if (w === 'remote_balance') return t('waiting.remote_balance');
+  if (w === 'remote_busy') return t('waiting.remote_busy');
+  if (w === 'remote_fallback') return t('waiting.remote_fallback');
+  if (w === 'remote_held') return t('waiting.remote_held');
   if (w === 'memory') return t('waiting.memory');
   if (w === 'no_asr_device') return t('waiting.no_asr_device');
   if (w === 'gpu_slot' && withDevices) return t('waiting.device_slot');
@@ -378,6 +396,46 @@ export function waitingForText(w, sys, res) {
   // v2 P12.6: offpeak:{local HH:MM} — the provider only takes requests off-peak
   if (w.startsWith(WAIT_OFFPEAK)) return t('waiting.offpeak', { time: w.slice(WAIT_OFFPEAK.length) });
   return w;
+}
+
+// ---- the retry countdown (3.2.0 L12) ----
+// waiting_for "retry_backoff:{s}" holds the seconds left when the lecture
+// was read (sched.WaitingFor); the texts count down from there, by a
+// deadline kept per stage object: a view that redraws the same lecture
+// counts on, a lecture read again starts from the server's new number.
+const backoffs = new WeakMap(); // stage → {w, until}
+
+/** Seconds left of a stage's retry backoff (0: due), or null when it has none. */
+export function backoffLeft(st, now = Date.now()) {
+  const w = st && st.waiting_for;
+  if (typeof w !== 'string' || !w.startsWith(WAIT_RETRY_BACKOFF)) return null;
+  const raw = w.slice(WAIT_RETRY_BACKOFF.length);
+  const n = Number(raw);
+  if (raw === '' || !Number.isFinite(n)) return null;
+  let b = backoffs.get(st);
+  if (!b || b.w !== w) {
+    b = { w, until: now + n * 1000 };
+    backoffs.set(st, b);
+  }
+  return Math.max(0, Math.ceil((b.until - now) / 1000));
+}
+
+/** True while a stage of stages counts down to its retry (backoffLeft > 0). */
+export function backoffCounting(stages) {
+  return (stages || []).some((s) => (backoffLeft(s) || 0) > 0);
+}
+
+/**
+ * A stage's waiting_for text (waitingForText) with its retry countdown
+ * counted from when the stage was read; "about to retry" once it is due
+ * (the scheduler starts the retry within a second, or it waits for a slot).
+ */
+export function stageWaitingText(st, sys, res) {
+  if (!st || !st.waiting_for) return '';
+  const left = backoffLeft(st);
+  if (left === 0) return t('waiting.retry_backoff_due');
+  if (left != null) return t('waiting.retry_backoff', { n: left });
+  return waitingForText(st.waiting_for, sys, res);
 }
 
 // ---- coded back-end texts (SPEC-v2 P14.3) ----
@@ -536,7 +594,7 @@ function pipelineSummary(stages, extra) {
   if (!Array.isArray(stages) || stages.length === 0) return { text: t('common.summary.none'), tone: 'muted', kind: 'none' };
   if (opt.draft) return { text: t('common.summary.draft'), tone: 'muted', kind: 'draft' };
   const find = (status) => stages.find((s) => s.status === status);
-  const wait = (st) => (st.waiting_for ? waitingForText(st.waiting_for, opt.sys, opt.res) : '');
+  const wait = (st) => stageWaitingText(st, opt.sys, opt.res); // a retry counts down (3.2.0 L12)
   let st;
   if ((st = find('failed'))) {
     const w = wait(st);
@@ -966,14 +1024,24 @@ export function sameStemGroups(files) {
   return [...groups.values()].filter((g) => g.length > 1);
 }
 
-const MEDIA_EXTS = new Set([
-  'mp4', 'm4v', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'ts', 'mts', 'mpg', 'mpeg', '3gp',
-  'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus', 'wma', 'amr', 'aiff', 'aif',
-]);
+// The file extensions a lecture's media (and a second camera angle) may
+// have: the server accepts no other (internal/media.Exts; security review
+// 2, M3: a playlist such as .m3u8 would make ffmpeg read other files).
+// api.js keeps a copy for the system dialog; web/media_exts_test.go checks
+// that the three lists are equal.
+export const MEDIA_EXT_LIST = [
+  'mp4', 'm4v', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'ts', 'mts', 'm2ts', 'mpg', 'mpeg', '3gp', 'ogv',
+  'mp3', 'm4a', 'aac', 'wav', 'flac', 'ogg', 'oga', 'opus', 'mka', 'wma', 'amr', 'aiff', 'aif',
+];
+const MEDIA_EXTS = new Set(MEDIA_EXT_LIST);
 
+// <input accept> of media pickers: the extensions only. "audio/*" would
+// also offer playlists (Windows types .m3u and .m3u8 as audio/x-mpegurl).
+export const MEDIA_ACCEPT = MEDIA_EXT_LIST.map((e) => '.' + e).join(',');
+
+// By extension only, for the same reason (a playlist can have an audio/* type).
 export function isMediaFile(file) {
-  const type = file.type || '';
-  return type.startsWith('audio/') || type.startsWith('video/') || MEDIA_EXTS.has(extOf(file.name));
+  return MEDIA_EXTS.has(extOf((file && file.name) || ''));
 }
 
 export function isSyllabusFile(file) {

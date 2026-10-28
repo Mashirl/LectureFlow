@@ -132,6 +132,13 @@ func fakeWorker(mode string) int {
 		return 1
 	case "noout":
 		return 0
+	case "env": // pyenv_test.go: --out gets this process's environment
+		b, _ := json.Marshal(os.Environ())
+		if err := os.WriteFile(out, b, 0o644); err != nil {
+			fmt.Fprintln(os.Stderr, "ERROR:", err)
+			return 1
+		}
+		return 0
 	case "chinese":
 		fmt.Fprint(os.Stderr, longChineseStderr())
 		return 1
@@ -141,6 +148,9 @@ func fakeWorker(mode string) int {
 		return 0
 	}
 	if rc, ok := fakeOVWorker(mode, job, out, writeResult); ok {
+		return rc
+	}
+	if rc, ok := fakePDFWorker(mode, writeResult); ok { // pdf_limits_test.go
 		return rc
 	}
 	if mode == "ckpt" {
@@ -619,10 +629,28 @@ func (e *env) useFakeWorker(mode, result string) {
 
 type recEvents struct {
 	mu      sync.Mutex
-	changed []string // "kind:id"
+	changed []string    // "kind:id"
+	jobs    []model.Job // Job events, in order
 }
 
-func (r *recEvents) Job(model.Job) {}
+func (r *recEvents) Job(j model.Job) {
+	r.mu.Lock()
+	r.jobs = append(r.jobs, j)
+	r.mu.Unlock()
+}
+
+// jobEvents are the recorded Job events of stage for scopeID.
+func (r *recEvents) jobEvents(scopeID, stage string) []model.Job {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []model.Job
+	for _, j := range r.jobs {
+		if j.ScopeID == scopeID && j.Stage == stage {
+			out = append(out, j)
+		}
+	}
+	return out
+}
 func (r *recEvents) Changed(kind, id string) {
 	r.mu.Lock()
 	r.changed = append(r.changed, kind+":"+id)

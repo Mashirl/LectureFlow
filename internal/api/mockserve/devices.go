@@ -643,6 +643,9 @@ func (s *store) openVINOInfo(now time.Time) *api.OpenVINOInfo {
 		{Name: "CPU", Kind: model.DeviceKindCPU, FullName: labelOVCPU, DeviceID: model.DeviceOVCPU},
 	}
 	info.Ignored = []api.OVDeviceInfo{{Name: "GPU.1", FullName: labelCUDA + " (dGPU)", DriverVersion: "32.0.15.6614", Reason: "not_intel"}}
+	if s.dev.cpuOnly || s.dev.noCUDA { // ext-step1: no NVIDIA card to ignore
+		info.Ignored = []api.OVDeviceInfo{}
+	}
 	return info
 }
 
@@ -653,8 +656,12 @@ func (s *store) openVINOChecks() []api.SystemCheck {
 		return &model.ErrorInfo{Code: code, Params: params}
 	}
 	if s.dev.noOV { // no .venv-ov: the other three are not checked
+		missing := "check.openvino_venv_missing"
+		if s.dev.noCUDA { // ext-step1: without an NVIDIA card the text does not mention CUDA
+			missing = "check.openvino_venv_absent"
+		}
 		return []api.SystemCheck{
-			{Name: "openvino_venv", Status: "warn", DetailInfo: ci("check.openvino_venv_missing", map[string]any{"path": mockOVPy}), HintInfo: ci("check.hint_openvino_venv", nil)},
+			{Name: "openvino_venv", Status: "warn", DetailInfo: ci(missing, map[string]any{"path": mockOVPy}), HintInfo: ci("check.hint_openvino_venv", nil)},
 			{Name: "openvino", Status: "warn", DetailInfo: ci("check.api_skipped", nil)},
 			{Name: "openvino_devices", Status: "warn", DetailInfo: ci("check.api_skipped", nil)},
 			{Name: "npu_driver", Status: "warn", DetailInfo: ci("check.api_skipped", nil)},
@@ -671,7 +678,10 @@ func (s *store) openVINOChecks() []api.SystemCheck {
 
 // withDeviceChecks inserts the OpenVINO checks after the cuda check (and
 // keeps the gpu / cuda checks at warn when cuda:0 is turned off, lead
-// ruling 13).
+// ruling 13). ext-step1 (internal/api/system_env.go): without an NVIDIA card
+// (cpuonly, power_ac_intel, diag_intel) there is no faster-whisper, GPU,
+// cuDNN or CUDA row; the OpenVINO rows (none without an Intel device or
+// OpenVINO environment: cpuonly) follow pypdf, then the CPU inference test.
 func (s *store) withDeviceChecks(checks []api.SystemCheck) []api.SystemCheck {
 	cudaOn := false
 	for _, d := range s.visibleDevices() {
@@ -679,33 +689,48 @@ func (s *store) withDeviceChecks(checks []api.SystemCheck) []api.SystemCheck {
 			cudaOn = true
 		}
 	}
-	out := make([]api.SystemCheck, 0, len(checks)+4)
+	nvidia := !s.dev.cpuOnly && !s.dev.noCUDA
+	anchor := "cuda"
+	var local []api.SystemCheck
+	if nvidia {
+		local = s.openVINOChecks()
+	} else {
+		anchor = "pypdf"
+		if !s.dev.cpuOnly {
+			local = s.openVINOChecks()
+		}
+		local = append(local, s.cpuSelftestCheck())
+	}
+	out := make([]api.SystemCheck, 0, len(checks)+len(local))
 	inserted := false
 	for _, c := range checks {
-		if s.dev.cpuOnly { // scenario cpuonly: no NVIDIA card
-			switch c.Name {
-			case "gpu":
-				c.Status, c.Hint, c.HintInfo = "warn", "", nil
-				c.DetailInfo = &model.ErrorInfo{Code: "check.gpu_unreadable", Params: map[string]any{"error": "exec: \"nvidia-smi\": executable file not found in %PATH%"}}
-				c.Detail = ""
-			case "cuda":
-				c.Status, c.Hint, c.HintInfo, c.Detail = "warn", "", nil, ""
-				c.DetailInfo = &model.ErrorInfo{Code: "check.api_skipped"}
-			}
+		if !nvidia && (c.Name == "faster-whisper" || c.Name == "gpu" || c.Name == "cudnn" || c.Name == "cuda") {
+			continue
 		}
 		if !cudaOn && (c.Name == "gpu" || c.Name == "cuda") && c.Status == "error" {
 			c.Status = "warn"
 		}
 		out = append(out, c)
-		if c.Name == "cuda" {
-			out = append(out, s.openVINOChecks()...)
+		if c.Name == anchor {
+			out = append(out, local...)
 			inserted = true
 		}
 	}
 	if !inserted {
-		out = append(out, s.openVINOChecks()...)
+		out = append(out, local...)
 	}
 	return out
+}
+
+// cpuSelftestCheck is the CPU inference test after "重新检查" (ext-step1):
+// faster-whisper on the CPU in cpuonly (fw:cpu), else OpenVINO's CPU; the
+// worker's own line.
+func (s *store) cpuSelftestCheck() api.SystemCheck {
+	line := "SELFTEST ok device=CPU load_s=2.3 transcribe_s=0.84 segments=0"
+	if s.dev.cpuOnly {
+		line = "SELFTEST ok device=cpu compute_type=int8 load_s=0.9 transcribe_s=0.41 segments=0"
+	}
+	return api.SystemCheck{Name: "cpu_selftest", Status: "ok", Detail: line}
 }
 
 // ---------- endpoints ----------

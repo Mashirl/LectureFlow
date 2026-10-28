@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later
+   Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* Course page requests of 2026-10-27 (course-ux; course_ux.js,
+   lecture_list.js): the batch rerun dialog, teaching materials hung under a
+   week, make-up lectures. Its own file so that parallel work on style.css
+   does not collide; the tokens are style.css's. */
+
+/* the yellow "补" tag of a make-up lecture (the state tag's warn colour) */
+.chip-makeup { flex: none; background: var(--warn-soft); color: var(--warn); font-weight: 600; letter-spacing: 0.02em; }
+
+/* a teaching material's drag handle, in the row's left padding; a button,
+   so keyboard users reach the same weeks through its menu */
+.lrow.can-hang { position: relative; }
+.lrow-grip {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
+  display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-xs);
+  background: transparent; color: var(--text-3); opacity: 0.45; cursor: grab;
+}
+.lrow.can-hang:hover .lrow-grip, .lrow-grip:focus-visible, .lrow-grip[aria-expanded="true"] { opacity: 1; }
+.lrow-grip:hover { color: var(--accent-text); background: var(--accent-soft); }
+.lrow-grip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.lrow.is-dragging { opacity: 0.5; }
+
+/* a supplement hangs under its week: indented, with a tree connector */
+.lrow.is-child { border-top-style: dashed; }
+.lrow.is-child .lrow-main { position: relative; padding-left: 22px; }
+.lrow.is-child .lrow-main::before {
+  content: ""; position: absolute; left: 4px; top: -6px; width: 10px; height: 16px;
+  border-left: 1.5px solid var(--border-3); border-bottom: 1.5px solid var(--border-3); border-bottom-left-radius: 4px;
+}
+
+/* drop targets while a material is dragged: its week lights up */
+.lt-group.is-drop { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.lrow.is-drop { background: color-mix(in srgb, var(--accent-soft) 60%, transparent); box-shadow: inset 3px 0 0 var(--accent); }
+.lt-unhang { display: none; }
+.lt.can-unhang .lt-unhang {
+  display: flex; align-items: center; justify-content: center;
+  margin: 8px 16px 12px; padding: 12px; border: 1.5px dashed var(--border-3); border-radius: var(--r-md);
+  color: var(--text-2); font-size: var(--fs-sm);
+}
+.lt-unhang > span { display: inline-flex; align-items: center; gap: 6px; pointer-events: none; }
+.lt-unhang.is-drop { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+
+/* the selection bar: select the whole course */
+.batchbar-all {
+  padding: 2px 6px; border: 0; border-radius: var(--r-sm); background: transparent; color: inherit;
+  font: inherit; font-size: var(--fs-sm); white-space: nowrap; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--inverse-border);
+}
+.batchbar-all:hover { text-decoration-color: currentColor; }
+
+/* the batch rerun dialog */
+/* the stages side by side: the dialog stays short enough to see the summary */
+.rr-stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.rr-stages .dlg-choice { margin: 0; }
+@media (max-width: 560px) { .rr-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.rr-summary { min-height: 2.5em; }
+.rr-summary > * + * { margin-top: 8px; }
+.rr-summary .dlg-list { max-height: 160px; }
+.rr-list li { flex-direction: column; align-items: flex-start; gap: 2px; }
+.rr-lec { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rr-why { color: var(--text-2); font-size: var(--fs-sm); }
+.rr-model { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-1); }
+.rr-model .dlg-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 10px 0 0; }
+@media (max-width: 560px) { .rr-model .dlg-choices { grid-template-columns: minmax(0, 1fr); } }

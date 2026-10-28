@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+/* Copyright (C) 2026 LectureFlow contributors. Licensed under the GNU AGPL v3 or later; see LICENSE. */
+/* The in-page entry points (src/content/inpage.js), inside closed shadow
+   roots: the page's styles do not reach in, ours do not leak out. The
+   build puts this after the design tokens (as :host), ui/base.css and
+   ui/card.css into ui/inpage-css.js. Flat, colours from tokens only. */
+
+:host { all: initial; display: inline-block; }
+:host([data-kind="card"]), :host([data-kind="bar"]) { display: block; }
+
+.lf-root {
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--text-1);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* the button: 28px, outlined in the accent colour */
+.ip-btn {
+  display: inline-flex; align-items: center; gap: var(--sp-3);
+  height: 28px; padding: 0 var(--sp-5);
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  background: var(--bg-card); color: var(--accent-text);
+  font-family: var(--font-sans); font-size: var(--fs-sm); font-weight: 600; line-height: 1; white-space: nowrap;
+  cursor: pointer;
+}
+.ip-btn:hover { background: var(--accent-soft); }
+.ip-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.ip-btn .icon { width: 15px; height: 15px; }
+.ip-btn.compact { width: 28px; padding: 0; justify-content: center; }
+.ip-btn.small { height: 24px; padding: 0 var(--sp-4); font-size: var(--fs-xs); }
+
+/* a list row: button, or the row's state */
+.ip-row { display: inline-flex; align-items: center; gap: var(--sp-4); margin-top: var(--sp-2); }
+.ip-row .bar { width: 72px; height: 4px; }
+.ip-check { display: inline-flex; align-items: center; margin-right: var(--sp-3); vertical-align: middle; }
+.ip-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.ip-check input:disabled { cursor: not-allowed; }
+
+/* the card: 360px under its button */
+.ip-card {
+  box-sizing: border-box;
+  width: 360px; max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  padding: var(--sp-6);
+  border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  background: var(--bg-card);
+}
+.ip-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-bottom: var(--sp-5); }
+.ip-card-head h2 { font-size: var(--fs-md); font-weight: 600; }
+.ip-close { width: 28px; height: 28px; padding: 0; justify-content: center; }
+.ip-card .card { background: var(--bg-card); }
+.ip-card .lecture { padding: var(--sp-5); }
+
+/* the selection bar */
+.ip-bar {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
+  border: 1px solid var(--border-2); border-radius: var(--r-lg);
+  background: var(--bg-card);
+  font-size: var(--fs-sm);
+}
+.ip-bar .sep { color: var(--text-3); }
+.ip-bar .btn-primary { height: 30px; }

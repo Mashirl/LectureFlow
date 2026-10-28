@@ -1,0 +1,2 @@
+go test fuzz v1
+string("[{\"url\":\"HTTP://0%80\",\"kind\":\"audio\",\"formAt\":\"file\"}]")

@@ -12,11 +12,13 @@
 // for a model provider, a notice says so (with a link to the providers),
 // Play is the primary action, and the English subtitles and transcript are
 // in the download menu as soon as asr is done.
+// ext web3: the ⋯ menu offers "添加第二视角…" in the desktop app (lecture_angles.js).
+// colab-obs: a lecture transcribed in speed mode says so ("本节用极速模式（切成 N 段）").
 
 import { api } from './api.js';
-import { h, clear, btn, iconBtn, preserveFocus, toast } from './dom.js';
+import { h, clear, btn, iconBtn, preserveFocus, toast, everySecond } from './dom.js';
 import { icon } from './icons.js';
-import { pipelineBar } from './pipeline.js';
+import { pipelineBar, streamProgress } from './pipeline.js';
 import { menuButton, bindContextMenu } from './menu.js';
 import { lectureDownloadMenu, waitsForProvider, englishOnly } from './lecture_english.js';
 import * as A from './actions.js';
@@ -28,6 +30,8 @@ import { t } from './i18n.js';
 import { lectureTitles, fmtRecordedAt, openRecordedAtDialog } from './calendar_ui.js';
 import { lectureTagText } from './kinds.js';
 import { openKindDialog } from './kind_dialog.js';
+import { angleMenuItems } from './lecture_angles.js';
+import { splitParts } from './settings_colab.js';
 
 const enc = encodeURIComponent;
 
@@ -48,6 +52,7 @@ export function mountLecture(root, route, ctx) {
   let alive = true;
   let sub = null;
   let bar = null;
+  let streamNoticeText = null; // the text of the "generating" notice (updated in place)
   let timer = null;
   let shownCost = null;
 
@@ -58,7 +63,15 @@ export function mountLecture(root, route, ctx) {
   el.append(headEl, tabsEl, panelEl);
   root.append(el);
   // Right click / Shift+F10 on the header: the lecture row's menu (A12.2).
-  bindContextMenu(headEl, () => (lecture ? A.lectureMenuItems(lecture, handlers).filter((it) => !(it && it.id === 'open')) : null));
+  bindContextMenu(headEl, () => (lecture ? menuItems(lecture) : null));
+  // the lecture row's menu without "open", and the second angle before
+  // "delete" (ext web3)
+  const menuItems = (lec) => {
+    const items = A.lectureMenuItems(lec, handlers).filter((it) => !(it && it.id === 'open'));
+    const at = items.findIndex((it) => it && it.id === 'delete');
+    items.splice(at < 0 ? items.length : Math.max(0, at - 1), 0, ...angleMenuItems(lec, (l) => handlers.onLectures([l])));
+    return items;
+  };
 
   const handlers = {
     onLectures(ls) {
@@ -184,9 +197,7 @@ export function mountLecture(root, route, ctx) {
       out.push(dl);
     }
     out.push(
-      menuButton(iconBtn('ellipsis', t('lecture.page.menu'), { fkey: `lecd:${lec.id}:menu`, menu: true, class: 'icon-btn-bordered' }), () =>
-        A.lectureMenuItems(lec, handlers).filter((it) => !(it && it.id === 'open')),
-      ),
+      menuButton(iconBtn('ellipsis', t('lecture.page.menu'), { fkey: `lecd:${lec.id}:menu`, menu: true, class: 'icon-btn-bordered' }), () => menuItems(lec)),
     );
     return out;
   }
@@ -266,6 +277,43 @@ export function mountLecture(root, route, ctx) {
     );
   }
 
+  // P8.1 / stream-parallel: the playback file. A source that must be
+  // transcoded gets it in the background after prep, while the transcript
+  // goes on: say so (with its progress), and when it could not be made (the
+  // task failed, was cancelled or interrupted, or recorded no_space or a
+  // failure) say why and offer the retry (POST …/stages/stream/retry: the
+  // task's retry, or a new run). The player plays the audio meanwhile.
+  function streamNotice(lec) {
+    streamNoticeText = null;
+    const s = lec.stream;
+    if (lec.draft || !s) return null;
+    if (s.status === 'generating') {
+      streamNoticeText = h('span', { class: 'lec-notice-text' }, t('lecture.notice.stream_generating', { pct: U.pct(s.progress) }));
+      return h('div', { class: 'lec-notice is-draft', role: 'status' }, icon('play', { size: 16 }), streamNoticeText);
+    }
+    if (s.status === 'ready' || s.status === 'audio_only') return null; // plays (an earlier file, or audio only)
+    const job = (lec.aux || []).find((a) => a.stage === 'stream');
+    const ended = job && (job.status === 'failed' || job.status === 'cancelled') ? job : null;
+    if (!ended && s.status !== 'failed' && s.status !== 'no_space') return null;
+    let err = '';
+    if (ended && ended.status === 'failed') err = U.stageErrorText(ended);
+    else if (!ended && s.status === 'no_space') err = t('errors.media.no_space');
+    else if (!ended && s.error) err = U.errorInfoText({ code: s.error }, s.error);
+    const canRetry = ended ? (ended.allowed_actions || []).includes('retry') : true;
+    return h(
+      'div',
+      { class: 'lec-notice is-cancelled', role: 'status' },
+      icon('info', { size: 16 }),
+      h(
+        'span',
+        { class: 'lec-notice-text' },
+        h('b', null, ended && ended.status === 'cancelled' ? t('lecture.notice.stream_cancelled') : t('lecture.notice.stream_failed')),
+        err ? errorSpan(ended && ended.status === 'failed' ? ended : {}, err) : null,
+      ),
+      canRetry ? btn(t('common.retry'), { icon: 'rotate-cw', size: 'sm', fkey: `lecd:${lec.id}:retry:stream`, onclick: () => run(A.taskRetry(lec, 'stream')) }) : null,
+    );
+  }
+
   function notices(lec) {
     const acts = lec.lecture_actions || [];
     const out = [];
@@ -326,7 +374,22 @@ export function mountLecture(root, route, ctx) {
           { class: 'lec-notice is-cancelled', role: 'status' },
           icon('info', { size: 16 }),
           h('span', { class: 'lec-notice-text' }, h('b', null, t('lecture.detail.title_failed')), taErr ? errorSpan(ta, taErr) : null),
-          (ta.allowed_actions || []).includes('retry') ? btn(t('common.retry'), { icon: 'rotate-cw', size: 'sm', fkey: `lecd:${lec.id}:retry:title`, onclick: () => run(api.lectureStageAction(lec.id, 'title', 'retry')) }) : null,
+          (ta.allowed_actions || []).includes('retry') ? btn(t('common.retry'), { icon: 'rotate-cw', size: 'sm', fkey: `lecd:${lec.id}:retry:title`, onclick: () => run(A.taskRetry(lec, 'title')) }) : null,
+        ),
+      );
+    }
+    const sn = streamNotice(lec);
+    if (sn) out.push(sn);
+    // colab-obs: the last transcription used speed mode (Colab cut the
+    // lecture into parts, asr_timing.postprocess.split); a quiet fact
+    const parts = splitParts(lec);
+    if (parts) {
+      out.push(
+        h(
+          'div',
+          { class: 'lec-notice is-split', role: 'note', title: t('settings.colab.fast_hint') },
+          icon('zap', { size: 16 }),
+          h('span', { class: 'lec-notice-text' }, t('lecture.notice.split', { n: U.count(parts) })),
         ),
       );
     }
@@ -345,6 +408,15 @@ export function mountLecture(root, route, ctx) {
     return out;
   }
 
+  // The status next to the bar; the full stale text is in the notice below,
+  // with its "Update" button.
+  function headSummary(lec) {
+    const staleText = U.lectureStaleText(lec);
+    const sum = U.lectureSummary(lec.stages, { sys: ctx.system(), res: ctx.resources(), staleText, draft: lec.draft });
+    if (sum.kind === 'stale' && staleText) sum.text = t('lecture.page.needs_update');
+    return sum;
+  }
+
   function renderHead() {
     const lec = lecture;
     const course = ctx.courses().find((c) => c.id === lec.course_id);
@@ -352,15 +424,21 @@ export function mountLecture(root, route, ctx) {
       clear(headEl);
       bar = pipelineBar(lec.stages, {
         key: `lecd:${lec.id}`,
+        lecture: lec.id, // a remote asr's live steps (pipeline.js)
         size: 'lg',
         sys: ctx.system,
         res: ctx.resources,
+        stream: lec.stream, // stream-parallel: the playback file with prep
         onAction: (stage, action) => A.stageAction(lec, stage, action, true).then((r) => r && handlers.onLectures([r])),
       });
-      const staleText = U.lectureStaleText(lec);
-      const sum = U.lectureSummary(lec.stages, { sys: ctx.system(), res: ctx.resources(), staleText, draft: lec.draft });
-      // the full stale text is in the notice below, with its "Update" button
-      if (sum.kind === 'stale' && staleText) sum.text = t('lecture.page.needs_update');
+      const sum = headSummary(lec);
+      // a retry's countdown goes on by the second (3.2.0 L12)
+      const sumText = document.createTextNode(sum.text);
+      if (U.backoffCounting(lec.stages))
+        everySecond(sumText, () => {
+          sumText.data = headSummary(lec).text;
+          return U.backoffCounting(lec.stages);
+        });
       const warn = U.warningHint(lec.stages);
       const tt = lectureTitles(lec);
       const sub = [t('lecture.page.created', { when: U.fmtDateTime(lec.created_at) })];
@@ -427,7 +505,7 @@ export function mountLecture(root, route, ctx) {
             h(
               'div',
               { class: 'lec-state' },
-              h('span', { class: `lec-status tone-${sum.tone}` }, h('span', { class: `lec-status-dot is-${sum.tone}`, 'aria-hidden': 'true' }), sum.text),
+              h('span', { class: `lec-status tone-${sum.tone}` }, h('span', { class: `lec-status-dot is-${sum.tone}`, 'aria-hidden': 'true' }), sumText),
               warn ? h('span', { class: 'chip chip-warn', title: t('lecture.page.warning_tip') }, icon('triangle-alert', { size: 11 }), warn) : null,
             ),
           ),
@@ -494,6 +572,11 @@ export function mountLecture(root, route, ctx) {
     },
     onJob(ev) {
       if (!lecture || ev.scope !== 'lecture' || ev.scope_id !== id) return;
+      if (streamProgress(lecture, bar, ev)) {
+        // the background playback file: its notice follows in place
+        if (streamNoticeText && lecture.stream) streamNoticeText.textContent = t('lecture.notice.stream_generating', { pct: U.pct(lecture.stream.progress) });
+        return;
+      }
       const st = lecture.stages.find((s) => s.stage === ev.stage);
       if (st && st.status === ev.status && bar) {
         bar.setProgress(ev.stage, ev.progress);

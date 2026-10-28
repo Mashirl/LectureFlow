@@ -1,0 +1,299 @@
+{
+ "checks": [
+  {
+   "name": "data_dir",
+   "status": "ok",
+   "detail": "./data 可写",
+   "hint": "",
+   "detail_info": {
+    "code": "check.dir_writable",
+    "params": {
+     "path": "./data"
+    }
+   }
+  },
+  {
+   "name": "ffmpeg",
+   "status": "ok",
+   "detail": "ffmpeg version 9.0.1",
+   "hint": ""
+  },
+  {
+   "name": "aria2c",
+   "status": "ok",
+   "detail": "aria2 version 1.37.0，SHA-256 be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2（与安装包的清单一致）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.aria2c_verified",
+    "params": {
+     "version": "aria2 version 1.37.0",
+     "sha256": "be2099c214f63a3cb4954b09a0becd6e2e34660b886d4c898d260febfe9d70c2"
+    }
+   }
+  },
+  {
+   "name": "python",
+   "status": "ok",
+   "detail": "Python 3.13.15",
+   "hint": ""
+  },
+  {
+   "name": "pypdf",
+   "status": "ok",
+   "detail": "可以导入 pypdf",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "pypdf"
+    }
+   }
+  },
+  {
+   "name": "openvino_venv",
+   "status": "ok",
+   "detail": "OpenVINO 环境：C:\\Users\\Student\\LectureFlow\\.venv-ov\\Scripts\\python.exe",
+   "hint": "",
+   "detail_info": {
+    "code": "check.openvino_venv_ok",
+    "params": {
+     "path": "C:\\Users\\Student\\LectureFlow\\.venv-ov\\Scripts\\python.exe"
+    }
+   }
+  },
+  {
+   "name": "openvino",
+   "status": "ok",
+   "detail": "可以导入 openvino",
+   "hint": "",
+   "detail_info": {
+    "code": "check.import_ok",
+    "params": {
+     "module": "openvino"
+    }
+   }
+  },
+  {
+   "name": "openvino_devices",
+   "status": "ok",
+   "detail": "识别到的设备：Intel(R) Arc(TM) 140V GPU (16GB) (GPU.0), Intel(R) AI Boost (NPU), Intel(R) Core(TM) Ultra 7 258V (CPU)",
+   "hint": "",
+   "detail_info": {
+    "code": "check.openvino_devices",
+    "params": {
+     "devices": "Intel(R) Arc(TM) 140V GPU (16GB) (GPU.0), Intel(R) AI Boost (NPU), Intel(R) Core(TM) Ultra 7 258V (CPU)"
+    }
+   }
+  },
+  {
+   "name": "npu_driver",
+   "status": "ok",
+   "detail": "NPU 驱动可用（32.0.100.4297）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.npu_driver_ok",
+    "params": {
+     "version": "32.0.100.4297"
+    }
+   }
+  },
+  {
+   "name": "cpu_selftest",
+   "status": "ok",
+   "detail": "SELFTEST ok device=CPU load_s=2.3 transcribe_s=0.84 segments=0",
+   "hint": ""
+  },
+  {
+   "name": "browser_ext",
+   "status": "ok",
+   "detail": "已在 Chrome, Edge 中登记；最近一次扩展连接：Chrome 扩展 0.1.0，2026-10-27 09:30",
+   "hint": "",
+   "detail_info": {
+    "code": "check.browser_ext_connected",
+    "params": {
+     "browsers": "Chrome, Edge",
+     "browser": "Chrome",
+     "version": "0.1.0",
+     "at": "2026-10-27 09:30"
+    }
+   }
+  },
+  {
+   "name": "api_key:DeepSeek",
+   "status": "ok",
+   "detail": "已配置（sk-…7f3a）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…7f3a"
+    }
+   }
+  },
+  {
+   "name": "api:DeepSeek",
+   "status": "ok",
+   "detail": "连通（312 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 312
+    }
+   }
+  },
+  {
+   "name": "api_key:Anthropic",
+   "status": "ok",
+   "detail": "已配置（sk-…c2d9）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.key_set",
+    "params": {
+     "key": "sk-…c2d9"
+    }
+   }
+  },
+  {
+   "name": "api:Anthropic",
+   "status": "ok",
+   "detail": "连通（684 ms）",
+   "hint": "",
+   "detail_info": {
+    "code": "check.api_ok",
+    "params": {
+     "ms": 684
+    }
+   }
+  },
+  {
+   "name": "disk",
+   "status": "warn",
+   "detail": "剩余 4.2 GB",
+   "hint": "剩余空间少于 5 GB，建议删除不需要的讲座",
+   "detail_info": {
+    "code": "check.disk_free",
+    "params": {
+     "free_mb": 4300
+    }
+   },
+   "hint_info": {
+    "code": "check.hint_disk_warn"
+   }
+  }
+ ],
+ "gpu": {
+  "total_mb": 0,
+  "free_mb": 0,
+  "paused": false,
+  "slots_used": 0,
+  "slots_max": 0,
+  "estimated_job_mb": 0
+ },
+ "api": {
+  "Anthropic": {
+   "inflight": 4,
+   "max": 4,
+   "rpm_limit": 50
+  },
+  "DeepSeek": {
+   "inflight": 3,
+   "max": 8,
+   "rpm_limit": 120
+  },
+  "OpenRouter": {
+   "inflight": 0,
+   "max": 4,
+   "rpm_limit": 60
+  }
+ },
+ "usage_today": {
+  "prompt_tokens": 2152400,
+  "cache_hit_tokens": 1786600,
+  "completion_tokens": 115200,
+  "estimated_cost": 2.71
+ },
+ "budget_hit": false,
+ "disk": {
+  "free_mb": 4300,
+  "data_mb": 9840,
+  "courses_mb": {
+   "01JC0000000000000000002120": 2210,
+   "01JC0000000000000000003121": 1460,
+   "01JC0000000000000000003311": 980,
+   "01JC0000000000000000003631": 4870,
+   "01JC000000000000000000RM01": 320
+  }
+ },
+ "config": {
+  "listen": "127.0.0.1:8420",
+  "data_dir": "./data",
+  "python": [
+   {
+    "backend": "openvino",
+    "path": "C:\\Users\\Student\\LectureFlow\\.venv-ov\\Scripts\\python.exe",
+    "source": "default",
+    "exists": true
+   },
+   {
+    "backend": "base",
+    "path": "C:\\Users\\Student\\LectureFlow\\.venv\\Scripts\\python.exe",
+    "source": "default",
+    "exists": true
+   }
+  ],
+  "ffmpeg": "ffmpeg",
+  "worker_dir": "worker",
+  "log_level": "info",
+  "asr": {
+   "language": "en",
+   "device_mode": "auto",
+   "multi_device": true,
+   "battery_aware": true,
+   "mem_reserve_mb": 2048
+  },
+  "general": {
+   "keep_original_media": true,
+   "notifications": true,
+   "daily_budget": 20
+  },
+  "asr_devices": [
+   {
+    "id": "ov:GPU",
+    "label": "Intel(R) Arc(TM) 140V GPU (16GB)",
+    "backend": "openvino",
+    "model": "large-v3-turbo",
+    "precision": "fp16",
+    "max_parallel": 1,
+    "enabled": true
+   },
+   {
+    "id": "ov:NPU",
+    "label": "Intel(R) AI Boost",
+    "backend": "openvino",
+    "model": "large-v3-turbo",
+    "precision": "fp16",
+    "max_parallel": 1,
+    "enabled": true
+   },
+   {
+    "id": "fw:cpu",
+    "label": "CPU (faster-whisper)",
+    "backend": "faster-whisper",
+    "model": "small",
+    "precision": "auto",
+    "max_parallel": 1,
+    "enabled": false
+   },
+   {
+    "id": "ov:CPU",
+    "label": "Intel(R) Core(TM) Ultra 7 258V",
+    "backend": "openvino",
+    "model": "large-v3-turbo",
+    "precision": "int8",
+    "max_parallel": 1,
+    "enabled": false
+   }
+  ]
+ }
+}

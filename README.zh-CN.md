@@ -87,7 +87,7 @@ LectureFlow 是一个运行在你自己电脑上的讲座工具。把课程录�
 
 - 自动选择 NVIDIA 显卡、Intel 核显或 NPU、Apple Silicon 来转写。
 - 笔记本一次只用一台转写设备：插电用独显，拔电换到更省电的 NPU；无法迁移的任务会挂起，接回电源后继续。
-- 可选借用 Google Colab 的 GPU：自动开机、转写、取回结果、关机，一分钱都不让它多烧。
+- 可选借用 Google Colab 的 GPU：自动开机、把排队的讲座一节接一节转完、取回结果、关机，一分钱都不让它多烧。
 
 **平静，不催促**
 
@@ -98,13 +98,16 @@ LectureFlow 是一个运行在你自己电脑上的讲座工具。把课程录�
 **方便和其他工具一起用**
 
 - 导出中英对照讲稿、双语字幕（VTT），以及带时间戳引用的 JSON，可以交给其他 AI 整理笔记。
+- 浏览器扩展“发送至 LectureFlow”，支持 Chrome 和 Firefox（Edge 从 Chrome 网上应用店安装；见 [docs/install.md](docs/install.md#浏览器扩展)）：在 Panopto 等录播平台上看课时，点一下、确认一次，就把这节录播送进 LectureFlow。在 Panopto 上还可以直接在页面里发送，一节，或者课程列表的一整页。它只读媒体轨道，从不读你的课程信息。
 
 ## 隐私
 
 - **录音和转写都在你自己的电脑上完成**，不会上传到任何地方。
 - 只有当你配置了模型服务之后，转写出的文字才会发送给**你自己选择**的服务商，用于修复、摘要和翻译；也可以选择“只转写”，完全不用任何在线服务。
-- 使用 Google Colab 后端时，录音会上传到 Google 的服务器，选择时会明确提示。
+- 使用 Google Colab 后端时，录音会上传到 Google 的服务器，选择时会明确提示。LectureFlow 还会用你自己的授权向 Google 查询 Colab 账户的计算单元余额和可以借用的显卡；只在运行时使用期间，读取它的内存与 GPU 读数，显示在资源栏里。
+- 保存的 API key 与 Colab 授权用系统账户的凭据保护（Windows 的 DPAPI、macOS 的钥匙串）加密存放。把数据目录搬到另一台电脑或另一个系统账户后，需要重新输入。
 - LectureFlow 不收集任何使用数据，没有遥测，没有账户。
+- 浏览器扩展只和你电脑上的 LectureFlow 通信，只在你送入讲座时读取录播网站的 Cookie，详见[扩展隐私声明](docs/extension/privacy.md)。
 
 ## 转写后端
 
@@ -141,7 +144,7 @@ LectureFlow 是一个运行在你自己电脑上的讲座工具。把课程录�
 
 ## 开始使用
 
-1. 从 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下载对应系统的安装包：Windows 用 `LectureFlow-Setup-3.1.0-x64.exe`（或便携版），Apple Silicon Mac 用 `LectureFlow-3.1.0-arm64.dmg`。
+1. 从 [Releases](https://github.com/ShouldBeQuincy/LectureFlow/releases) 下载对应系统的安装包：Windows 用 `LectureFlow-Setup-3.2.0-x64.exe`（或便携版），Apple Silicon Mac 用 `LectureFlow-3.2.0-arm64.dmg`。新版本的变化见[发布说明](docs/release-notes/3.2.0.md)。
 2. 安装包目前没有代码签名，系统会弹出安全提示，放行方法见 [docs/install.md](docs/install.md)。
 3. 打开 LectureFlow，跟着引导走几步：选择语言、检测电脑、选择费用档位、下载组件。每一步都可以跳过，之后再回来。
 4. 添加一门课程：填写课程名称和开课日期，可以顺便粘贴课程大纲、上传课件（不是必须的，但能明显提高专业术语的准确度）。
@@ -159,7 +162,9 @@ English · 简体中文 · 繁體中文（台灣） · 粵語（香港） · Р�
 
 - **目前只在计算机科学专业的学生中测试过**，讲座语言为英语、翻译目标为简体中文。医学、法律、人文等学科的术语和讲课风格不同，效果可能有差别，欢迎告诉我们。
 - macOS 只在 Mac mini（Apple M6，macOS 27）上测试过，还没在用电池的 MacBook 上试过。
-- Whisper 的 large-v3 系列（包括 Mac 上默认的 large-v3-turbo）常常漏掉标点和大小写，large-v2 没有这个问题。会在之后的版本中解决。
+- Whisper 的 large-v3 系列（包括 Mac 上默认的 large-v3-turbo）常常漏掉标点和大小写，large-v2 没有这个问题。3.2.0 起，LectureFlow 会修复英语讲座里的这类段落：用 NVIDIA 显卡、CPU 或 Colab 转写时把这些段落重新转写一次，所有后端都会按本节讲座其余部分的规律补回标点和大小写；以前转写的讲座可以用“修复断句”修复。修得不错，但不完美。
+- 浏览器扩展最熟悉 Panopto，其他网站只做通用的轨道探测；不处理受 DRM 保护的媒体，不支持 Linux、ChromeOS 和手机。
+- 浏览器扩展和 LectureFlow 都不处理 YouTube 和在线课程平台（MOOC、付费课程，例如 Coursera、edX、Udemy、中国大学MOOC）：它们只用于学校给你的讲座录播。
 - AMD ROCm 尚未支持；多推理后端的调度还不够智能。
 - 自动转写、修复和翻译都可能出错，重要的内容请回到原声确认。
 - 它为**有参考资料的知识型内容**设计，不是通用的视频字幕工具：电影、动画、直播请找更合适的工具。
@@ -209,7 +214,7 @@ English · 简体中文 · 繁體中文（台灣） · 粵語（香港） · Р�
 
 ## 许可证
 
-本项目以 GNU Affero 通用公共许可证第 3 版或更高版本（AGPL-3.0-or-later）发布，见 [LICENSE](LICENSE)。如果你修改了 LectureFlow 并通过网络向他人提供服务，需要向这些用户提供修改后的源代码。另有一项依据许可证第 7 条的附加许可，允许把 LectureFlow 与 [LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md) 中列出的库组合使用。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+本项目以 GNU Affero 通用公共许可证第 3 版或更高版本（AGPL-3.0-or-later）发布，见 [LICENSE](LICENSE)。如果你修改了 LectureFlow 并通过网络向他人提供服务，需要向这些用户提供修改后的源代码。另有一项依据许可证第 7 条的附加许可（[LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md)），允许把 LectureFlow 与其中列出的专有或与 AGPL 不兼容的库（例如 NVIDIA CUDA，由组件管理器在你的电脑上下载）组合使用；AGPL 的其他条件不变。第三方组件的许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 ## 致谢
 

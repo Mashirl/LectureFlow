@@ -69,6 +69,12 @@ func newColabEnv(t *testing.T) *colabEnv {
 			_, _ = io.WriteString(w, `{}`)
 			return
 		}
+		if strings.HasSuffix(r.URL.Path, "/tun/m/ccu-info") {
+			// colab-obs-core: a paid account that may borrow the usual GPUs
+			_, _ = io.WriteString(w, ")]}'\n"+`{"currentBalance":42.5,"consumptionRateHourly":0,"assignmentsCount":0,`+
+				`"eligibleGpus":["G4","A100","L4","T4"],"ineligibleGpus":["H100"]}`)
+			return
+		}
 		_, _ = io.WriteString(w, `{"access_token":"`+colabTestAccess+`","expires_in":3599,"token_type":"Bearer",`+
 			`"scope":"openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/colaboratory"}`)
 	}))
@@ -147,23 +153,32 @@ func TestColabEndpoints(t *testing.T) {
 
 	var v ColabView
 	ce.call("GET", "/api/colab", nil, http.StatusOK, &v)
-	if v.Settings.Enabled || v.Settings.BatteryPrefer || v.Status.Configured || !v.ADC.Detected || v.Settings.Accelerator != "T4" || v.Held {
+	// colab-obs-core: no account read yet (no credential): the free level's T4
+	if v.Settings.Enabled || v.Settings.BatteryPrefer || v.Status.Configured || !v.ADC.Detected || v.Settings.Accelerator != "T4" ||
+		v.Settings.AcceleratorChosen || v.Held || v.Status.Account.Level != colab.LevelFree || v.Status.Account.ReadOK {
 		t.Fatalf("initial view = %+v", v)
 	}
 
 	// Settings: partial, validated by the backend, switches in kv.
-	ce.call("PUT", "/api/colab/settings", map[string]any{"enabled": true, "battery_prefer": true, "accelerator": "L4", "tier": "free"},
+	// A pick the account does not allow yet (never read) is kept; a tier is ignored.
+	ce.call("PUT", "/api/colab/settings", map[string]any{"enabled": true, "battery_prefer": true, "accelerator": "L4", "tier": "paid"},
 		http.StatusOK, &v)
-	if !v.Settings.Enabled || !v.Settings.BatteryPrefer || v.Settings.Accelerator != "L4" || v.Settings.Tier != "free" ||
-		v.Settings.Model != "large-v3" {
+	if !v.Settings.Enabled || !v.Settings.BatteryPrefer || v.Settings.Accelerator != "L4" || !v.Settings.AcceleratorChosen ||
+		v.Settings.Tier != "free" || v.Settings.Model != "large-v3" || v.Status.EffectiveAccelerator != "T4" ||
+		v.Status.LockedReason != colab.LockAccountUnknown {
 		t.Fatalf("view after PUT = %+v", v)
 	}
 	if val, ok, _ := ce.st.GetKV(ctx, model.KVColabEnabled); !ok || val != "1" {
 		t.Fatalf("kv %s = %q %v", model.KVColabEnabled, val, ok)
 	}
-	if info := ce.callErrInfo("PUT", "/api/colab/settings", map[string]any{"tier": "gold"}, http.StatusBadRequest); info.Code != colab.CodeSettingsInvalid ||
-		info.Params["field"] != "tier" {
-		t.Fatalf("bad tier: %+v", info)
+	// colab-obs-core: any tier is accepted and ignored (an older front end)
+	ce.call("PUT", "/api/colab/settings", map[string]any{"tier": "gold"}, http.StatusOK, &v)
+	if v.Settings.Tier != "free" || v.Settings.Accelerator != "L4" {
+		t.Fatalf("tier not ignored: %+v", v.Settings)
+	}
+	if info := ce.callErrInfo("PUT", "/api/colab/settings", map[string]any{"accelerator": "V6E1"}, http.StatusBadRequest); info.Code != colab.CodeSettingsInvalid ||
+		info.Params["field"] != "accelerator" {
+		t.Fatalf("bad accelerator: %+v", info)
 	}
 
 	// Enabled but no credential: not in the device table; use-colab says why.
@@ -192,6 +207,15 @@ func TestColabEndpoints(t *testing.T) {
 	}
 	if !ce.reg.Present(model.DeviceColab) {
 		t.Fatal("colab:remote not in the device table after the import")
+	}
+	// "重新查询": the account now (the import's own reading runs in the
+	// background); the paid account unlocks the L4 picked above.
+	v = ColabView{} // omitted fields (locked_reason) must not keep the last answer's
+	ce.call("POST", "/api/colab/account/refresh", nil, http.StatusOK, &v)
+	if a := v.Status.Account; !a.ReadOK || a.Level != colab.LevelPaid || *a.PaidBalanceCU != 42.5 || !a.EligibilityKnown ||
+		v.Status.EffectiveAccelerator != "L4" || v.Status.LockedReason != "" || v.Settings.Tier != "paid" ||
+		len(v.Status.SelectableAccelerators) != 4 {
+		t.Fatalf("after the account refresh: %+v", v.Status)
 	}
 	if d, _ := ce.reg.Get(model.DeviceColab); d.Label != "Google Colab · L4" || d.Model != "large-v3" || d.Precision != "float16" {
 		t.Fatalf("colab:remote row = %+v", d)

@@ -27,26 +27,52 @@ package sched
 //   - Colab hands a lecture back (colab.IsFallback, colab.IsRequeue): the
 //     job is requeued without using up a retry (stats.remote_requeues), its
 //     pin is dropped and it goes to the local devices (an auto snapshot is
-//     bound to a local device at its next start).
+//     bound to a local device at its next start). Without a local device
+//     it waits with remote_fallback and the stage offers "改用 Colab 处理"
+//     (colabfix). Colab only busy (colab.IsBusy: its runtime was being
+//     released or started) is no hand-back: requeued as it was.
 //   - The lectures that wait and could go to Colab are its planned queue
-//     (SetQueue); when none is left QueueDrained releases the runtime (now,
-//     or after the running lecture).
+//     (SetQueue); when none is left and no run on Colab exists,
+//     QueueDrained releases the runtime. A job that waits for a busy Colab
+//     and could not go to a local device either says remote_busy.
 //   - "处理完当前这节后关机" / "立即关机" (ShutdownRemote) hold the automatic
 //     dispatch until no such lecture is left, so the next scan does not
-//     borrow a new runtime at once.
+//     borrow a new runtime at once. A held lecture no local device can take
+//     says remote_held and the stage offers "改用 Colab 处理" (UseRemote
+//     ends the hold: the user asked for Colab explicitly; colabfix2).
+//   - Batches (colab-batch; a backend that is a RemoteBatcher): the
+//     scheduler tells Colab its plan (SetPlan: the lectures running there
+//     and those waiting, which of them may go up ahead of their turn). With
+//     local devices that Colab only relieves, Colab holds at most
+//     remoteOffloadHold lectures ("1 + 1"): the first lecture that cannot
+//     go to a local device is dispatched, the next one is kept for Colab
+//     (reserved: no local device takes it any more) and uploaded ahead;
+//     once Colab is free again a local device gets the first try ("续杯时本
+//     机优先"). Without a local device every waiting lecture may go ahead
+//     (the backend limits that by tier, window, balance and memory). A
+//     lecture whose audio is on Colab already (Held) or that is reserved
+//     runs on Colab only and goes before the others; Slots of them at once
+//     (two on the larger GPUs). The runtime is not released while lectures
+//     are being prepared (prep) or downloaded (Options.RemoteSoon) that
+//     would go to Colab, for at most RemoteImminentMax after its queue
+//     emptied.
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"lectureflow/internal/colab"
 	"lectureflow/internal/db"
+	"lectureflow/internal/devices"
 	"lectureflow/internal/model"
+	"lectureflow/internal/remote"
 	"lectureflow/internal/state"
 	"lectureflow/internal/wav"
 )
@@ -66,6 +92,28 @@ type RemoteBackend interface {
 	Status(ctx context.Context) colab.Status
 	Transcribe(ctx context.Context, job colab.Job, progress func(colab.Event)) (string, error)
 }
+
+// RemoteBatcher is a RemoteBackend that runs batches (colab-batch;
+// *colab.Backend): several lectures at once, the next ones uploaded ahead
+// of their turn. Without it the scheduler sends one lecture at a time and
+// nothing ahead, as before.
+type RemoteBatcher interface {
+	// SetPlan replaces the plan: the lectures running on Colab
+	// (Running) and those waiting that could go there, in dispatch order;
+	// Upload marks those whose audio may go up ahead of their turn. A
+	// lecture that leaves the plan has its uploaded files deleted.
+	SetPlan(plan []colab.PlanEntry)
+	// Held returns the job ids whose audio is on Colab (or on its way)
+	// ahead of their turn.
+	Held() map[string]bool
+	// Slots is how many lectures may run on Colab at once.
+	Slots() int
+}
+
+// remoteOffloadHold: with local devices, Colab holds at most this many
+// lectures — one transcribing, one uploaded ahead (user decision
+// 2026-10-27 04:30).
+const remoteOffloadHold = 2
 
 // RemotePrefs are the scheduler's Colab switches (kv model.KVColabEnabled,
 // model.KVColabBatteryPrefer).
@@ -106,9 +154,54 @@ func WriteRemotePrefs(ctx context.Context, st db.Store, p RemotePrefs) error {
 var ErrRemoteFallback = errors.New("remote transcription is not available: back to the local devices")
 
 // remoteHandBack reports whether a run's error hands the lecture back to
-// the local devices (requeue, not a failure).
+// the local devices (requeue, not a failure), or — remoteBusy — just puts
+// it back in the queue.
 func remoteHandBack(err error) bool {
-	return err != nil && (errors.Is(err, ErrRemoteFallback) || colab.IsFallback(err) || colab.IsRequeue(err))
+	return err != nil && (errors.Is(err, ErrRemoteFallback) || colab.IsFallback(err) || colab.IsRequeue(err) || colab.IsBusy(err) ||
+		remote.IsFallback(err) || remote.IsBusy(err)) // ssh-mvp: the SSH servers' classes
+}
+
+// remoteBusy reports whether Colab could not take the lecture yet (the
+// runtime was being released or started; colabfix): requeued without a
+// hand-back (no stats.remote_fallback, the pin and a fixed colab snapshot
+// stay), and no lecture goes to Colab for Options.RemoteBusyPause.
+func remoteBusy(err error) bool { return err != nil && (colab.IsBusy(err) || remote.IsBusy(err)) }
+
+// localUnavailable reports whether the local devices' reason says that no
+// local device can take the job at all (none exists, is enabled or allowed
+// by the power policy, or every one is paused; fresh-cuda: the only ones
+// lack a component that no task installs), as opposed to being busy (a
+// component being installed counts as busy: the device takes jobs soon).
+func localUnavailable(reason string) bool {
+	switch reason {
+	case model.WaitNoASRDevice, model.WaitPowerNoDevice, model.WaitPowerNoSaverDevice:
+		return true
+	}
+	return strings.HasPrefix(reason, model.WaitDevicePausedPrefix) ||
+		strings.HasPrefix(reason, devices.WaitComponentMissingPrefix) || strings.HasPrefix(reason, devices.WaitModelMissingPrefix)
+}
+
+// remoteBusyReason is the waiting_for of a job that could go to Colab
+// while Colab is busy: WaitRemoteBusy when no local device can take it
+// (colabfix: only Colab transcribes, the local reason would be misleading),
+// else the local reason (whichever frees first takes it).
+func remoteBusyReason(local string) string {
+	if localUnavailable(local) {
+		return model.WaitRemoteBusy
+	}
+	return local
+}
+
+// remoteHeldReason is the waiting_for of a job that could go to Colab
+// while a shutdown holds the automatic dispatch (colabfix2):
+// WaitRemoteHeld when no local device can take it — it would wait until
+// the user acts; the stage offers "改用 Colab 处理", which ends the hold —
+// else the local reason.
+func remoteHeldReason(local string) string {
+	if localUnavailable(local) {
+		return model.WaitRemoteHeld
+	}
+	return local
 }
 
 type remoteKey struct{}
@@ -140,7 +233,7 @@ func RemoteLabel(accelerator string) string {
 // and precision are Colab's settings (the remote worker runs them).
 func RemoteRow(set colab.Settings) model.ASRDevice {
 	return model.ASRDevice{ID: model.DeviceColab, Backend: model.BackendColab, Label: RemoteLabel(set.Accelerator),
-		Enabled: true, Model: set.Model, Precision: set.ComputeType, MaxParallel: 1,
+		Enabled: true, Model: set.Model, Precision: set.ComputeType, MaxParallel: colab.SlotsFor(set),
 		Priority: model.DefaultDevicePriority(model.DeviceColab)}
 }
 
@@ -162,15 +255,34 @@ func (r remoteScan) usable() bool { return r.present() && r.rowEnabled }
 // remoteState is the scheduler's own Colab bookkeeping (guarded by
 // Scheduler.mu).
 type remoteState struct {
-	hold      bool      // ShutdownRemote: no automatic dispatch until the planned queue is empty
-	queue     []float64 // the last SetQueue
-	planned   bool      // the last scan had eligible lectures
-	runEnded  bool      // a colab run ended since the last scan
-	reported  bool      // OnRemote was called once
-	lastPres  bool
-	lastRow   model.ASRDevice
-	draining  bool // a QueueDrained call runs
+	hold     bool      // ShutdownRemote: no automatic dispatch until the planned queue is empty
+	queue    []float64 // the last SetQueue
+	planned  bool      // the last scan had eligible lectures
+	runEnded bool      // a colab run ended since the last scan
+	reported bool      // OnRemote was called once
+	lastPres bool
+	lastRow  model.ASRDevice
+	draining bool // a QueueDrained call runs
+	// busyUntil: Colab answered "busy" (remoteBusy); no lecture is sent to
+	// it before this time.
+	busyUntil time.Time
 	durations map[string]audioLen
+
+	// colab-batch: reserved are the queued lectures kept for Colab (the
+	// "+1" with local devices); colabOnly: the last lecture planned for
+	// Colab had no local device to go to (or was pinned); emptySince: when
+	// the planned queue last became empty (the imminent-work hold);
+	// lastPlan: the last SetPlan.
+	reserved   map[string]bool
+	colabOnly  bool
+	emptySince time.Time
+	lastPlan   []colab.PlanEntry
+	// drainHeld: a drain was put off for work about to arrive; it comes
+	// once that ends (or the limit passes).
+	drainHeld bool
+
+	// ssh-mvp (remote_devices.go): the SSH servers (SetSSH; nil = none).
+	ssh SSHFleet
 }
 
 type audioLen struct {
@@ -269,8 +381,10 @@ func (s *Scheduler) remoteRunningLocked() bool {
 	return s.pipelineOnLocked(model.DeviceColab) > 0
 }
 
-// isRemote: a device id of the remote backend.
-func isRemote(id string) bool { return model.DeviceBackend(id) == model.BackendColab }
+// isRemote: a remote device id (Colab or an SSH server; ssh-mvp): outside
+// the power-aware policy, never a local worker. Colab's own bookkeeping
+// uses isColab.
+func isRemote(id string) bool { return model.IsRemoteDevice(id) }
 
 // remotePinned: the job may run on colab:remote only (a "改用 Colab 处理"
 // pin, or a fixed colab:remote snapshot).
@@ -279,7 +393,7 @@ func remotePinned(j model.Job) bool {
 		return true
 	}
 	snap, ok := model.ParseASRSnapshot(j.ConfigSnapshot)
-	return ok && !snap.Auto && isRemote(snap.DeviceID)
+	return ok && !snap.Auto && isColab(snap.DeviceID)
 }
 
 // remoteOnlyAdmit decides a pinned job: Colab or wait.
@@ -299,9 +413,53 @@ func (s *Scheduler) remoteOnlyAdmit(ctx context.Context, sc *scanState, r *run) 
 	sc.remoteQueue = append(sc.remoteQueue, s.audioSec(ctx, r.job))
 	sc.remoteEligible++
 	if sc.remoteHold {
-		return model.WaitGPUSlot
+		// Only a fixed colab:remote snapshot gets here (a shutdown drops
+		// the pins, UseRemote ends the hold): it runs on Colab only, so it
+		// says remote_held like a job without a local device (colabfix2).
+		return model.WaitRemoteHeld
 	}
-	return s.remoteAdmit(ctx, sc, r, model.WaitGPUSlot)
+	// colab-batch: on Colab only (pinned, or its audio is there already):
+	// it may go up ahead of its turn.
+	s.planEntry(ctx, sc, r.job, true)
+	s.mu.Lock()
+	s.rem.colabOnly = true
+	s.mu.Unlock()
+	return s.remoteAdmit(ctx, sc, r, model.WaitRemoteBusy)
+}
+
+// remoteScanStart notes, at the start of a scan, which queued asr jobs
+// are kept for Colab (colab-batch): their audio is on Colab already
+// (Held) or they are reserved, and Colab can take lectures now. They run
+// on Colab only, before the others.
+func (s *Scheduler) remoteScanStart(sc *scanState, jobs []model.Job) {
+	if s.batch == nil || !sc.remote.usable() || sc.remoteHold {
+		return
+	}
+	sc.remoteHeld = s.batch.Held()
+	s.mu.Lock()
+	reserved := maps.Clone(s.rem.reserved)
+	s.mu.Unlock()
+	sc.remoteKeptJobs = map[string]bool{}
+	for _, j := range jobs {
+		// pending ones too: they may become queued in this scan (a kept
+		// job skipped by the scan gives its place back, scan())
+		if j.Stage != model.StageASR {
+			continue
+		}
+		if sc.remoteHeld[j.ID] || reserved[j.ID] {
+			sc.remoteKeptJobs[j.ID] = true
+			sc.remoteKeptLeft++
+		}
+	}
+}
+
+// planEntry adds a waiting job to this scan's plan for Colab.
+func (s *Scheduler) planEntry(ctx context.Context, sc *scanState, j model.Job, upload bool) {
+	if s.batch == nil {
+		return
+	}
+	sc.remotePlan = append(sc.remotePlan, colab.PlanEntry{Key: j.ID, AudioPath: s.audioPath(ctx, j),
+		AudioSec: s.audioSec(ctx, j), Upload: upload})
 }
 
 // remoteOverflow is the automatic dispatch of a job the local devices did
@@ -314,6 +472,11 @@ func (s *Scheduler) remoteOverflow(ctx context.Context, sc *scanState, r *run, l
 		return local
 	}
 	j := r.job
+	if j.Stats.RemoteFallback != nil && j.Stats.ASRResume == nil && localUnavailable(local) {
+		// colabfix: Colab handed it back and no local device can take it:
+		// it would wait for good; the stage offers "改用 Colab 处理".
+		return model.WaitRemoteFallback
+	}
 	if j.Stats.ASRResume != nil || j.Stats.RemoteFallback != nil {
 		return local // suspended by the power policy (V14.4), or Colab handed it back before
 	}
@@ -334,9 +497,38 @@ func (s *Scheduler) remoteOverflow(ctx context.Context, sc *scanState, r *run, l
 	sc.remoteQueue = append(sc.remoteQueue, s.audioSec(ctx, j))
 	sc.remoteEligible++
 	if sc.remoteHold {
-		return local
+		return remoteHeldReason(local)
 	}
-	return s.remoteAdmit(ctx, sc, r, local)
+	only := localUnavailable(local)
+	s.mu.Lock()
+	s.rem.colabOnly = only
+	s.mu.Unlock()
+	reason := s.remoteAdmit(ctx, sc, r, remoteBusyReason(local))
+	if reason == "" || s.batch == nil {
+		return reason
+	}
+	// colab-batch: not dispatched now. Without a local device that could
+	// take it, it may go up ahead of its turn; with local devices Colab
+	// keeps it only as the "+1" (reserved), and only once its runtime is
+	// asked for.
+	upload := only
+	if !only && reason != model.WaitRemoteWindow && reason != model.WaitRemoteBalance && reason != model.WaitRemoteAuth {
+		s.mu.Lock()
+		// "1 + 1": one transcribing on Colab, one waiting there.
+		onColab := s.pipelineOnLocked(model.DeviceColab)
+		inflight := onColab + len(s.rem.reserved) + len(sc.remoteHeld)
+		if onColab > 0 && inflight < remoteOffloadHold {
+			if s.rem.reserved == nil {
+				s.rem.reserved = map[string]bool{}
+			}
+			s.rem.reserved[j.ID] = true
+			upload = true
+			slog.Info("asr job kept for Colab (uploaded ahead while the current lecture runs there)", "job", j.ID)
+		}
+		s.mu.Unlock()
+	}
+	s.planEntry(ctx, sc, j, upload)
+	return reason
 }
 
 // remoteDispatchTimeout bounds CanDispatch inside a scan (the paid tier
@@ -346,11 +538,26 @@ const remoteDispatchTimeout = 10 * time.Second
 // remoteAdmit asks Colab and, when it can take the job, binds the run to
 // colab:remote (busy: the reason the job keeps).
 func (s *Scheduler) remoteAdmit(ctx context.Context, sc *scanState, r *run, busy string) string {
+	slots := 1
+	if s.batch != nil {
+		slots = max(1, s.batch.Slots())
+	}
+	kept := sc.remoteKeptJobs[r.job.ID]
 	s.mu.Lock()
-	taken := s.remoteRunningLocked()
+	// Slots lectures at a time (one, or two on the larger GPUs;
+	// colab-batch); none while QueueDrained runs (the runtime is being
+	// released: a lecture sent now would find it stopping) or shortly after
+	// Colab answered busy (colabfix). The lectures kept for Colab (their
+	// audio is there already) go first.
+	running := max(s.pipelineOnLocked(model.DeviceColab), sc.remoteDispatched)
+	free := slots - running
+	if !kept {
+		free -= sc.remoteKeptLeft
+	}
+	taken := free <= 0 || s.rem.draining || s.now().Before(s.rem.busyUntil)
 	s.mu.Unlock()
-	if taken || sc.remoteTaken {
-		return busy // one lecture at a time
+	if taken {
+		return busy
 	}
 	sec := sc.remoteQueue[len(sc.remoteQueue)-1]
 	cctx, cancel := context.WithTimeout(ctx, remoteDispatchTimeout)
@@ -365,7 +572,13 @@ func (s *Scheduler) remoteAdmit(ctx context.Context, sc *scanState, r *run, busy
 	// Dispatched: not part of the planned queue any more.
 	sc.remoteQueue = sc.remoteQueue[:len(sc.remoteQueue)-1]
 	sc.remoteEligible--
-	sc.remoteTaken = true
+	sc.remoteDispatched++
+	if kept {
+		sc.remoteKeptLeft--
+	}
+	s.mu.Lock()
+	delete(s.rem.reserved, r.job.ID)
+	s.mu.Unlock()
 	snap, snapOK := model.ParseASRSnapshot(r.job.ConfigSnapshot)
 	r.device, r.devRow = model.DeviceColab, RemoteRow(sc.remote.set)
 	r.bind = snapOK && snap.Auto
@@ -374,14 +587,22 @@ func (s *Scheduler) remoteAdmit(ctx context.Context, sc *scanState, r *run, busy
 	return ""
 }
 
+// audioPath is the job's lecture audio.wav ("" when the lecture is gone).
+func (s *Scheduler) audioPath(ctx context.Context, j model.Job) string {
+	l, err := s.st.GetLecture(ctx, j.ScopeID)
+	if err != nil {
+		return ""
+	}
+	return model.LectureDir(s.dataDir, l.CourseID, l.ID) + string(os.PathSeparator) + model.AudioFile
+}
+
 // audioSec is the length of the job's lecture audio.wav in seconds (0 when
 // unknown), cached by size and modification time.
 func (s *Scheduler) audioSec(ctx context.Context, j model.Job) float64 {
-	l, err := s.st.GetLecture(ctx, j.ScopeID)
-	if err != nil {
+	path := s.audioPath(ctx, j)
+	if path == "" {
 		return 0
 	}
-	path := model.LectureDir(s.dataDir, l.CourseID, l.ID) + string(os.PathSeparator) + model.AudioFile
 	fi, err := os.Stat(path)
 	if err != nil {
 		return 0
@@ -407,9 +628,14 @@ func (s *Scheduler) audioSec(ctx context.Context, j model.Job) float64 {
 }
 
 // endRemoteScan tells Colab its planned queue (SetQueue) and, when none is
-// left, that the queue is drained (once; the runtime is released now or
-// after the running lecture). A shutdown's hold ends with the queue.
-func (s *Scheduler) endRemoteScan(sc *scanState) {
+// left, that the queue is drained (once; the runtime is released). A
+// shutdown's hold ends with the queue.
+//
+// colabfix (accept2): never while a run on colab:remote exists — also one
+// this scan has just started, whose asr stage has not reached Transcribe
+// yet: the backend would release the runtime under it and the lecture
+// would find it stopping. The drain waits for that run's end (runEnded).
+func (s *Scheduler) endRemoteScan(ctx context.Context, sc *scanState) {
 	if s.remote == nil || !sc.remote.configured {
 		return
 	}
@@ -417,23 +643,49 @@ func (s *Scheduler) endRemoteScan(sc *scanState) {
 	if sc.remoteHold || !sc.remote.usable() {
 		q = nil // nothing is planned for Colab while held or unusable
 	}
+	plan := s.remotePlanOf(sc, len(q) > 0)
 	s.mu.Lock()
 	prevPlanned, ended := s.rem.planned, s.rem.runEnded
 	s.rem.runEnded = false
 	s.rem.planned = len(q) > 0
 	changed := !slices.Equal(q, s.rem.queue)
 	s.rem.queue = slices.Clone(q)
-	if sc.remoteEligible == 0 && s.rem.hold && !s.remoteRunningLocked() {
+	planChanged := s.batch != nil && !slices.Equal(plan, s.rem.lastPlan)
+	s.rem.lastPlan = plan
+	// A run this scan started is in s.running already (start registers it
+	// before its goroutine); one whose start failed is not.
+	running := s.remoteRunningLocked()
+	if sc.remoteEligible == 0 && s.rem.hold && !running {
 		s.rem.hold = false
 		slog.Info("colab: no lecture is waiting any more; automatic dispatch to Colab allowed again")
 	}
-	drain := len(q) == 0 && (prevPlanned || ended) && !s.rem.draining
-	if drain {
-		s.rem.draining = true
+	if len(q) > 0 || running {
+		s.rem.emptySince = time.Time{}
+	} else if s.rem.emptySince.IsZero() {
+		s.rem.emptySince = s.now()
 	}
+	if len(q) > 0 || running {
+		s.rem.drainHeld = false
+	}
+	drain := len(q) == 0 && (prevPlanned || ended || s.rem.drainHeld) && !s.rem.draining && !running
 	s.mu.Unlock()
+	if drain && s.remoteImminent(ctx, sc) {
+		drain = false // work is about to arrive: keep the runtime (colab-batch)
+		s.mu.Lock()
+		s.rem.drainHeld = true
+		s.mu.Unlock()
+	}
+	if drain {
+		s.mu.Lock()
+		drain = !s.rem.draining
+		s.rem.draining, s.rem.drainHeld = true, false
+		s.mu.Unlock()
+	}
 	if changed {
 		s.remote.SetQueue(q)
+	}
+	if planChanged {
+		s.batch.SetPlan(plan)
 	}
 	if drain {
 		go func() {
@@ -459,6 +711,7 @@ func (s *Scheduler) ShutdownRemote(ctx context.Context, now bool) error {
 	}
 	s.mu.Lock()
 	s.rem.hold = true
+	s.rem.reserved = nil
 	s.mu.Unlock()
 	if err := s.unpinQueued(ctx); err != nil {
 		slog.Warn("colab: unpinning the queued lectures", "err", err)
@@ -544,7 +797,7 @@ func (s *Scheduler) UseRemote(ctx context.Context, lectureID string) error {
 	}
 	s.mu.Lock()
 	cur := s.running[j.ID]
-	onRemote := cur != nil && isRemote(cur.device)
+	onRemote := cur != nil && isColab(cur.device)
 	s.mu.Unlock()
 	if onRemote || (j.Status == model.StatusQueued && j.Stats.RemotePin) {
 		return nil
@@ -579,8 +832,11 @@ func (s *Scheduler) UseRemote(ctx context.Context, lectureID string) error {
 		var nj model.Job
 		if nj, err = s.st.GetCurrentJob(ctx, model.ScopeLecture, lectureID, model.StageASR); err == nil {
 			st := nj.Stats
-			// From the start (V14.4): no checkpoint, no power event to show.
+			// From the start (V14.4): no checkpoint, no power event to show;
+			// a transcription on Colab, not a "修复断句" run (textrepair-int:
+			// the mode would only be ignored, lead ruling 05:50 item 3).
 			st.RemotePin, st.RemoteFallback, st.ASRResume, st.PowerEvent = true, nil, nil, nil
+			st.ASRMode = ""
 			err = s.st.SetJobStats(ctx, nj.ID, st)
 		}
 	}
@@ -612,6 +868,31 @@ func (s *Scheduler) remoteRunning() bool {
 // replaced by the current auto snapshot so a local device can take it.
 func (s *Scheduler) remoteRequeue(ctx context.Context, r *run, runErr error) {
 	id := r.job.ID
+	if model.IsSSHDevice(r.device) {
+		s.sshRequeue(ctx, r, runErr)
+		return
+	}
+	if remoteBusy(runErr) {
+		// colabfix: Colab was not ready (its runtime was being released or
+		// started): back to the queue as it was — pinned or fixed to Colab
+		// it stays so, an auto job may go to Colab again — after a short
+		// pause (CanDispatch says busy until the release has ended anyway).
+		s.mu.Lock()
+		s.rem.busyUntil = s.now().Add(s.remoteBusyPause)
+		s.mu.Unlock()
+		if err := state.PowerRequeue(ctx, s.st, id); err != nil {
+			slog.Error("job requeue after Colab was busy", "job", id, "err", err)
+			return
+		}
+		slog.Info("Colab was not ready for the lecture (its runtime was being released or started); back to the queue",
+			"job", id, "lecture", r.scopeID)
+		return
+	}
+	// colab-batch: a hand-back ends the lectures kept for Colab too; the
+	// local devices may take them (their uploads go with the plan).
+	s.mu.Lock()
+	s.rem.reserved = nil
+	s.mu.Unlock()
 	if err := state.PowerRequeue(ctx, s.st, id); err != nil {
 		slog.Error("job requeue after Colab handed it back", "job", id, "err", err)
 		return
@@ -636,4 +917,109 @@ func remoteErrorInfo(err error) *model.ErrorInfo {
 		return &info
 	}
 	return &model.ErrorInfo{Code: colab.CodeUnavailable, Params: map[string]any{"endpoint": "local"}}
+}
+
+// remotePlanOf is the plan for Colab (colab-batch): the lectures running
+// there, then the waiting ones of this scan in dispatch order (kept ones
+// first). Reserved lectures that are no longer waiting are forgotten.
+// Without lectures planned and nothing running it is empty.
+func (s *Scheduler) remotePlanOf(sc *scanState, planned bool) []colab.PlanEntry {
+	if s.batch == nil {
+		return nil
+	}
+	s.mu.Lock()
+	var plan []colab.PlanEntry
+	for _, r := range s.running {
+		if r.res == ResourceGPU && isColab(r.device) {
+			plan = append(plan, colab.PlanEntry{Key: r.job.ID, Running: true})
+		}
+	}
+	waiting := map[string]bool{}
+	for _, e := range sc.remotePlan {
+		waiting[e.Key] = true
+	}
+	for id := range s.rem.reserved {
+		if !waiting[id] || !sc.remote.usable() || sc.remoteHold {
+			delete(s.rem.reserved, id)
+		}
+	}
+	s.mu.Unlock()
+	slices.SortStableFunc(plan, func(a, b colab.PlanEntry) int { return strings.Compare(a.Key, b.Key) })
+	if !planned && len(plan) == 0 {
+		return nil
+	}
+	if sc.remoteHold || !sc.remote.usable() {
+		return plan
+	}
+	kept := func(e colab.PlanEntry) bool { return sc.remoteKeptJobs[e.Key] }
+	for _, e := range sc.remotePlan {
+		if kept(e) {
+			plan = append(plan, e)
+		}
+	}
+	for _, e := range sc.remotePlan {
+		if !kept(e) {
+			plan = append(plan, e)
+		}
+	}
+	return plan
+}
+
+// RemoteImminentMax: the longest the runtime is kept, after its queue
+// emptied, for lectures still being prepared or downloaded (colab-batch:
+// "设上限，例如这些任务的预计到达时间不超过几分钟").
+const remoteImminentMax = 5 * time.Minute
+
+// remoteImminent reports whether work that would go to Colab is about to
+// arrive (colab-batch, user's principle of 2026-10-27 04:40): a lecture
+// whose asr job waits for its prep, or a download that ends (and becomes
+// a lecture) within the limit (Options.RemoteSoon), while no local device
+// would take it (none is usable for the lectures planned so far, or the
+// local devices are busy). Never longer than remoteImminentMax after the
+// queue emptied.
+func (s *Scheduler) remoteImminent(ctx context.Context, sc *scanState) bool {
+	if !sc.remote.usable() || sc.remoteHold {
+		return false
+	}
+	s.mu.Lock()
+	since, only := s.rem.emptySince, s.rem.colabOnly
+	localBusy := false
+	for _, r := range s.running {
+		if r.res == ResourceGPU && r.job.Stage == model.StageASR && r.device != "" && !isRemote(r.device) {
+			localBusy = true
+		}
+	}
+	s.mu.Unlock()
+	if !since.IsZero() && s.now().Sub(since) >= s.remoteImminentMax {
+		return false
+	}
+	if !only && !localBusy {
+		return false
+	}
+	for _, j := range sc.remotePending {
+		if remotePinned(j) || remoteEligibleAuto(j) {
+			if p, err := s.st.GetCurrentJob(ctx, model.ScopeLecture, j.ScopeID, model.StagePrep); err == nil &&
+				(p.Status == model.StatusQueued || p.Status == model.StatusRunning) {
+				slog.Info("colab: keeping the runtime for a lecture being prepared", "lecture", j.ScopeID)
+				return true
+			}
+		}
+	}
+	if s.remoteSoon != nil {
+		if eta := s.remoteSoon(ctx); eta >= 0 && eta <= s.remoteImminentMax {
+			slog.Info("colab: keeping the runtime for a download about to become a lecture", "eta_s", int(eta.Seconds()))
+			return true
+		}
+	}
+	return false
+}
+
+// remoteEligibleAuto: an asr job Colab could take automatically (auto
+// snapshot, never handed back, not suspended by the power policy).
+func remoteEligibleAuto(j model.Job) bool {
+	if j.Stats.RemoteFallback != nil || j.Stats.ASRResume != nil {
+		return false
+	}
+	snap, ok := model.ParseASRSnapshot(j.ConfigSnapshot)
+	return !ok || snap.Auto
 }

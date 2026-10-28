@@ -1,0 +1,350 @@
+{
+  "kind": "lectureflow-detection-report",
+  "reportVersion": 1,
+  "generatedAt": "2026-10-26",
+  "extension": {
+    "version": "0.1.0",
+    "browser": "chrome"
+  },
+  "page": {
+    "url": "https://lectures.example.edu/watch/lecture-07",
+    "frames": [
+      {
+        "frameId": 0,
+        "url": "https://lectures.example.edu/watch/lecture-07"
+      },
+      {
+        "frameId": 3,
+        "url": "https://lectures.example.edu/embed/drm"
+      }
+    ]
+  },
+  "profile": null,
+  "inputs": {
+    "frames": [
+      {
+        "frameId": 0,
+        "url": "https://lectures.example.edu/watch/lecture-07",
+        "encryptedEvents": 0,
+        "elements": [
+          {
+            "tag": "video",
+            "src": "https://lectures.example.edu/media/lecture-07.mp4",
+            "currentSrc": "https://lectures.example.edu/media/lecture-07.mp4",
+            "sources": [],
+            "mediaKeys": false,
+            "videoWidth": 1280,
+            "videoHeight": 720,
+            "duration": 3000.5,
+            "readyState": 4
+          },
+          {
+            "tag": "audio",
+            "src": "",
+            "currentSrc": "https://lectures.example.edu/media/lecture-07.m4a",
+            "sources": [
+              {
+                "src": "https://lectures.example.edu/media/lecture-07.m4a",
+                "type": "audio/mp4"
+              }
+            ],
+            "mediaKeys": false,
+            "videoWidth": null,
+            "videoHeight": null,
+            "duration": 3000.5,
+            "readyState": 1
+          }
+        ],
+        "resources": [
+          {
+            "url": "https://lectures.example.edu/hls/master.m3u8",
+            "initiatorType": "fetch",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://lectures.example.edu/hls/v720/index.m3u8",
+            "initiatorType": "fetch",
+            "responseStatus": 200
+          },
+          {
+            "url": "https://lectures.example.edu/hls/v720/seg0.ts",
+            "initiatorType": "fetch",
+            "responseStatus": 200
+          }
+        ]
+      },
+      {
+        "frameId": 3,
+        "url": "https://lectures.example.edu/embed/drm",
+        "encryptedEvents": 0,
+        "elements": [],
+        "resources": [
+          {
+            "url": "https://lectures.example.edu/dash/protected.mpd",
+            "initiatorType": "xmlhttprequest",
+            "responseStatus": 200
+          }
+        ]
+      }
+    ],
+    "webRequests": [
+      {
+        "url": "https://lectures.example.edu/media/lecture-07.mp4",
+        "frameId": 0,
+        "resourceType": "media",
+        "statusCode": 206,
+        "contentType": "video/mp4",
+        "contentLength": 65536,
+        "contentRangeTotal": 734003200
+      }
+    ],
+    "fetches": [
+      {
+        "purpose": "manifest",
+        "url": "https://lectures.example.edu/dash/protected.mpd",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" xmlns:cenc=\"urn:mpeg:cenc:2013\" type=\"static\" mediaPresentationDuration=\"PT50M\" profiles=\"urn:mpeg:dash:profile:isoff-live:2011\">\n  <Period id=\"p0\">\n    <AdaptationSet contentType=\"video\" mimeType=\"video/mp4\" segmentAlignment=\"true\">\n      <ContentProtection schemeIdUri=\"urn:mpeg:dash:mp4protection:2011\" value=\"cenc\" cenc:default_KID=\"00000000-0000-4000-8000-000000000001\"/>\n      <ContentProtection schemeIdUri=\"urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed\">\n        <cenc:pssh>{opaque}</cenc:pssh>\n      </ContentProtection>\n      <SegmentTemplate timescale=\"1000\" media=\"v/$RepresentationID$/seg-$Number%05d$.m4s\" initialization=\"v/$RepresentationID$/init.mp4\" startNumber=\"1\" duration=\"4000\"/>\n      <Representation id=\"v1080\" bandwidth=\"4000000\" width=\"1920\" height=\"1080\" codecs=\"avc1.640028\"/>\n      <Representation id=\"v540\" bandwidth=\"1200000\" width=\"960\" height=\"540\" codecs=\"avc1.64001f\"/>\n    </AdaptationSet>\n    <AdaptationSet contentType=\"audio\" mimeType=\"audio/mp4\" lang=\"en\">\n      <ContentProtection schemeIdUri=\"urn:mpeg:dash:mp4protection:2011\" value=\"cenc\"/>\n      <SegmentTemplate timescale=\"1000\" media=\"a/$RepresentationID$/seg-$Number%05d$.m4s\" initialization=\"a/$RepresentationID$/init.mp4\" startNumber=\"1\" duration=\"4000\"/>\n      <Representation id=\"a128\" bandwidth=\"128000\" codecs=\"mp4a.40.2\" audioSamplingRate=\"48000\"/>\n    </AdaptationSet>\n    <AdaptationSet contentType=\"text\" mimeType=\"text/vtt\" lang=\"en\">\n      <Representation id=\"sub\" bandwidth=\"1000\">\n        <BaseURL>subs/en.vtt</BaseURL>\n      </Representation>\n    </AdaptationSet>\n  </Period>\n</MPD>\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://lectures.example.edu/hls/master.m3u8",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-VERSION:6\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\",NAME=\"Xxxxxxx\",LANGUAGE=\"en\",DEFAULT=YES,URI=\"a-en/index.m3u8\"\n#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\",NAME=\"Xxxxxxxxx\",LANGUAGE=\"yue\",URI=\"a-yue/index.m3u8\"\n#EXT-X-STREAM-INF:BANDWIDTH=800000,RESOLUTION=640x360,CODECS=\"avc1.4d401e,mp4a.40.2\",AUDIO=\"aac\"\nv360/index.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=2500000,AVERAGE-BANDWIDTH=2000000,RESOLUTION=1280x720,CODECS=\"avc1.4d401f,mp4a.40.2\",AUDIO=\"aac\"\nv720/index.m3u8\n#EXT-X-I-FRAME-STREAM-INF:BANDWIDTH=90000,RESOLUTION=1280x720,URI=\"v720/iframes.m3u8\"\n"
+      },
+      {
+        "purpose": "manifest",
+        "url": "https://lectures.example.edu/hls/v720/index.m3u8",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\nseg0.ts\n#EXTINF:10,\nseg1.ts\n#EXT-X-ENDLIST\n"
+      },
+      {
+        "purpose": "probe",
+        "url": "https://lectures.example.edu/hls/a-en/index.m3u8",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\na0.aac\n#EXT-X-ENDLIST\n"
+      },
+      {
+        "purpose": "probe",
+        "url": "https://lectures.example.edu/hls/a-yue/index.m3u8",
+        "ok": true,
+        "status": 200,
+        "contentType": "application/vnd.apple.mpegurl",
+        "text": "#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:10,\na0.aac\n#EXT-X-ENDLIST\n"
+      },
+      {
+        "purpose": "file",
+        "url": "https://lectures.example.edu/media/lecture-07.m4a",
+        "ok": true,
+        "status": 200,
+        "contentType": "audio/mp4",
+        "size": 48000000
+      }
+    ]
+  },
+  "dom": [],
+  "expected": {
+    "summary": {
+      "total": 7,
+      "audio": 4,
+      "video": 3,
+      "unknown": 0,
+      "protected": 2
+    },
+    "tracks": [
+      {
+        "id": "https://lectures.example.edu/dash/protected.mpd#lf=video:-:0",
+        "url": "https://lectures.example.edu/dash/protected.mpd",
+        "kind": "video",
+        "format": "dash",
+        "sizeBytes": 1500000000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          3
+        ],
+        "protected": true,
+        "selector": "video:-:0",
+        "quality": "1080p",
+        "durationSec": 3000,
+        "variants": [
+          {
+            "id": "v1080",
+            "bandwidth": 4000000,
+            "width": 1920,
+            "height": 1080,
+            "codecs": "avc1.640028"
+          },
+          {
+            "id": "v540",
+            "bandwidth": 1200000,
+            "width": 960,
+            "height": 540,
+            "codecs": "avc1.64001f"
+          }
+        ]
+      },
+      {
+        "id": "https://lectures.example.edu/media/lecture-07.mp4",
+        "url": "https://lectures.example.edu/media/lecture-07.mp4",
+        "kind": "video",
+        "format": "file",
+        "sizeBytes": 734003200,
+        "sizeEstimated": false,
+        "sources": [
+          "element",
+          "webrequest"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "quality": "720p",
+        "durationSec": 3000.5,
+        "mime": "video/mp4"
+      },
+      {
+        "id": "https://lectures.example.edu/hls/master.m3u8",
+        "url": "https://lectures.example.edu/hls/master.m3u8",
+        "kind": "video",
+        "format": "hls",
+        "sizeBytes": 5000000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "quality": "720p",
+        "durationSec": 20,
+        "variants": [
+          {
+            "url": "https://lectures.example.edu/hls/v720/index.m3u8",
+            "bandwidth": 2500000,
+            "width": 1280,
+            "height": 720,
+            "codecs": "avc1.4d401f,mp4a.40.2"
+          },
+          {
+            "url": "https://lectures.example.edu/hls/v360/index.m3u8",
+            "bandwidth": 800000,
+            "width": 640,
+            "height": 360,
+            "codecs": "avc1.4d401e,mp4a.40.2"
+          }
+        ]
+      },
+      {
+        "id": "https://lectures.example.edu/dash/protected.mpd#lf=audio:en:0",
+        "url": "https://lectures.example.edu/dash/protected.mpd",
+        "kind": "audio",
+        "format": "dash",
+        "sizeBytes": 48000000,
+        "sizeEstimated": true,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          3
+        ],
+        "protected": true,
+        "selector": "audio:en:0",
+        "durationSec": 3000,
+        "variants": [
+          {
+            "id": "a128",
+            "bandwidth": 128000,
+            "width": null,
+            "height": null,
+            "codecs": "mp4a.40.2"
+          }
+        ],
+        "language": "en"
+      },
+      {
+        "id": "https://lectures.example.edu/media/lecture-07.m4a",
+        "url": "https://lectures.example.edu/media/lecture-07.m4a",
+        "kind": "audio",
+        "format": "file",
+        "sizeBytes": 48000000,
+        "sizeEstimated": false,
+        "sources": [
+          "element"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "durationSec": 3000.5,
+        "mime": "audio/mp4"
+      },
+      {
+        "id": "https://lectures.example.edu/hls/a-en/index.m3u8",
+        "url": "https://lectures.example.edu/hls/a-en/index.m3u8",
+        "kind": "audio",
+        "format": "hls",
+        "sizeBytes": -1,
+        "sizeEstimated": false,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "durationSec": 10,
+        "variants": [
+          {
+            "url": "https://lectures.example.edu/hls/a-en/index.m3u8",
+            "groupId": "aac"
+          }
+        ],
+        "name": "Xxxxxxx",
+        "language": "en"
+      },
+      {
+        "id": "https://lectures.example.edu/hls/a-yue/index.m3u8",
+        "url": "https://lectures.example.edu/hls/a-yue/index.m3u8",
+        "kind": "audio",
+        "format": "hls",
+        "sizeBytes": -1,
+        "sizeEstimated": false,
+        "sources": [
+          "performance"
+        ],
+        "frameIds": [
+          0
+        ],
+        "protected": false,
+        "durationSec": 10,
+        "variants": [
+          {
+            "url": "https://lectures.example.edu/hls/a-yue/index.m3u8",
+            "groupId": "aac"
+          }
+        ],
+        "name": "Xxxxxxxxx",
+        "language": "yue"
+      }
+    ],
+    "segmentRuns": [],
+    "evidence": {
+      "mse": false,
+      "mediaKeys": false,
+      "mediaKeysOnStream": false,
+      "encrypted": false
+    },
+    "profile": null
+  }
+}

@@ -28,8 +28,20 @@ type estimateCase struct {
 	Output json.RawMessage `json:"output"`
 }
 
+// goldenDefaults are the defaults the golden cases were written for
+// (15 s per audio minute, 180 s overhead, 420 s setup): the cases test
+// the pure functions, their names describe outcomes under these values,
+// so they stay when DefaultEstimateDefaults changes (colab-batch:
+// measured values, TestDefaultEstimateDefaults).
+func goldenDefaults() EstimateDefaults {
+	return EstimateDefaults{
+		SecPerAudioMin: 15, OverheadSec: 180, SetupSec: 420, AuthMarginSec: 600,
+		CUPerHour: map[string]float64{"T4": 2.0, "L4": 5.0, "G4": 12.0, "A100": 13.0, "H100": 20.0},
+	}
+}
+
 func estimateCases() []estimateCase {
-	d := DefaultEstimateDefaults()
+	d := goldenDefaults()
 	base := DispatchInput{WindowSec: FairWindow.Seconds(), Defaults: d, Paid: true, BalanceKnown: true, BalanceCU: 100,
 		CUPerHour: 2, AuthRemainingSec: -1}
 	with := func(f func(*DispatchInput)) DispatchInput {
@@ -226,4 +238,26 @@ func boolsEqual(a, b []bool) bool {
 		}
 	}
 	return true
+}
+
+// colab-batch: the defaults are the speeds and rates measured on Colab
+// (colab-prof §9.1), per accelerator.
+func TestDefaultEstimateDefaults(t *testing.T) {
+	d := DefaultEstimateDefaults()
+	for acc, want := range map[string][2]float64{"T4": {4.2, 1.07}, "L4": {3.1, 1.54}, "A100": {2.3, 5.3}, "G4": {1.8, 8.9}} {
+		if got := d.For(acc); got.SecPerAudioMin != want[0] || d.CUPerHour[acc] != want[1] {
+			t.Errorf("%s: %v s per audio minute, %v CU/h; want %v", acc, got.SecPerAudioMin, d.CUPerHour[acc], want)
+		}
+	}
+	// Unknown accelerators take the slowest speed; H100 keeps a high guess of its rate.
+	if got := d.For("H100"); got.SecPerAudioMin != 4.2 || d.CUPerHour["H100"] < 10 {
+		t.Errorf("H100: %+v", got)
+	}
+	if d.OverheadSec != 90 || d.SetupSec != 60 {
+		t.Errorf("overhead %v, setup %v", d.OverheadSec, d.SetupSec)
+	}
+	// A 55-minute lecture on a fresh L4: transcription, overhead and setup.
+	if e := EstimateSec(55*60, Rate{}, d.For("L4"), false); e != 55*3.1+90+60 {
+		t.Errorf("estimate %v", e)
+	}
 }
