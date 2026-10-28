@@ -15,6 +15,19 @@ import (
 
 // sddlOf is the DACL of p in SDDL, without the "automatically inherited"
 // flag (Windows sets it when a DACL is written back; it changes nothing).
+// sddlToken is how SDDL strings name sid: a well-known alias where Windows
+// has one (the built-in Administrator, which CI runners run as, is "LA"),
+// else the SID itself.
+func sddlToken(t *testing.T, sid string) string {
+	t.Helper()
+	sd, err := windows.SecurityDescriptorFromString("D:(A;;FA;;;" + sid + ")")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := sd.String()
+	return strings.TrimSuffix(s[strings.LastIndex(s, ";")+1:], ")")
+}
+
 func sddlOf(t *testing.T, p string) string {
 	t.Helper()
 	sd, err := windows.GetNamedSecurityInfo(p, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
@@ -60,14 +73,14 @@ func TestPrivateDACL(t *testing.T) {
 	if _, err := MkdirPrivate(dir); err != nil {
 		t.Fatal(err)
 	}
-	want := "D:P(A;OICI;FA;;;" + me.String() + ")(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
+	want := "D:P(A;OICI;FA;;;" + sddlToken(t, me.String()) + ")(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
 	if got := sddlOf(t, dir); got != want {
 		t.Fatalf("DACL %s, want %s", got, want)
 	}
 	f := filepath.Join(dir, "lectureflow.db")
 	os.WriteFile(f, []byte("x"), 0o644)
 	got := sddlOf(t, f)
-	if !strings.Contains(got, "(A;ID;FA;;;"+me.String()+")") || strings.Contains(got, ";AU)") || strings.Contains(got, ";BU)") || strings.Contains(got, ";WD)") {
+	if !strings.Contains(got, "(A;ID;FA;;;"+sddlToken(t, me.String())+")") || strings.Contains(got, ";AU)") || strings.Contains(got, ";BU)") || strings.Contains(got, ";WD)") {
 		t.Fatalf("a file inside: %s", got)
 	}
 }

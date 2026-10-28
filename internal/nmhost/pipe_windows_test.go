@@ -46,7 +46,14 @@ func TestPipeSecurityDescriptor(t *testing.T) {
 	}
 	sddl := sd.String()
 	sid, _ := currentUserSID()
-	if !strings.HasPrefix(sddl, "D:P") || strings.Count(sddl, "(A;") != 1 || !strings.Contains(sddl, ";;;"+sid+")") {
+	// SDDL names the built-in Administrator (CI runners) "LA", not by SID
+	ref, err := windows.SecurityDescriptorFromString("D:(A;;FA;;;" + sid + ")")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rs := ref.String()
+	tok := strings.TrimSuffix(rs[strings.LastIndex(rs, ";")+1:], ")")
+	if !strings.HasPrefix(sddl, "D:P") || strings.Count(sddl, "(A;") != 1 || !strings.Contains(sddl, ";;;"+tok+")") {
 		t.Fatalf("pipe DACL %s, want only %s", sddl, sid)
 	}
 }

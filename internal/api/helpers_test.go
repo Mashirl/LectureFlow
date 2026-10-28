@@ -85,6 +85,10 @@ func newEnvWith(t *testing.T, ec envConfig) *env {
 	fake := llmtest.New(t)
 	cfg := config.Default()
 	cfg.DataDir = filepath.Join(dir, "data")
+	// Never the machine's own aria2c: CI runners have one on PATH
+	// (Chocolatey, Homebrew), and the diagnostics would run it. Tests of
+	// the aria2c check set their own.
+	cfg.Aria2c = filepath.Join(dir, "no-aria2c", "aria2c")
 	// as the application creates it (cmd: private from the start; the
 	// system's temporary directory may let other accounts in, which the
 	// data_dir row would report)

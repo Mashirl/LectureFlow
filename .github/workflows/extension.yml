@@ -113,11 +113,34 @@ jobs:
         working-directory: extension
         run: npm run lint:firefox
 
+  # The end-to-end tests check the popup, the in-page buttons and the settings
+  # page in several interface languages, which they choose with Chromium's
+  # --lang. Chromium honours --lang only on Windows (on Linux and macOS the
+  # interface language comes from the environment), so this job runs there,
+  # as the tests do on the maintainer's machine.
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/tools/ms-playwright
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Install (npm ci)
+        id: install
+        working-directory: extension
+        run: npm ci
       - name: Install Playwright's Chromium
         id: browser
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: extension
-        run: npx --no-install playwright install --with-deps chromium
+        run: npx --no-install playwright install chromium
       - name: End-to-end tests (headless Chromium, local test site only)
         if: ${{ !cancelled() && steps.browser.outcome == 'success' }}
         working-directory: extension
